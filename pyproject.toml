@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcm-c-agent"
+version = "0.1.0"
+description = "A semi-autonomous multi-agent research system for MCM Problem C."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+  "langgraph>=0.2.0",
+  "langchain-core>=0.3.0",
+  "langchain-openai>=0.2.0",
+  "streamlit>=1.39.0",
+  "pydantic>=2.8.0",
+  "pydantic-settings>=2.4.0",
+  "python-dotenv>=1.0.1",
+  "sqlalchemy>=2.0.0",
+  "psycopg[binary]>=3.2.0",
+  "pgvector>=0.3.0",
+  "pandas>=2.2.0",
+  "numpy>=1.26.0",
+  "structlog>=24.4.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0", "pytest-cov>=5.0.0", "ruff>=0.6.0", "mypy>=1.11.0"]
+anthropic = ["langchain-anthropic>=0.2.0"]
+science = ["scipy>=1.14.0", "scikit-learn>=1.5.0", "statsmodels>=0.14.0", "matplotlib>=3.9.0"]
+pdf = ["pymupdf>=1.24.0", "pymupdf4llm>=0.0.10"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["core", "llm", "agents", "schemas", "database"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
