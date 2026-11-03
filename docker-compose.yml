@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: mcm-c-agent-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mcm_research
+      POSTGRES_USER: mcm
+      POSTGRES_PASSWORD: mcm_dev_password
+    ports: ['5432:5432']
+    volumes: ['postgres_data:/var/lib/postgresql/data', './docker/init-db.sql:/docker-entrypoint-initdb.d/001-init.sql:ro']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mcm -d mcm_research']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  postgres_data:
