@@ -14,6 +14,7 @@ class ColumnProfile(BaseModel):
     top_values: list[dict[str, Any]] | None = None
     datetime_min: str | None = None
     datetime_max: str | None = None
+    unit: str | None = None
 
 class DatasetMetadata(BaseModel):
     file_name: str
@@ -25,6 +26,12 @@ class DatasetMetadata(BaseModel):
     column_count: int
     duplicate_row_count: int
     columns: list[ColumnProfile]
+    data_source: str | None = None
+    temporal_frequency: str | None = None
+    inferred_frequency: str | None = None
+    period_start: str | None = None
+    period_end: str | None = None
+    column_units: dict[str, str] = Field(default_factory=dict)
 
 class EDAReport(BaseModel):
     report_version: str = "1.0"
