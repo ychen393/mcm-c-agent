@@ -1,0 +1,7 @@
+{
+  "missingness.csv": {"rows":6,"columns":5,"missing_by_column":{"record_id":0,"day":0,"temperature_c":1,"rain_mm":1,"rentals":1}},
+  "outliers.csv": {"rows":10,"columns":3,"rentals_min":100,"rentals_max":900,"temperature_min":10,"temperature_max":65},
+  "time_trend.csv": {"rows":10,"columns":2,"rentals_min":100,"rentals_max":127,"rentals_mean":1126/10,"date_unique":10},
+  "categorical.csv": {"rows":9,"columns":4,"weather_categories":3,"day_type_categories":2},
+  "joins": {"left_rows":6,"right_rows":3,"expected_join_rows":6,"unmatched_station_ids":0}
+}
