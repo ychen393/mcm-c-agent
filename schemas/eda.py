@@ -34,7 +34,7 @@ class DatasetMetadata(BaseModel):
     column_units: dict[str, str] = Field(default_factory=dict)
 
 class EDAReport(BaseModel):
-    report_version: str = "1.0"
+    report_version: str = "1.1"
     project_id: str
     dataset: DatasetMetadata
     numeric_correlations: dict[str, dict[str, float | None]] = Field(default_factory=dict)
