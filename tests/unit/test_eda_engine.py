@@ -45,3 +45,6 @@ def test_artifacts_are_saved_with_hash_based_directory(tmp_path):
     assert (tmp_path / "demo-project" / "eda" / dataset.sha256[:12] / "eda_report.json").exists()
     assert (tmp_path / "demo-project" / "eda" / dataset.sha256[:12] / "eda_report.md").exists()
     assert len(artifacts["chart_paths"]) == 2
+    import json
+    saved_report = json.loads((tmp_path / "demo-project" / "eda" / dataset.sha256[:12] / "eda_report.json").read_text(encoding="utf-8"))
+    assert saved_report["chart_paths"] == artifacts["chart_paths"]
