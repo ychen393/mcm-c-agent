@@ -1,0 +1,8 @@
+{
+  "version": "0.1",
+  "cases": [
+    {"case_id":"REC-001","failure":"application_process_terminated_after_node_commit","expected":"resume_from_latest_checkpoint","duplicate_side_effects":0},
+    {"case_id":"REC-002","failure":"llm_provider_timeout_during_node","expected":"retry_or_resume_without_losing_prior_state","duplicate_side_effects":0},
+    {"case_id":"REC-003","failure":"tool_exception_after_artifact_write","expected":"reconcile_artifact_by_idempotency_key_and_hash","duplicate_side_effects":0}
+  ]
+}
