@@ -60,7 +60,7 @@ def load_dataset(source: bytes | BinaryIO, file_name: str, *, max_file_size: int
         else:
             frame = pd.read_excel(io.BytesIO(raw), engine="openpyxl")
     except Exception as exc:
-        raise ValueError(f"Could not read {extension.upper()} file: {exc}") from exc
+        raise ValueError(f"Could not read {extension.lstrip('.').upper()} file: {exc}") from exc
     if frame.empty or len(frame.columns) == 0:
         raise ValueError("Dataset contains no rows or columns.")
     if len(frame) > MAX_ROWS:
