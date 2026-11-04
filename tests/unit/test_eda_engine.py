@@ -22,3 +22,26 @@ def test_markdown_report_has_traceability_and_caveats():
     markdown = render_markdown_report(report)
     assert "SHA-256" in markdown
     assert "does not establish causation" in markdown
+
+
+def test_date_column_is_inferred_and_trend_metadata_is_recorded():
+    dataset = load_dataset(
+        b"date,demand\n2026-01-01,10\n2026-01-02,12\n2026-01-03,15\n",
+        "trend.csv",
+    )
+    report = build_eda_report(dataset, "demo")
+    date_profile = next(item for item in report.dataset.columns if item.name == "date")
+    assert date_profile.dtype == "datetime (inferred)"
+    assert date_profile.datetime_min.startswith("2026-01-01")
+    assert report.summary["datetime_columns"] == ["date"]
+
+
+def test_artifacts_are_saved_with_hash_based_directory(tmp_path):
+    from tools.eda_artifacts import save_eda_artifacts
+
+    dataset = load_dataset(b"x,y\n1,2\n2,4\n3,6\n", "sample.csv")
+    report = build_eda_report(dataset, "demo-project")
+    artifacts = save_eda_artifacts(dataset, report, tmp_path)
+    assert (tmp_path / "demo-project" / "eda" / dataset.sha256[:12] / "eda_report.json").exists()
+    assert (tmp_path / "demo-project" / "eda" / dataset.sha256[:12] / "eda_report.md").exists()
+    assert len(artifacts["chart_paths"]) == 2
