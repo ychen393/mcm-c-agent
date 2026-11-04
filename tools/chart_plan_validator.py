@@ -15,9 +15,10 @@ def validate_chart_plan(plan: ChartPlan, frame: pd.DataFrame) -> None:
             if name is not None and name not in frame.columns:
                 raise ValueError(f"Unknown column: {name}")
         if spec.chart_type in ("histogram", "scatter", "box_plot"):
-            col = spec.y if spec.chart_type == "scatter" else spec.x
-            if not pd.api.types.is_numeric_dtype(frame[col]):
-                raise ValueError(f"Numeric column required: {col}")
+            cols = [spec.x, spec.y] if spec.chart_type == "scatter" else [spec.x]
+            for col in cols:
+                if not pd.api.types.is_numeric_dtype(frame[col]):
+                    raise ValueError(f"Numeric column required: {col}")
         if spec.chart_type == "time_series":
             if not pd.api.types.is_numeric_dtype(frame[spec.y]):
                 raise ValueError(f"Numeric column required: {spec.y}")
