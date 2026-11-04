@@ -48,7 +48,7 @@ All automated tests pass and all manual acceptance items are verified by the use
 
 
 ## M1-A Phase A — Chart Plan / Labels / Evidence Metadata (2026-11-04)
-Status: Implemented on feature branch; awaiting full-project CI and manual review.
+Status: Implemented on feature branch; automated CI passed; local manual UI review remains pending.
 
 Scope:
 - Typed ChartSpec and ChartPlan, with required title, figure label, axis labels, caption, analytical question and rationale.
@@ -59,21 +59,21 @@ Scope:
 - Streamlit renders each chart with its caption, figure label, analytical question and metrics; narrative insight is explicitly marked pending Phase C.
 
 Phase A acceptance:
-- [ ] ChartSpec rejects invalid or empty required labels.
-- [ ] Validator rejects unknown fields and unsupported field/chart combinations.
-- [ ] Duplicate chart IDs and labels are rejected.
-- [ ] All generated figures save under dataset-hash-scoped output paths.
-- [ ] Each chart result records source SHA-256, plotted rows, source columns and computed metrics.
-- [ ] Fallback outputs preserve previous tests (two histograms for two numeric columns).
-- [ ] Time series charts retain chronology and report actual first/last values.
-- [ ] Full pytest suite and GitHub Actions complete.
+- [x] ChartSpec rejects invalid or empty required labels.
+- [x] Validator rejects unknown fields and unsupported field/chart combinations.
+- [x] Duplicate chart IDs and labels are rejected.
+- [x] All generated figures save under dataset-hash-scoped output paths.
+- [x] Each chart result records source SHA-256, plotted rows, source columns and computed metrics.
+- [x] Fallback outputs preserve previous tests (two histograms for two numeric columns).
+- [x] Time series charts retain chronology and report actual first/last values.
+- [x] Full pytest suite and GitHub Actions complete (33 tests passed on 2026-11-04).
 - [ ] User reviews label/caption visibility in Streamlit and report downloads.
 
 Limitations: This is Phase A (deterministic). The LLM chart planner (B), evidence-grounded Insight Analyst/Reviewer (C), and expanded presentation/quality evaluation (D) are not implemented. No chart-specific narrative inference is claimed.
 
 
 ## M1-A Phase A Revision — Presentation & Dataset Context (2026-11-04)
-Status: Implemented on feature branch; automated CI pending final revision commit and user re-check.
+Status: Implemented on feature branch; GitHub Actions passed (33 tests); user re-check remains pending.
 
 Changes:
 - Dataset context fields: optional source, user-declared frequency, estimated frequency, detected date range and column-unit mapping.
@@ -93,8 +93,8 @@ Revision acceptance checklist:
 - [ ] Figure number and LaTeX label are visible for every chart.
 - [ ] Chart statistics are displayed as readable metric cards, with raw JSON collapsed.
 - [ ] Markdown and JSON preserve source hash, chart ID, source columns and computed metrics.
-- [ ] New tests for dataset context, frequency estimation, units, chart provenance and Markdown report pass.
-- [ ] Full GitHub Actions test suite passes.
+- [x] New tests for dataset context, frequency estimation, units, chart provenance and Markdown report pass.
+- [x] Full GitHub Actions test suite passes (33 tests).
 - [ ] User re-runs the app and confirms the revised UI.
 
 Important: Source, frequency and units are not guessed from the data. Users may provide them; date range and approximate frequency are inferred from observed date values and labeled accordingly. Phase B/C remain separate milestones.
