@@ -29,7 +29,7 @@ Build vertical slices that each run end-to-end. Do not implement disconnected ag
 - [x] Create 3 workflow recovery scenarios and golden EDA statistics.
 - [x] Create corpus registry template and 2027 competition checklist template.
 - [x] Add automated schema and fixture validation tests.
-- [ ] Run the automated tests locally and attach the test output.
+- [x] Run the automated tests locally; user confirmed pytest completed at 100% and `$LASTEXITCODE` = 0 (2026-11-04).
 - [ ] Complete human review of corpus registry policy and official competition checklist.
 - [ ] Record baseline evaluation report before prompt tuning.
 
