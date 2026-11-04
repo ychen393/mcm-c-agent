@@ -3,6 +3,7 @@ from tools.eda_engine import build_eda_report
 from tools.chart_catalog import fallback_chart_plan
 from tools.chart_executor import execute_chart_plan
 from tools.eda_artifacts import save_eda_artifacts
+import pytest
 
 
 def test_dataset_context_captures_source_period_frequency_and_units():
@@ -61,7 +62,7 @@ def test_chart_metrics_and_provenance_are_retained_in_report(tmp_path):
     trend = next(item for item in artifacts["chart_metadata"] if item["spec"]["chart_type"] == "time_series")
     assert trend["metrics"]["first"] == 10.0
     assert trend["metrics"]["last"] == 11.0
-    assert trend["metrics"]["change_pct"] == 10.0
+    assert trend["metrics"]["change_pct"] == pytest.approx(10.0)
 
 
 def test_markdown_report_exposes_data_context_and_figure_labels(tmp_path):
