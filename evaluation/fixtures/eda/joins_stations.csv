@@ -1,0 +1,4 @@
+station_id,zone,capacity
+S01,north,40
+S02,south,35
+S03,east,50
