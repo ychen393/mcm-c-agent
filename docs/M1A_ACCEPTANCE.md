@@ -45,3 +45,28 @@ Status: Implementation in review. Automated and local execution results must be 
 
 ## Pass condition
 All automated tests pass and all manual acceptance items are verified by the user. Until then, status remains In Review.
+
+
+## M1-A Phase A — Chart Plan / Labels / Evidence Metadata (2026-11-04)
+Status: Implemented on feature branch; awaiting full-project CI and manual review.
+
+Scope:
+- Typed ChartSpec and ChartPlan, with required title, figure label, axis labels, caption, analytical question and rationale.
+- Deterministic fallback Chart Catalog (histogram, time series) to preserve existing M1-A outputs.
+- ChartPlan Validator rejects missing columns, invalid numeric axes, duplicate IDs/labels and insufficient temporal data.
+- Deterministic executor supports histogram, time series, bar, scatter and box plot using an approved ChartSpec; no LLM-generated arbitrary code.
+- JSON/Markdown artifacts include chart plan, provenance, actual computed metrics and image paths.
+- Streamlit renders each chart with its caption, figure label, analytical question and metrics; narrative insight is explicitly marked pending Phase C.
+
+Phase A acceptance:
+- [ ] ChartSpec rejects invalid or empty required labels.
+- [ ] Validator rejects unknown fields and unsupported field/chart combinations.
+- [ ] Duplicate chart IDs and labels are rejected.
+- [ ] All generated figures save under dataset-hash-scoped output paths.
+- [ ] Each chart result records source SHA-256, plotted rows, source columns and computed metrics.
+- [ ] Fallback outputs preserve previous tests (two histograms for two numeric columns).
+- [ ] Time series charts retain chronology and report actual first/last values.
+- [ ] Full pytest suite and GitHub Actions complete.
+- [ ] User reviews label/caption visibility in Streamlit and report downloads.
+
+Limitations: This is Phase A (deterministic). The LLM chart planner (B), evidence-grounded Insight Analyst/Reviewer (C), and expanded presentation/quality evaluation (D) are not implemented. No chart-specific narrative inference is claimed.
