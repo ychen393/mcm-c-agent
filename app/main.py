@@ -50,12 +50,48 @@ if uploaded_file is not None:
         st.success(f"Loaded {dataset.file_name}: {len(dataset.frame):,} rows × {len(dataset.frame.columns)} columns")
         st.dataframe(dataset.frame.head(20), use_container_width=True)
         st.caption(f"SHA-256: {dataset.sha256}")
+        with st.expander("Dataset context (optional)", expanded=False):
+            data_source = st.text_input("Data source", placeholder="e.g., World Bank / Kaggle / official competition dataset", key="eda_data_source")
+            frequency_choice = st.selectbox(
+                "Data frequency",
+                ["Not specified — estimate from dates", "Daily", "Weekly", "Monthly", "Quarterly", "Annual", "Irregular"],
+                key="eda_frequency",
+            )
+            units_text = st.text_area(
+                "Column units (one per line: column_name = unit)",
+                placeholder="USD (PM) = USD per metric tonne\nDate = YYYY-MM-DD",
+                key="eda_column_units",
+                height=80,
+            )
         if st.button("Run EDA", type="primary"):
-            report = build_eda_report(dataset, project_id)
-            artifacts = save_eda_artifacts(dataset, report, settings.output_dir)
-            st.session_state["eda_report"] = report.model_dump(mode="json")
-            st.session_state["eda_artifacts"] = artifacts
-            st.success("EDA completed. Reports and charts have been saved.")
+            column_units = {}
+            invalid_unit_lines = []
+            for line in units_text.splitlines():
+                if not line.strip():
+                    continue
+                if "=" not in line:
+                    invalid_unit_lines.append(line)
+                    continue
+                column_name, unit = line.split("=", 1)
+                if not column_name.strip() or not unit.strip():
+                    invalid_unit_lines.append(line)
+                else:
+                    column_units[column_name.strip()] = unit.strip()
+            unknown_unit_columns = sorted(set(column_units) - set(dataset.frame.columns.astype(str)))
+            if invalid_unit_lines:
+                st.error("Invalid unit mapping. Use one 'column_name = unit' entry per line.")
+            elif unknown_unit_columns:
+                st.error(f"Unit mappings reference unknown columns: {', '.join(unknown_unit_columns)}")
+            else:
+                frequency_value = None if frequency_choice.startswith("Not specified") else frequency_choice
+                report = build_eda_report(
+                    dataset, project_id, data_source=data_source,
+                    temporal_frequency=frequency_value, column_units=column_units,
+                )
+                artifacts = save_eda_artifacts(dataset, report, settings.output_dir)
+                st.session_state["eda_report"] = report.model_dump(mode="json")
+                st.session_state["eda_artifacts"] = artifacts
+                st.success("EDA completed. Reports and charts have been saved.")
     except ValueError as exc:
         st.error(str(exc))
     except Exception as exc:
@@ -90,18 +126,51 @@ if "eda_report" in st.session_state:
         st.subheader("Data Quality Warnings")
         for warning in report_data["warnings"]:
             st.warning(warning)
+    dataset_meta = report_data["dataset"]
+    st.subheader("Dataset Context")
+    context_cols = st.columns(4)
+    context_cols[0].metric("Data period", "Available" if dataset_meta.get("period_start") else "Not detected")
+    context_cols[1].metric("Frequency", dataset_meta.get("temporal_frequency") or "Not specified")
+    context_cols[2].metric("Estimated frequency", "Available" if dataset_meta.get("inferred_frequency") else "N/A")
+    context_cols[3].metric("Data source", "Provided" if dataset_meta.get("data_source") else "Not provided")
+    st.caption(f"Period: {dataset_meta.get('period_start') or 'N/A'} → {dataset_meta.get('period_end') or 'N/A'}")
+    if dataset_meta.get("inferred_frequency"):
+        st.caption(f"Frequency estimate: {dataset_meta['inferred_frequency']}")
+    if dataset_meta.get("data_source"):
+        st.caption(f"Source: {dataset_meta['data_source']}")
+    if dataset_meta.get("column_units"):
+        st.dataframe(
+            [{"Column": name, "Unit": unit} for name, unit in dataset_meta["column_units"].items()],
+            hide_index=True, use_container_width=True,
+        )
     if artifacts["chart_paths"]:
         st.subheader("EDA Charts & Evidence")
-        for chart_path in artifacts["chart_paths"]:
+        metric_labels = {
+            "count": "Observations", "median": "Median", "min": "Minimum", "max": "Maximum",
+            "mean": "Mean", "first": "First value", "last": "Last value",
+            "change": "Absolute change", "change_pct": "Change (%)",
+        }
+        for chart_index, chart_path in enumerate(artifacts["chart_paths"], start=1):
             meta = next((m for m in report_data.get("chart_metadata", []) if m["path"] == chart_path), None)
             if meta:
                 spec = meta["spec"]
-                st.markdown(f"**{spec['figure_label']} — {spec['title']}**")
+                st.markdown(f"### Figure {chart_index:02d} · {spec['title']}")
+                st.caption(f"LaTeX reference: \\label{{{spec['figure_label']}}}")
                 st.image(chart_path, caption=spec["caption"], use_container_width=True)
+                st.markdown(f"**Figure ID:** {spec['figure_label']}")
                 st.markdown(f"**Analytical question:** {spec['analytical_question']}")
-                st.caption(f"Axes: {spec['x_label']} / {spec['y_label']} | Plotted rows: {meta['plotted_rows']}")
-                st.json(meta["metrics"])
-                st.info("Insight: evidence-grounded narrative is planned for Phase C.")
+                st.caption(f"Axes: {spec['x_label']} / {spec['y_label']} · Plotted rows: {meta['plotted_rows']}")
+                selected_metrics = [(metric_labels.get(k, k), v) for k, v in meta["metrics"].items()
+                                    if k in metric_labels and v is not None]
+                if selected_metrics:
+                    metric_cols = st.columns(min(4, len(selected_metrics)))
+                    for metric_index, (label, value) in enumerate(selected_metrics[:4]):
+                        display_value = f"{value:,.2f}" if isinstance(value, float) else f"{value:,}" if isinstance(value, int) else str(value)
+                        metric_cols[metric_index % len(metric_cols)].metric(label, display_value)
+                st.caption(f"Source columns: {', '.join(meta.get('source_columns', [spec['x']]))} · Dataset SHA-256: {meta['source_sha256'][:12]}…")
+                with st.expander("Technical metrics (JSON)"):
+                    st.json(meta["metrics"])
+                st.info("Insight generation is not part of Phase A. Evidence-grounded Observation / Finding / Insight will be added in Phase C.")
             else:
                 st.image(chart_path, caption=chart_path.split("/")[-1], use_container_width=True)
     with open(artifacts["report_markdown_path"], "rb") as report_file:
