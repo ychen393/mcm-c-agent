@@ -70,3 +70,31 @@ Phase A acceptance:
 - [ ] User reviews label/caption visibility in Streamlit and report downloads.
 
 Limitations: This is Phase A (deterministic). The LLM chart planner (B), evidence-grounded Insight Analyst/Reviewer (C), and expanded presentation/quality evaluation (D) are not implemented. No chart-specific narrative inference is claimed.
+
+
+## M1-A Phase A Revision — Presentation & Dataset Context (2026-11-04)
+Status: Implemented on feature branch; automated CI pending final revision commit and user re-check.
+
+Changes:
+- Dataset context fields: optional source, user-declared frequency, estimated frequency, detected date range and column-unit mapping.
+- Frequency estimation is explicitly labeled as an estimate and based on median gaps between unique dates; it must not be represented as confirmed source metadata.
+- Unit mapping is user-provided in the format `column_name = unit`; unknown column names and malformed lines are rejected in the UI.
+- Unit metadata is attached to column profiles and used in chart axis labels where applicable.
+- Chart cards display visible Figure numbering, LaTeX figure label, caption, analytical question, axes, source columns and dataset hash.
+- Key chart statistics are shown as metric cards; raw metrics JSON is moved into a technical-details expander.
+- Markdown and JSON exports include data context, unit metadata, chart provenance and a clear Phase A statement that narrative Insights are not yet generated.
+
+Revision acceptance checklist:
+- [ ] User can optionally enter data source, frequency and per-column units.
+- [ ] Date range is detected and displayed where a valid date column exists.
+- [ ] Estimated frequency is explicitly identified as an estimate.
+- [ ] Invalid unit mappings and unknown column names produce clear errors.
+- [ ] Unit appears in column profile and relevant chart axis label.
+- [ ] Figure number and LaTeX label are visible for every chart.
+- [ ] Chart statistics are displayed as readable metric cards, with raw JSON collapsed.
+- [ ] Markdown and JSON preserve source hash, chart ID, source columns and computed metrics.
+- [ ] New tests for dataset context, frequency estimation, units, chart provenance and Markdown report pass.
+- [ ] Full GitHub Actions test suite passes.
+- [ ] User re-runs the app and confirms the revised UI.
+
+Important: Source, frequency and units are not guessed from the data. Users may provide them; date range and approximate frequency are inferred from observed date values and labeled accordingly. Phase B/C remain separate milestones.
