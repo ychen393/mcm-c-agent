@@ -2,7 +2,7 @@
 
 A semi-autonomous multi-agent research workspace for exploring MCM Problem C. The system is designed to support evidence-based problem decomposition, data analysis, modeling, validation, and LaTeX paper preparation.
 
-> **Status:** M0 Project Foundation — scaffold pushed; local runtime and external integrations still require verification.
+> **Status:** M0.5 Evaluation baseline passed locally; M1-A Data-to-EDA implementation is in review on `feature/m1a-data-eda`.
 
 ## Product principles
 
@@ -69,7 +69,7 @@ streamlit run app/main.py
 - Streamlit project foundation
 - Unit tests for core contracts
 
-Not yet implemented: paper ingestion/RAG, full EDA agents, sandboxed Python execution, model validation, LaTeX generation, and reviewer loops.
+M1-A in review: deterministic CSV/XLSX loading, dataset profiling, descriptive statistics, quality warnings, correlations, trend/distribution charts, and JSON/Markdown artifacts. Not yet implemented: paper ingestion/RAG, sandboxed Python execution, model validation, LaTeX generation, and reviewer loops.
 
 See [Project Structure](docs/PROJECT_STRUCTURE.md), [Development Plan](docs/DEVELOPMENT_PLAN.md), and [M0 Acceptance](docs/M0_ACCEPTANCE.md).
 
