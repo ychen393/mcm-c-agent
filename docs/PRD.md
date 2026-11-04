@@ -902,3 +902,41 @@ PD-05：引入垂直切片交付和建模质量策略。已批准。
 v1.1 Approved — 2026-11-04
 - 新增可执行验收标准、评估集方案、垂直切片路线、版权与 2027 竞赛合规 Gate、Checkpoint/Sandbox 技术决策建议、建模质量策略。
 - 用户于 2026-11-04 批准五项变更；本版本成为正式 PRD v1.1 基线。
+
+
+## 32. PRD v1.2 — Visual EDA & Chart Intelligence (Approved 2026-11-04)
+
+**Decision:** User approved the proposed Visual EDA Agent architecture on 2026-11-04. This section is the approved v1.2 product direction, not evidence that every phase is implemented.
+
+### 32.1 User value
+Given a dataset and MCM C problem statement, choose charts for their analytical purpose rather than generating histograms for every numeric column. Each chart must include clear labels, a figure reference, caption, the question it answers, data-supported findings, insights, limitations, and next-step implications.
+
+### 32.2 Architecture
+Dataset Loader → Deterministic EDA Profiler → Visual EDA Agent (chart planner) → Chart Plan Validator → Python Chart Executor → Insight Analyst → EDA Reviewer → EDA Report.
+
+LLM plans and interprets; Python computes actual values and renders charts. Do not run arbitrary LLM-authored Python as part of chart planning. Any quantitative claims must be supported by actual computed metrics and provenance. No invented data, figures or causal inferences.
+
+### 32.3 ChartSpec contract
+A chart specification includes: chart_id, chart_type, title, figure_label (LaTeX-compatible identifier), x/y source columns, axis labels and optional units, legend, caption, analytical_question, rationale, priority, caveats, transform and aggregation where supported. Execution results include plotted row counts, dataset hash, input fields, chart path and computed metrics.
+
+Insight objects (Phase C) must distinguish observation, numeric finding, research insight, limitation, next step and evidence_refs. Insights are not valid without data evidence.
+
+### 32.4 Chart selection
+Support common table, categorical, time-series, comparative and domain-specific charts through a typed catalog. Financial return, volatility, drawdown and normalized asset comparisons are optional specialized capabilities, not universal defaults. The planner must select charts with clear value, reject redundant/unsuitable charts, and explain when a chart should not be generated.
+
+When the problem statement is absent or the LLM is unavailable, deterministic fallback EDA must still work and be labeled as generic rather than problem-aware analysis.
+
+### 32.5 Chart presentation and paper reuse
+UI and exported Markdown/JSON must bind a plot to its Figure Label, title, axes with units, caption, analytical question, actual metrics and later Insight. LaTeX paper generation will reuse the figure label, image path, caption and evidence references. Full label coverage and zero unsupported quantitative findings are release requirements.
+
+### 32.6 Phased implementation
+- **Phase A (first):** structured ChartSpec, Chart Catalog, validator, deterministic Python executor, labels, computed metrics and provenance. Preserve legacy chart output as fallback.
+- **Phase B:** connect Visual EDA Agent through existing Multi-LLM Adapter; plan and rank charts using the question and dataset profile.
+- **Phase C:** connect Insight Analyst and Reviewer to produce and verify evidence-grounded findings, insights, limitations and proposed follow-up analysis.
+- **Phase D:** refine Streamlit report cards, LaTeX export hooks and evaluation cases for relevance, nonredundancy, grounding and reproducibility.
+
+### 32.7 Progress
+Phase A code authored on `feature/m1a-data-eda` on 2026-11-04; isolated local chart-runtime tests passed (4/4). Whole-project CI, Streamlit UX acceptance and the user's approval remain pending. Phases B–D have not been implemented.
+
+### 32.8 Change log
+v1.2 Approved — 2026-11-04: user confirmed Visual EDA Agent + image labels + evidence-grounded findings/insights architecture; implementation gated by phased review.
