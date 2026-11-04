@@ -37,6 +37,33 @@ def save_eda_artifacts(dataset: LoadedDataset, report: EDAReport, output_root: P
         fig.savefig(chart_path, dpi=130)
         plt.close(fig)
         chart_paths.append(str(chart_path))
+
+    date_columns = [
+        item.name for item in report.dataset.columns if item.datetime_min is not None
+    ]
+    trend_count = 0
+    for date_column in date_columns:
+        dates = pd.to_datetime(dataset.frame[date_column], errors="coerce")
+        for value_column in numeric_columns:
+            paired = pd.DataFrame({"date": dates, "value": pd.to_numeric(dataset.frame[value_column], errors="coerce")}).dropna()
+            if len(paired) < 3:
+                continue
+            paired = paired.sort_values("date")
+            fig, ax = plt.subplots(figsize=(7, 4))
+            ax.plot(paired["date"], paired["value"], marker="o", linewidth=1.5)
+            ax.set(title=f"Trend: {value_column} over {date_column}", xlabel=date_column, ylabel=value_column)
+            fig.autofmt_xdate()
+            fig.tight_layout()
+            chart_path = project_dir / f"trend_{_safe_stem(str(value_column))}_by_{_safe_stem(date_column)}.png"
+            fig.savefig(chart_path, dpi=130)
+            plt.close(fig)
+            chart_paths.append(str(chart_path))
+            trend_count += 1
+            if trend_count >= 3:
+                break
+        if trend_count >= 3:
+            break
+
     return {"dataset_path": str(dataset_path), "report_json_path": str(report_path),
             "report_markdown_path": str(markdown_path), "chart_paths": chart_paths}
 
