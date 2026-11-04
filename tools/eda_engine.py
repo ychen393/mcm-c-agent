@@ -56,7 +56,7 @@ def build_eda_report(dataset: LoadedDataset, project_id: str) -> EDAReport:
             token in str(column).lower() for token in ("date", "time", "timestamp")
         ):
             values = pd.to_datetime(series, errors="coerce").dropna()
-            if not values.empty and len(values) / max(len(non_null), 1) >= 0.8:
+            if not values.empty and len(values) / max(int(series.notna().sum()), 1) >= 0.8:
                 profile.dtype = "datetime (inferred)"
                 profile.datetime_min, profile.datetime_max = values.min().isoformat(), values.max().isoformat()
             else:
