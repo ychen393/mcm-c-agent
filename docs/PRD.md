@@ -940,3 +940,40 @@ Phase A code authored on `feature/m1a-data-eda` on 2026-11-04; isolated local ch
 
 ### 32.8 Change log
 v1.2 Approved — 2026-11-04: user confirmed Visual EDA Agent + image labels + evidence-grounded findings/insights architecture; implementation gated by phased review.
+
+
+## 33. PRD v1.3 — Phase A Presentation & Dataset Context Revision (Approved 2026-11-04)
+
+The user approved this revision after reviewing the first generated charts.
+
+### 33.1 Dataset context
+- Optional user-entered data source.
+- User-declared temporal frequency, kept separate from estimated frequency.
+- Date range inferred from valid date-like columns.
+- Explicit per-column units; units are never guessed from column names.
+- Unit mappings validated against uploaded column names.
+- Source, declared frequency, estimated frequency, date range and units saved in JSON and Markdown.
+
+### 33.2 Chart presentation
+- Every chart displays sequential Figure numbering and a stable LaTeX figure label.
+- Display title, caption, analytical question, axis labels/units, source columns and dataset hash.
+- Key metrics are rendered as cards; raw JSON is placed in an expandable technical-details section.
+- Chart metadata includes source columns, plotted row count, dataset SHA-256, chart spec version and generation timestamp.
+- User-provided units are applied to relevant axis labels.
+
+### 33.3 Evidence boundaries
+- Python computes all numeric metrics from plotted observations.
+- Estimated frequency is explicitly labeled as an estimate.
+- Source, units and declared frequency are user-provided, not inferred.
+- Phase A does not generate narrative Insights; this is clearly stated in the UI and exports.
+- Insight Analyst and evidence Reviewer remain Phase C scope.
+
+### 33.4 Implementation status
+- Implemented on `feature/m1a-data-eda`: metadata schema, date-range/frequency estimation, user-entered source/frequency/units, unit-aware chart labels, metric-card UI, JSON expander and Markdown provenance.
+- Added tests for metadata, units, frequency estimation, chart provenance and report exports.
+- An intermediate CI run found a floating-point exact-equality assertion in a new test; it was changed to use numeric tolerance. Final CI for the latest commit remains to be verified.
+- User must re-run Streamlit for final visual acceptance.
+- No merge to `main` has been performed.
+
+### 33.5 Change log
+v1.3 Approved — 2026-11-04: Phase A presentation, dataset context, explicit units, provenance and test coverage revision.
