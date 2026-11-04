@@ -82,8 +82,8 @@ def render_markdown_report(report: EDAReport) -> str:
         "",
         "## Column profile",
         "",
-        "| Column | Type | Missing | Unique | Numeric summary / Top values |",
-        "|---|---|---:|---:|---|",
+        "| Column | Type | Unit | Missing | Unique | Numeric summary / Top values |",
+        "|---|---|---|---:|---:|---|",
     ]
     for column in data.columns:
         if column.numeric_summary is not None:
@@ -95,7 +95,7 @@ def render_markdown_report(report: EDAReport) -> str:
             )
         detail = detail.replace("|", "\\\\|")
         lines.append(
-            f"| {column.name} | {column.dtype} | {column.missing_count} "
+            f"| {column.name} | {column.dtype} | {column.unit or 'Not provided'} | {column.missing_count} "
             f"({column.missing_rate:.1%}) | {column.unique_count} | {detail} |"
         )
 
