@@ -16,11 +16,15 @@ Status legend: Not Run / Pass / Fail / Blocked. Do not mark a test Pass without 
 - [ ] T12: evaluation case schema and deterministic fixture layout are created.
 - [ ] T13: ADR-001 is reviewed and implementation spike tasks are scheduled.
 - [ ] T14: secret scanning confirms no real API keys or credentials are committed.
-- [ ] T15: 15 task cases validate against the JSON Schema and split counts are 8/4/3.
-- [ ] T16: 10 citation-policy cases and 3 recovery scenarios parse and have unique IDs.
-- [ ] T17: 5 deterministic EDA fixtures match golden row/column/missingness/range/category/join expectations.
+- [x] T15: 15 task cases validate against the JSON Schema and split counts are 8/4/3.
+- [x] T16: 10 citation-policy cases and 3 recovery scenarios parse and have unique IDs.
+- [x] T17: 5 deterministic EDA fixtures match golden row/column/missingness/range/category/join expectations.
 - [ ] T18: competition compliance checklist and corpus registry template are reviewed and populated before corpus ingestion.
-- [ ] T19: `pytest tests/evaluation -q` passes locally; attach test output and environment details.
+- [x] T19: `pytest tests/evaluation -q` passes locally; attach test output and environment details.
+
+## Execution record — 2026-11-04
+- User ran `pytest tests/evaluation -q` locally; terminal displayed `[100%]` and user confirmed `$LASTEXITCODE` returned `0`.
+- T15–T17 and T19 are marked Pass based on this user-reported local execution. Screenshot/terminal confirmation is the evidence; detailed per-test counts were not printed in the captured terminal output.
 
 ## Reliability design gates
 - Persistent LangGraph PostgreSQL checkpointing is not yet active in the M0 scaffold.
