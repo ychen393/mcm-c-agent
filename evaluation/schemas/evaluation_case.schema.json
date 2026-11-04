@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/mcm-c-agent/evaluation_case.schema.json",
+  "title": "MCM C Agent Evaluation Case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "suite", "split", "task_type", "difficulty", "input", "reference_checklist", "rubric", "critical_errors", "expected_output_schema", "provenance"],
+  "properties": {
+    "case_id": {"type": "string", "pattern": "^[A-Z0-9_-]+$"},
+    "suite": {"type": "string", "enum": ["task", "eda", "citation", "recovery", "compliance"]},
+    "split": {"type": "string", "enum": ["dev", "holdout", "regression"]},
+    "task_type": {"type": "string", "minLength": 2},
+    "difficulty": {"type": "string", "enum": ["easy", "medium", "hard"]},
+    "input": {"type": "object"},
+    "reference_checklist": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "rubric": {
+      "type": "object",
+      "required": ["task_coverage", "evidence_grounding", "mathematical_soundness", "reproducibility", "communication", "competition_compliance"],
+      "properties": {
+        "task_coverage": {"$ref": "#/$defs/rubricDimension"},
+        "evidence_grounding": {"$ref": "#/$defs/rubricDimension"},
+        "mathematical_soundness": {"$ref": "#/$defs/rubricDimension"},
+        "reproducibility": {"$ref": "#/$defs/rubricDimension"},
+        "communication": {"$ref": "#/$defs/rubricDimension"},
+        "competition_compliance": {"$ref": "#/$defs/rubricDimension"}
+      },
+      "additionalProperties": false
+    },
+    "critical_errors": {"type": "array", "items": {"type": "string"}},
+    "expected_output_schema": {"type": "string", "minLength": 1},
+    "provenance": {
+      "type": "object",
+      "required": ["content_origin", "license_status"],
+      "properties": {
+        "content_origin": {"type": "string"},
+        "license_status": {"type": "string", "enum": ["original_synthetic", "open_license", "authorized", "metadata_link_only", "pending_review"]},
+        "source_id": {"type": ["string", "null"]},
+        "source_url": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "fixture_refs": {"type": "array", "items": {"type": "string"}},
+    "tags": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "rubricDimension": {
+      "type": "object",
+      "required": ["weight", "scoring_guide"],
+      "properties": {
+        "weight": {"type": "number", "minimum": 0, "maximum": 1},
+        "scoring_guide": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+  }
+}
