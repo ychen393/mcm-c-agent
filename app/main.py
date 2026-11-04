@@ -91,9 +91,19 @@ if "eda_report" in st.session_state:
         for warning in report_data["warnings"]:
             st.warning(warning)
     if artifacts["chart_paths"]:
-        st.subheader("Numeric Distributions")
+        st.subheader("EDA Charts & Evidence")
         for chart_path in artifacts["chart_paths"]:
-            st.image(chart_path, caption=chart_path.split("/")[-1], use_container_width=True)
+            meta = next((m for m in report_data.get("chart_metadata", []) if m["path"] == chart_path), None)
+            if meta:
+                spec = meta["spec"]
+                st.markdown(f"**{spec['figure_label']} — {spec['title']}**")
+                st.image(chart_path, caption=spec["caption"], use_container_width=True)
+                st.markdown(f"**Analytical question:** {spec['analytical_question']}")
+                st.caption(f"Axes: {spec['x_label']} / {spec['y_label']} | Plotted rows: {meta['plotted_rows']}")
+                st.json(meta["metrics"])
+                st.info("Insight: evidence-grounded narrative is planned for Phase C.")
+            else:
+                st.image(chart_path, caption=chart_path.split("/")[-1], use_container_width=True)
     with open(artifacts["report_markdown_path"], "rb") as report_file:
         st.download_button(
             "Download EDA Markdown Report",
