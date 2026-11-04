@@ -2,7 +2,7 @@ MCM C AGENT
 
 产品需求文档（PRD）
 
-版本：v1.0 | 状态：Baseline / M0 开发基线 | 日期：2026-11-03
+版本：v1.1 | 状态：Approved Baseline | 日期：2026-11-04
 
 文档用途
 
@@ -604,7 +604,7 @@ v1.0 — 2026-11-03
 
 ==============================
 PRD v1.1 CHANGE PROPOSAL
-状态：Proposed Change Set — 待用户审核批准
+状态：Approved Change Set — 已获用户批准
 提案日期：2026-11-04
 本提案不覆盖 v1.0 已批准基线；用户批准后，合并为 PRD v1.1 正式基线。
 ==============================
@@ -892,13 +892,13 @@ Debate 不能以 Agent 数量、发言轮数或输出长度作为质量指标。
 
 26. PRD v1.1 Proposed Decision Log
 
-PD-01：断点续跑由 P1 提升至 P0。建议批准。
-PD-02：M1/M2 前建立固定 Dev/Holdout/Regression 评估集。建议批准。
-PD-03：M1 批量知识库摄取必须经过版权与竞赛合规 Gate。建议批准。
-PD-04：M2 前冻结 PostgreSQL Checkpointer + rootless Docker Sandbox ADR。建议批准。
-PD-05：引入垂直切片交付和建模质量策略。建议批准。
+PD-01：断点续跑由 P1 提升至 P0。已批准。
+PD-02：M1/M2 前建立固定 Dev/Holdout/Regression 评估集。已批准。
+PD-03：M1 批量知识库摄取必须经过版权与竞赛合规 Gate。已批准。
+PD-04：M2 前冻结 PostgreSQL Checkpointer + Docker Sandbox ADR。已批准；rootless 优先在支持的 Linux 环境验证。
+PD-05：引入垂直切片交付和建模质量策略。已批准。
 
 版本记录补充：
-v1.1 Proposed — 2026-11-04
+v1.1 Approved — 2026-11-04
 - 新增可执行验收标准、评估集方案、垂直切片路线、版权与 2027 竞赛合规 Gate、Checkpoint/Sandbox 技术决策建议、建模质量策略。
-- 本提案尚待用户审核；批准后将状态更新为正式 PRD v1.1。
+- 用户于 2026-11-04 批准五项变更；本版本成为正式 PRD v1.1 基线。
