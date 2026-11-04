@@ -28,3 +28,13 @@ def test_load_xlsx():
     pd.DataFrame({"id": [1, 2], "value": [3.5, 4.5]}).to_excel(raw_buffer, index=False, engine="openpyxl")
     loaded = load_dataset(raw_buffer.getvalue(), "sample.xlsx")
     assert loaded.frame.shape == (2, 2)
+
+
+def test_reject_blank_headers():
+    with pytest.raises(ValueError, match="Column names must not be blank"):
+        load_dataset(b",value\n1,2\n", "blank_header.csv")
+
+
+def test_reject_corrupt_csv():
+    with pytest.raises(ValueError, match="Could not read CSV"):
+        load_dataset(b"not,a,valid\n1,2\n", "corrupt.csv")
