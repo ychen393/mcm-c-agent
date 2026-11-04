@@ -22,7 +22,9 @@ def execute_chart_plan(plan: ChartPlan, frame: pd.DataFrame, output: Path, sha25
                 else:
                     ax.boxplot(s)
                 n = len(s)
-                metrics = {"count": n, "min": float(s.min()), "max": float(s.max()), "median": float(s.median())}
+                metrics = {"count": n, "min": float(s.min()), "max": float(s.max()),
+                    "median": float(s.median()), "mean": float(s.mean()),
+                    "std": float(s.std()) if n > 1 else 0.0}
             elif spec.chart_type == "time_series":
                 data = pd.DataFrame({"date": pd.to_datetime(frame[spec.x], errors="coerce"),
                     "value": pd.to_numeric(frame[spec.y], errors="coerce")}).dropna().sort_values("date")
@@ -31,8 +33,12 @@ def execute_chart_plan(plan: ChartPlan, frame: pd.DataFrame, output: Path, sha25
                 ax.plot(data["date"], data["value"], linewidth=1.5, label=spec.legend[0] if spec.legend else None)
                 fig.autofmt_xdate()
                 n = len(data)
-                metrics = {"count": n, "first": float(data["value"].iloc[0]), "last": float(data["value"].iloc[-1]),
-                    "min": float(data["value"].min()), "max": float(data["value"].max())}
+                first, last = float(data["value"].iloc[0]), float(data["value"].iloc[-1])
+                metrics = {"count": n, "first": first, "last": last,
+                    "change": last - first,
+                    "change_pct": ((last / first) - 1) * 100 if first != 0 else None,
+                    "min": float(data["value"].min()), "max": float(data["value"].max()),
+                    "median": float(data["value"].median()), "mean": float(data["value"].mean())}
             elif spec.chart_type == "bar":
                 counts = frame[spec.x].dropna().astype(str).value_counts().head(15)
                 ax.bar(counts.index, counts.values)
@@ -47,14 +53,16 @@ def execute_chart_plan(plan: ChartPlan, frame: pd.DataFrame, output: Path, sha25
             else:
                 raise ValueError(f"Unsupported chart type: {spec.chart_type}")
             ax.set(title=spec.title,
-                xlabel=spec.x_label + (f" ({spec.x_unit})" if spec.x_unit else ""),
-                ylabel=spec.y_label + (f" ({spec.y_unit})" if spec.y_unit else ""))
+                xlabel=spec.x_label + (f" ({spec.x_unit})" if spec.x_unit and f"({spec.x_unit})" not in spec.x_label else ""),
+                ylabel=spec.y_label + (f" ({spec.y_unit})" if spec.y_unit and f"({spec.y_unit})" not in spec.y_label else ""))
             if spec.legend and spec.chart_type == "time_series": ax.legend()
             fig.tight_layout()
             path = output / f"{spec.chart_id}.png"
             fig.savefig(path, dpi=150)
+            source_columns = [spec.x] + ([spec.y] if spec.y and spec.y != spec.x else [])
             results.append(ChartResult(chart_id=spec.chart_id, figure_label=spec.figure_label,
-                path=str(path), source_sha256=sha256, spec=spec, plotted_rows=n, metrics=metrics))
+                path=str(path), source_sha256=sha256, spec=spec, plotted_rows=n,
+                metrics=metrics, source_columns=source_columns))
         finally:
             plt.close(fig)
     return results
