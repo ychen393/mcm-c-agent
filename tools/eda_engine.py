@@ -52,10 +52,16 @@ def build_eda_report(dataset: LoadedDataset, project_id: str) -> EDAReport:
             profile.numeric_summary, profile.outlier_count_iqr = summary, outlier_count
             if outlier_count:
                 warnings.append(f"Column '{column}' has {outlier_count} IQR-flagged values; this is a review signal, not proof of bad data.")
-        elif pd.api.types.is_datetime64_any_dtype(series):
+        elif pd.api.types.is_datetime64_any_dtype(series) or any(
+            token in str(column).lower() for token in ("date", "time", "timestamp")
+        ):
             values = pd.to_datetime(series, errors="coerce").dropna()
-            if not values.empty:
+            if not values.empty and len(values) / max(len(non_null), 1) >= 0.8:
+                profile.dtype = "datetime (inferred)"
                 profile.datetime_min, profile.datetime_max = values.min().isoformat(), values.max().isoformat()
+            else:
+                counts = series.astype("string").value_counts(dropna=True).head(10)
+                profile.top_values = [{"value": str(value), "count": int(count)} for value, count in counts.items()]
         else:
             counts = series.astype("string").value_counts(dropna=True).head(10)
             profile.top_values = [{"value": str(value), "count": int(count)} for value, count in counts.items()]
@@ -77,4 +83,5 @@ def build_eda_report(dataset: LoadedDataset, project_id: str) -> EDAReport:
         summary={"row_count": row_count, "column_count": column_count,
             "numeric_column_count": int(numeric_frame.shape[1]),
             "columns_with_missing_values": sum(item.missing_count > 0 for item in profiles),
-            "duplicate_row_count": duplicate_rows})
+            "duplicate_row_count": duplicate_rows,
+            "datetime_columns": [item.name for item in profiles if item.datetime_min is not None]})
