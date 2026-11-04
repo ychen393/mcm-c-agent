@@ -1,0 +1,10 @@
+{"case_id":"CIT-001","expected":"verified","metadata":{"title":"Example public data release","publisher":"Example Institute","url":"https://example.org/data/release-2025","accessed_at":"2026-11-04"}}
+{"case_id":"CIT-002","expected":"unverified_missing_url","metadata":{"title":"Urban mobility annual report","author":"Research Group"}}
+{"case_id":"CIT-003","expected":"unverified_invalid_doi","metadata":{"title":"Forecasting demand","doi":"10.0000/not-a-real-doi"}}
+{"case_id":"CIT-004","expected":"unverified_dead_link","metadata":{"title":"Archived transport table","url":"https://example.invalid/dead-link"}}
+{"case_id":"CIT-005","expected":"needs_definition_reconciliation","metadata":{"title":"Population estimate A","url":"https://example.org/pop-a","reference_year":2022,"definition":"resident population"}}
+{"case_id":"CIT-006","expected":"needs_definition_reconciliation","metadata":{"title":"Population estimate B","url":"https://example.org/pop-b","reference_year":2024,"definition":"registered population"}}
+{"case_id":"CIT-007","expected":"metadata_link_only","metadata":{"title":"Award-winning solution paper","url":"https://example.org/paper-record","rights":"unknown"}}
+{"case_id":"CIT-008","expected":"authorized_fulltext","metadata":{"title":"Author-shared paper","url":"https://example.org/author-copy","rights":"written_permission_recorded"}}
+{"case_id":"CIT-009","expected":"reject_fabricated_source","metadata":{"title":"Invented Journal Article","doi":"10.9999/fabricated"}}
+{"case_id":"CIT-010","expected":"unverified_conflicting_metadata","metadata":{"title":"Dataset release","url":"https://example.org/dataset","published_year":2021,"landing_page_year":2023}}
