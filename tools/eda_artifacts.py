@@ -34,47 +34,17 @@ def save_eda_artifacts(
     temp_dataset.write_bytes(dataset.raw_bytes)
     os.replace(temp_dataset, dataset_path)
 
-    chart_paths: list[str] = []
-    numeric_columns = dataset.frame.select_dtypes(include=["number"]).columns.tolist()
-    for column in numeric_columns[:6]:
-        values = pd.to_numeric(dataset.frame[column], errors="coerce").dropna()
-        if values.empty:
-            continue
-        fig, ax = plt.subplots(figsize=(7, 4))
-        ax.hist(values, bins=min(30, max(5, int(len(values) ** 0.5))))
-        ax.set(title=f"Distribution: {column}", xlabel=str(column), ylabel="Count")
-        fig.tight_layout()
-        chart_path = project_dir / f"distribution_{_safe_stem(str(column))}.png"
-        fig.savefig(chart_path, dpi=130)
-        plt.close(fig)
-        chart_paths.append(str(chart_path))
+    # Phase A: deterministic chart plan -> validated executor; no LLM calls.
+    from tools.chart_catalog import fallback_chart_plan
+    from tools.chart_executor import execute_chart_plan
+    from tools.chart_plan_validator import validate_chart_plan
 
-    date_columns = [item.name for item in report.dataset.columns if item.datetime_min is not None]
-    trend_count = 0
-    for date_column in date_columns:
-        dates = pd.to_datetime(dataset.frame[date_column], errors="coerce")
-        for value_column in numeric_columns:
-            paired = pd.DataFrame({
-                "date": dates,
-                "value": pd.to_numeric(dataset.frame[value_column], errors="coerce"),
-            }).dropna()
-            if len(paired) < 3:
-                continue
-            paired = paired.sort_values("date")
-            fig, ax = plt.subplots(figsize=(7, 4))
-            ax.plot(paired["date"], paired["value"], marker="o", linewidth=1.5)
-            ax.set(title=f"Trend: {value_column} over {date_column}", xlabel=date_column, ylabel=value_column)
-            fig.autofmt_xdate()
-            fig.tight_layout()
-            chart_path = project_dir / f"trend_{_safe_stem(str(value_column))}_by_{_safe_stem(date_column)}.png"
-            fig.savefig(chart_path, dpi=130)
-            plt.close(fig)
-            chart_paths.append(str(chart_path))
-            trend_count += 1
-            if trend_count >= 3:
-                break
-        if trend_count >= 3:
-            break
+    plan = fallback_chart_plan(report)
+    validate_chart_plan(plan, dataset.frame)
+    chart_results = execute_chart_plan(plan, dataset.frame, project_dir, dataset.sha256)
+    chart_paths = [item.path for item in chart_results]
+    report.chart_metadata = [item.model_dump(mode="json") for item in chart_results]
+    report.chart_plan = plan.model_dump(mode="json")
 
     report.chart_paths = chart_paths
     report_path.write_text(
@@ -87,6 +57,7 @@ def save_eda_artifacts(
         "report_json_path": str(report_path),
         "report_markdown_path": str(markdown_path),
         "chart_paths": chart_paths,
+        "chart_metadata": report.chart_metadata,
     }
 
 
@@ -138,8 +109,19 @@ def render_markdown_report(report: EDAReport) -> str:
         lines.append("- Fewer than two numeric columns; correlation matrix not generated.")
 
     lines.extend(["", "## Generated charts", ""])
-    if report.chart_paths:
-        lines.extend(f"- {Path(path).name}" for path in report.chart_paths)
+    if report.chart_metadata:
+        for item in report.chart_metadata:
+            spec = item["spec"]
+            lines.extend([
+                f"### {spec['figure_label']} — {spec['title']}",
+                f"![{spec['title']}]({Path(item['path']).name})",
+                f"**Analytical question:** {spec['analytical_question']}",
+                f"**Caption:** {spec['caption']}",
+                f"**Axes:** {spec['x_label']} / {spec['y_label']}",
+                f"**Computed metrics:** {item['metrics']}",
+                "**Insight:** Pending evidence-grounded interpretation (Phase C).",
+                "",
+            ])
     else:
         lines.append("- No charts generated for this dataset.")
 
