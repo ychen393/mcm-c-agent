@@ -34,4 +34,6 @@ class EDAReport(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     generated_at_utc: datetime
     chart_paths: list[str] = Field(default_factory=list)
+    chart_plan: dict[str, Any] = Field(default_factory=dict)
+    chart_metadata: list[dict[str, Any]] = Field(default_factory=list)
     summary: dict[str, Any] = Field(default_factory=dict)
