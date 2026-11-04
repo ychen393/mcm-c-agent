@@ -1,0 +1,10 @@
+record_id,weather,day_type,rentals
+1,sunny,weekday,120
+2,rainy,weekday,82
+3,cloudy,weekend,150
+4,sunny,weekend,175
+5,rainy,weekend,101
+6,cloudy,weekday,110
+7,sunny,weekday,130
+8,rainy,weekday,88
+9,cloudy,weekend,158
