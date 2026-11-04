@@ -117,6 +117,7 @@ if "eda_report" in st.session_state:
                 "Missing rate": f"{item['missing_rate']:.1%}",
                 "Unique": item["unique_count"],
                 "IQR outliers": item["outlier_count_iqr"],
+                "Unit": item.get("unit") or "Not provided",
             }
             for item in report_data["dataset"]["columns"]
         ],
@@ -129,10 +130,11 @@ if "eda_report" in st.session_state:
     dataset_meta = report_data["dataset"]
     st.subheader("Dataset Context")
     context_cols = st.columns(4)
-    context_cols[0].metric("Data period", "Available" if dataset_meta.get("period_start") else "Not detected")
-    context_cols[1].metric("Frequency", dataset_meta.get("temporal_frequency") or "Not specified")
-    context_cols[2].metric("Estimated frequency", "Available" if dataset_meta.get("inferred_frequency") else "N/A")
-    context_cols[3].metric("Data source", "Provided" if dataset_meta.get("data_source") else "Not provided")
+    context_cols[0].metric("Period start", dataset_meta.get("period_start", "N/A")[:10] if dataset_meta.get("period_start") else "N/A")
+    context_cols[1].metric("Period end", dataset_meta.get("period_end", "N/A")[:10] if dataset_meta.get("period_end") else "N/A")
+    context_cols[2].metric("Declared frequency", dataset_meta.get("temporal_frequency") or "Not specified")
+    inferred_short = (dataset_meta.get("inferred_frequency") or "N/A").split(" (")[0]
+    context_cols[3].metric("Estimated frequency", inferred_short)
     st.caption(f"Period: {dataset_meta.get('period_start') or 'N/A'} → {dataset_meta.get('period_end') or 'N/A'}")
     if dataset_meta.get("inferred_frequency"):
         st.caption(f"Frequency estimate: {dataset_meta['inferred_frequency']}")
@@ -160,8 +162,10 @@ if "eda_report" in st.session_state:
                 st.markdown(f"**Figure ID:** {spec['figure_label']}")
                 st.markdown(f"**Analytical question:** {spec['analytical_question']}")
                 st.caption(f"Axes: {spec['x_label']} / {spec['y_label']} · Plotted rows: {meta['plotted_rows']}")
-                selected_metrics = [(metric_labels.get(k, k), v) for k, v in meta["metrics"].items()
-                                    if k in metric_labels and v is not None]
+                preferred_order = (["count", "median", "min", "max"] if spec["chart_type"] in ("histogram", "box_plot")
+                                   else ["count", "first", "last", "change_pct", "min", "max"])
+                selected_metrics = [(metric_labels.get(k, k), meta["metrics"][k]) for k in preferred_order
+                                    if k in meta["metrics"] and meta["metrics"][k] is not None]
                 if selected_metrics:
                     metric_cols = st.columns(min(4, len(selected_metrics)))
                     for metric_index, (label, value) in enumerate(selected_metrics[:4]):
