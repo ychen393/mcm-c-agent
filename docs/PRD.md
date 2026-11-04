@@ -601,3 +601,304 @@ v1.0 — 2026-11-03
 - LaTeX 模板是否采用当届官方模板，以及 AI Use 报告的最终格式。
 
 - 首个端到端 Demo 采用哪一届、哪一道 MCM C 历史题目。
+
+==============================
+PRD v1.1 CHANGE PROPOSAL
+状态：Proposed Change Set — 待用户审核批准
+提案日期：2026-11-04
+本提案不覆盖 v1.0 已批准基线；用户批准后，合并为 PRD v1.1 正式基线。
+==============================
+
+20. 变更摘要与优先级
+
+本次提案将五项改进纳入下一版本：
+C1. 将验收标准转化为可自动化或按清单核验的指标。
+C2. 采用垂直切片（Vertical Slice）交付，并在 M1/M2 开发前建立评估集。
+C3. 在 M1 知识库摄取前完成论文版权、来源许可和当届竞赛合规检查。
+C4. 在 M2 Agent Workflow 设计冻结前确定持久化 Checkpoint 与 Python Sandbox 方案；断点续跑由 P1 提升至 P0。
+C5. 新增建模质量策略，明确题型方法库、模型选择规则和 Debate 价值验证方法。
+
+拟议优先级：
+- P0：项目状态持久化、断点续跑、运行幂等性、基础评估集、版权/合规 Gate、可验证的核心质量指标。
+- P1：题型方法库扩展、自动模型比较、Debate 消融评估、复杂评估仪表盘。
+- P2：跨题型泛化、大规模论文库治理和更复杂的协作评测。
+
+21. 可执行验收标准（Testable Acceptance Criteria）
+
+所有验收项必须有唯一 ID、测试方法、测试数据、预期结果、实际结果、执行日期和证据位置。状态只允许：Not Run / Pass / Fail / Blocked。未执行的测试不得标记 Pass。
+
+AC-01 项目初始化
+- 输入有效项目名称与题目文本，项目创建成功并生成唯一 project_id。
+- 缺少必填字段或名称不合法时，返回明确校验错误，不创建半成品项目。
+- 自动化：pytest API/service tests。
+
+AC-02 文件上传与数据读取
+- 支持的文件类型必须由 allowlist 明确列出；首期建议 CSV、XLSX、JSON、PDF。
+- 对每个成功上传文件记录文件名、MIME/扩展名、字节大小、SHA-256、上传时间和项目归属。
+- 对不支持、损坏、超限文件返回可理解错误；不得静默丢弃或误读。
+- 自动化：每种支持格式至少 2 个 fixture（正常与异常），覆盖率 100%。
+
+AC-03 EDA 正确性
+- 对固定 fixture 自动检查行列数、字段类型、缺失值、重复值和关键统计量。
+- 确定性统计项与人工核对基准一致；数值容差默认 absolute tolerance 1e-6，特殊算法另行声明。
+- 所有图表与发现必须记录输入文件 hash、数据处理步骤和生成代码/配置版本。
+- 自动化：golden dataset tests + output schema validation。
+
+AC-04 知识检索与引用
+- 每条检索结果必须有 source_id、标题、来源 URL/文件路径和来源类型。
+- 引用 URL 可访问性/文件定位状态必须明确标注；不能验证的引用不得标记为 verified。
+- 在评估集的引用核验样本中，虚构引用数必须为 0；来源字段完整率目标 100%。
+- 自动化：metadata schema tests + citation verification tests；人工抽查原文。
+
+AC-05 Agent 结构化输出
+- 每个 Agent 输出必须通过对应 Pydantic Schema 校验。
+- Schema 校验失败时执行有限次数修复/重试；超过上限后将节点标记为 failed，并保留错误。
+- 不允许把自由文本解析失败静默转换为成功状态。
+- 自动化：schema contract tests + malformed-output fixtures。
+
+AC-06 并行研究与整合
+- EDA 与 Literature/Method Research 在同一研究阶段启动为独立分支。
+- 任一分支失败时保留另一分支结果；整合节点必须标注缺失分支和不确定性。
+- 两个分支均成功时，整合报告必须包含共识、冲突、证据缺口、候选方案和推荐理由。
+- 自动化：graph integration tests，检查分支状态与输出字段。
+
+AC-07 Checkpoint 与断点续跑（P0）
+- 在每个关键节点完成后持久化状态；运行中断后可从最近成功节点恢复，不重复执行已成功且非幂等的外部副作用。
+- 进程被强制终止并重启后，能够按 project_id/thread_id 找回运行状态和 artifact references。
+- 至少通过 3 类故障注入：进程中断、LLM 超时、工具执行失败。
+- 自动化：integration tests；必须包含 kill/restart resume test。
+- 验收目标：恢复后状态完整率 100%；已完成节点重复副作用次数为 0。
+
+AC-08 Sandbox 安全边界
+- Agent 生成的 Python 代码只能在独立隔离执行环境运行，不得在 Streamlit 或 Orchestrator 进程内执行。
+- 默认禁止网络访问；只挂载当前任务所需的只读输入与专用输出目录。
+- 设置 CPU、内存、进程数、运行时长、磁盘/输出大小限制。
+- 执行容器以非 root 用户运行，根文件系统只读，使用固定版本镜像。
+- 自动化：security integration tests，验证网络隔离、路径越权、超时、内存/CPU 限制和清理行为。
+
+AC-09 模型验证
+- 每个正式候选模型至少包含一个 baseline 对照。
+- 记录训练/验证/测试切分或其他适用验证设计，防止数据泄漏。
+- 结果报告至少包含适用的误差/拟合指标、验证方式、关键假设和局限性。
+- 自动化：固定合成数据集上的数值测试；人工审核方法是否适合题目。
+
+AC-10 论文完整性
+- LaTeX 构建成功时必须保存编译日志、源文件版本和 PDF。
+- 论文中的数字、图表、公式、结论和引用应建立 evidence/artifact mapping。
+- AI 使用报告须记录工具/模型、用途和使用环节。
+- 自动化：latex build test、required-section checker、citation key checker、artifact reference checker。
+- 验收目标：必需章节覆盖率 100%；引用键未解析数 0；关键主张无来源映射数 0（未核实主张必须显式标记）。
+
+AC-11 人工审批
+- H1、H2、H3 必须有审批状态、版本、时间、决策和意见。
+- 未批准 Gate 不得进入下游正式阶段。
+- 自动化：workflow routing tests。
+
+AC-12 可观测性与运行记录
+- 每个节点记录 run_id、agent、provider/model、prompt version、开始/结束时间、状态、错误和产物引用。
+- 密钥不得进入日志。
+- 自动化：log schema tests + secret redaction tests。
+
+21.2 评估集与评分规则
+
+在 M1/M2 开发前建立第一版固定评估集，避免系统完成后才补做质量评估。
+
+建议最小规模：
+- 3 道不同年份的历史 MCM Problem C 题目作为端到端 benchmark。
+- 至少 15 个 task-level evaluation cases，覆盖题目拆解、数据理解、EDA、来源检索、方法选择、Debate、验证设计和论文结构。
+- 至少 5 个确定性数据分析 fixture，覆盖缺失值、异常值、时间趋势、类别变量和多表关联。
+- 至少 10 个引用核验样本，包含有效来源、元数据不全来源和不可验证来源。
+- 每个 LLM 评估 case 保存输入、参考要点、评分 Rubric、禁止错误和期望输出 Schema。
+
+评估集分层：
+- Dev Set：允许用于 Prompt、Schema 和工作流调试。
+- Holdout Set：只用于阶段验收，不允许反复用于提示词调优；若被用于调优，应重新建立 Holdout。
+- Regression Set：保存已发现的失败案例，代码或 Prompt 变更后自动回归。
+
+评分维度（建议统一为 0–4 分）：
+- Task Coverage：是否覆盖题目要求。
+- Evidence Grounding：是否有数据或来源支撑。
+- Mathematical Soundness：变量、假设、公式和推理是否成立。
+- Reproducibility：是否能够复现结果。
+- Communication：结构、图表与表达是否清楚。
+- Compliance：是否满足竞赛披露、引用和格式要求。
+
+评估报告必须同时呈现分项分数、失败案例、严重错误数和人工评审意见；不得只用单一 LLM Judge 分数代表系统质量。关键数学与引用问题必须进行人工抽查。建议至少 20% 的 LLM 评估样本由人工复核。
+
+22. 垂直切片交付路线（Vertical Slices）
+
+每个切片都必须形成可运行、可演示、可测试的端到端薄功能，而不是只完成孤立 Agent。
+
+VS-0 Foundation Smoke Slice（M0）
+- 创建项目 → 保存项目 → 读取项目 → 基础 LangGraph 运行 → UI 展示状态。
+- 交付：本地可运行应用、数据库连通性、基础测试、环境说明。
+- Gate：新环境按 README 可启动；核心测试通过。
+
+VS-1 Data-to-EDA Slice（M1-A）
+- 上传一个 CSV/XLSX → 文件校验 → 数据预览 → 数据字典 → 基础 EDA → 图表/报告 → 保存报告。
+- 交付：至少一个完整样例项目及可追溯 EDA 产物。
+- Gate：AC-02、AC-03 通过。
+
+VS-2 Knowledge-to-Evidence Slice（M1-B）
+- 输入题目/研究问题 → 检索获准来源 → 返回证据卡片 → 用户打开原始来源 → 生成带来源标记的研究摘要。
+- 交付：首批知识库、来源登记表、检索评估集和引用核验报告。
+- Gate：版权/竞赛合规 Gate 通过，AC-04 通过。
+
+VS-3 Parallel Research-to-Decision Slice（M2）
+- Problem Analyst → EDA 与 Literature 并行 → Research Strategy → Debate/Critic → 方案整合 → H1 审批 → Checkpoint 恢复。
+- 交付：可恢复的研究流程、结构化报告、冲突日志、审批记录。
+- Gate：AC-05、AC-06、AC-07、AC-11 通过；评估集完成首轮基线测试。
+
+VS-4 Approved Plan-to-Validated Model Slice（M3）
+- 获批研究方案 → Sandbox 执行 → baseline/candidate 对比 → 验证与敏感性分析 → H2 审批。
+- 交付：可复现模型、运行环境/参数记录、验证报告。
+- Gate：AC-08、AC-09 通过。
+
+VS-5 Evidence-to-LaTeX Submission Slice（M4）
+- 已批准研究产物 → 论文大纲 → 章节证据映射 → LaTeX/BibTeX → 编译 PDF → Reviewer → AI Use Report → H3 审批。
+- 交付：完整 LaTeX 项目、PDF、BibTeX、图表和 AI 使用报告。
+- Gate：AC-10、AC-11 通过；按当届规则检查页数与格式。
+
+VS-6 Full Historical Problem Demo（M5）
+- 从历史题目输入开始，完整走通 VS-1 至 VS-5。
+- 交付：录屏/演示脚本、评估报告、已知限制和回归测试结果。
+- Gate：全部 P0 验收项通过；关键失败均有记录，无虚构引用或实验结果。
+
+23. 知识库版权与竞赛合规 Gate（M1 前置条件）
+
+23.1 版权与来源策略
+在任何批量论文下载或索引前，先建立 Corpus Registry（知识库来源登记表），至少记录：
+- source_id、标题、作者/机构、年份、原始 URL、获取日期。
+- 发布方、许可类型/版权声明、使用条款链接。
+- 文件来源（官方公开、作者授权、用户提供、机构订阅或其他）。
+- 允许的操作：仅链接、元数据索引、内部全文检索、摘要、片段引用、是否允许再分发。
+- 审核状态、审核人和审核日期。
+
+默认原则：
+- 公开可访问不等于 Public Domain，也不自动意味着可批量下载、复制、再分发或向第三方模型上传。
+- 优先使用 COMAP 官方公开资料、明确开放许可资料、作者授权资料和用户有权使用的材料。
+- 对权利不明确的获奖论文，默认只保存必要元数据与原始链接；在权利确认前不建立可对外分发的全文语料库。
+- 知识库生成的方法卡片应以抽象总结为主，不复制论文大段原文、图表或独创表达。
+- 用户上传文件不自动代表用户拥有再分发或训练使用权；上传前应提示用户确认使用权限。
+- 不向外部 LLM Provider 发送超出完成任务所需的受版权保护全文；Provider 数据处理条款和保留政策需纳入评估。
+- 为每份来源保留删除/下架机制；来源失效或许可变更时可禁用检索并移除本地副本。
+
+23.2 2027 MCM/ICM 竞赛合规基线（需在比赛前再次核验）
+截至 2026-11-04，COMAP 官方 2027 规则明确：
+- AI 工具允许作为辅助工具使用，但团队必须诚实、清晰地披露 AI 使用情况。
+- 报告中需指出使用的 AI 工具/模型及用途，并按官方要求在正文中引用、在参考文献中列出；若使用 AI，需在 25 页 solution 后附 Report on Use of AI，该报告不计入 25 页 solution 限额。
+- 团队必须核验 AI 生成内容及引用的准确性、有效性和适当性，并防范抄袭。
+- COMAP 特别提醒谨慎使用 AI 进行模型选择与构建、代码生成、数据/模型结果解释和科学结论推导；团队对最终分析与提交内容负责。
+- 2027 Solution 主体总页数上限为 25 页，包含 Summary Sheet、Solution、目录、参考文献、附录等；AI Use Report 按官方说明另附。
+- 比赛期间不得向团队外部人员寻求解题帮助；工具设计必须服务于团队自主分析，不能引入外部人员代做或代答。
+
+系统必须实现：
+- AI Usage Ledger：记录 Provider、模型标识、用途、调用阶段、时间和人工核验状态。
+- AI Use Report Export：按官方要求生成可编辑的披露草稿，最终由参赛团队核实。
+- Citation & Claim Review：要求用户核对 AI 输出的事实、公式、引用和结论。
+- Competition Mode Checklist：比赛前锁定当届官方规则版本、规则 URL、核验日期、页数/字体/匿名要求和 AI 披露要求。
+- 不得将任何往届格式假设硬编码为永久规则；以当届官方规则为准。
+
+官方依据：
+COMAP 2027 MCM/ICM Contest Rules and Instructions：
+https://contest.comap.com/undergraduate/contests/mcm/instructions.php
+COMAP 2027 AI Tools Guidance（包含于官方规则页面）：
+https://www.contest.comap.com/undergraduate/contests/mcm/instructions.php
+
+23.3 M1 Knowledge Ingestion Release Gate
+在以下事项全部完成前，不得启动批量历史论文摄取：
+- 首批来源清单经用户审核。
+- 每个来源的许可/使用条款字段完整，或明确标记为“仅链接/不存全文”。
+- 版权不明材料采用保守处理方式。
+- 已确认不会把知识库设计成论文全文再分发服务。
+- 用户确认首批 Corpus Registry 和检索用途边界。
+
+24. Checkpoint 持久化与 Sandbox 技术决策（M2 前冻结）
+
+24.1 Checkpoint 推荐方案
+- LangGraph 使用 PostgreSQL Checkpointer（优先采用官方 PostgresSaver 实现）。
+- 每个研究项目映射稳定 thread_id；每次运行有独立 run_id。
+- 在重要节点边界保存 checkpoint；H1/H2/H3 等人工审批中断必须可持久化恢复。
+- ResearchState 中保存结构化状态与 artifact references；大文件、数据集、图表、PDF 不直接塞入 checkpoint，而存文件系统并保存 URI、hash、版本。
+- 对节点定义幂等策略；外部副作用（文件写入、远程 API、导出）使用 idempotency key 或先检查产物是否已存在。
+- 记录 checkpoint schema version；升级时提供兼容/迁移策略。
+- 定义保留策略、备份方式和项目删除行为。
+
+24.2 Sandbox 推荐方案
+首选 rootless Docker container-per-run：
+- 每次 Agent 代码执行创建独立容器或隔离任务。
+- 默认 network=none；如需联网，必须由明确授权的受控数据获取工具完成，不允许任意代码直接访问网络。
+- 非 root 用户、只读根文件系统、drop capabilities、禁止 privileged。
+- 输入数据只读挂载；输出目录单独挂载并限制路径。
+- CPU、内存、PID、运行时长和输出文件大小均设硬限制。
+- 固定并扫描基础镜像；执行后清理容器与临时目录。
+- 记录代码 hash、镜像 digest、依赖版本、参数、随机种子、stdout/stderr 和退出码。
+- Sandbox 不应拥有数据库管理员凭证、LLM API Key 或宿主机敏感目录访问权限。
+
+24.3 设计冻结前验证
+M2 设计开始前必须提交 Architecture Decision Record（ADR），明确：
+- Checkpointer 选型、依赖版本、连接池、迁移和恢复策略。
+- thread_id/run_id 规则与 artifact storage contract。
+- Sandbox 运行时、资源限制、网络策略、镜像和清理策略。
+- 本地开发环境如何启动和测试。
+- 故障注入测试方案。
+用户审核 ADR 后，才冻结 M2 工作流实现方案。
+
+25. 建模质量策略（Modeling Quality Strategy）
+
+25.1 题型方法库（Problem-Type Method Library）
+建立可检索、可解释的方法卡片库，而不是直接按题目关键词调用固定模型。首批方法族建议包括：
+- 描述统计与探索性分析：分布、分组比较、相关性、异常检测。
+- 时间序列与预测：趋势/季节性基线、指数平滑、ARIMA 类模型及适用的机器学习模型。
+- 回归与解释分析：线性/广义线性回归、正则化、非线性关系和诊断。
+- 分类与评分：逻辑回归、树模型、分类指标、校准与阈值选择。
+- 聚类与分群：K-means、层次聚类、密度聚类及聚类稳定性。
+- 降维与综合指标：PCA、标准化指标、权重敏感性。
+- 优化与资源分配：线性/整数规划、约束优化、启发式算法。
+- 仿真与不确定性：Monte Carlo、离散事件/Agent-based simulation（按题目需要）。
+- 网络与空间分析：图指标、网络结构、空间相关与地理可视化。
+每张方法卡片记录：适用问题、数据要求、核心假设、公式/算法、参数、优缺点、验证指标、常见失败模式、参考来源和可运行示例。
+
+25.2 模型选择规则
+- 先把题目子问题转化为明确的任务类型、目标变量、决策变量和评价标准。
+- 先建立简单、可解释的 baseline，再考虑复杂模型；复杂度必须由可验证收益支撑。
+- 每个候选模型必须声明假设、数据需求、适用条件、评价指标和失败风险。
+- 至少比较 baseline 与一个有理由的候选模型；若题目不适合比较，需说明原因。
+- 预测任务使用与时间/数据结构相符的验证切分；时间序列不得随机打乱造成未来信息泄漏。
+- 分类任务同时考虑类别不平衡、Precision/Recall/F1、ROC-AUC/PR-AUC 与校准（按场景选取）。
+- 回归任务按场景选择 MAE、RMSE、R²、残差诊断和外推风险；不能只凭 R² 判定优劣。
+- 聚类任务结合内部指标、稳定性和业务/题意可解释性，不能只看单一 Silhouette Score。
+- 优化/仿真任务需验证约束可行性、边界情况、随机种子稳定性、情景敏感性和基准策略对比。
+- 模型选择必须考虑解释性、计算成本、数据质量和题目叙事，而不只是模型分数。
+- 禁止在测试集上反复调参；所有数据切分与指标须记录。
+
+25.3 Debate 机制与价值验证
+Debate 的目标不是让多个 Agent 互相赞同或增加文字，而是提高研究决策质量。每次 Debate 必须围绕具体决策对象进行：
+- 主张：当前推荐方案/模型是什么？
+- 证据：来自数据、文献、数学推导或实验的哪些证据？
+- 假设：依赖哪些可检验前提？
+- 反例：什么观察会推翻该主张？
+- 替代方案：至少一个合理备选及其代价。
+- 验证动作：下一步用什么数据/实验区分候选方案？
+- 决策记录：采纳/拒绝/保留意见及理由。
+
+Debate 不能以 Agent 数量、发言轮数或输出长度作为质量指标。必须通过消融实验评估：
+- Baseline A：Research Strategy 单 Agent，不启用 Debate。
+- Baseline B：Research Strategy + Debate/Critic。
+- 对同一 Holdout 题目、相同输入和可比模型预算进行评估。
+- 由盲评者按方案适配度、证据充分性、数学合理性、风险识别和可验证性评分。
+- 记录 Debate 新发现的实质性问题数、被数据/原文核实的问题数、误报数、方案修订前后评分变化、额外耗时/成本。
+- 只有当 Debate 带来可重复的质量提升或发现并验证了实质性风险，且收益与额外成本相称时，才保留该阶段；否则简化为单轮 Critic 或规则化审查。
+
+26. PRD v1.1 Proposed Decision Log
+
+PD-01：断点续跑由 P1 提升至 P0。建议批准。
+PD-02：M1/M2 前建立固定 Dev/Holdout/Regression 评估集。建议批准。
+PD-03：M1 批量知识库摄取必须经过版权与竞赛合规 Gate。建议批准。
+PD-04：M2 前冻结 PostgreSQL Checkpointer + rootless Docker Sandbox ADR。建议批准。
+PD-05：引入垂直切片交付和建模质量策略。建议批准。
+
+版本记录补充：
+v1.1 Proposed — 2026-11-04
+- 新增可执行验收标准、评估集方案、垂直切片路线、版权与 2027 竞赛合规 Gate、Checkpoint/Sandbox 技术决策建议、建模质量策略。
+- 本提案尚待用户审核；批准后将状态更新为正式 PRD v1.1。
