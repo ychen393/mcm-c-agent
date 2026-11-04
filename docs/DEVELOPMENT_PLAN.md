@@ -24,10 +24,13 @@ Build vertical slices that each run end-to-end. Do not implement disconnected ag
 - [ ] Do not mark live API/database/container tests as passed until executed.
 
 ### M0.5 — Evaluation and compliance foundation
-- [ ] Build Dev/Holdout/Regression directory conventions and case schema.
-- [ ] Create first 15 task-level cases, 5 data fixtures and 10 citation cases.
-- [ ] Create corpus registry and source-use policy.
-- [ ] Freeze a versioned 2027 competition checklist and re-check official rules before contest use.
+- [x] Build Dev/Holdout/Regression directory conventions and case schema.
+- [x] Create first 15 task-level cases, 5 deterministic data fixtures and 10 citation cases.
+- [x] Create 3 workflow recovery scenarios and golden EDA statistics.
+- [x] Create corpus registry template and 2027 competition checklist template.
+- [x] Add automated schema and fixture validation tests.
+- [ ] Run the automated tests locally and attach the test output.
+- [ ] Complete human review of corpus registry policy and official competition checklist.
 - [ ] Record baseline evaluation report before prompt tuning.
 
 ### M1 — Data and knowledge vertical slices
