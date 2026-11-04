@@ -1,5 +1,6 @@
 """Versioned chart specification. No executable expressions."""
 from typing import Literal
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field, model_validator
 
 ChartType = Literal["histogram", "time_series", "bar", "scatter", "box_plot"]
@@ -42,3 +43,6 @@ class ChartResult(BaseModel):
     spec: ChartSpec
     plotted_rows: int = Field(ge=0)
     metrics: dict[str, float | int | str | None] = Field(default_factory=dict)
+    source_columns: list[str] = Field(default_factory=list)
+    generated_at_utc: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    chart_spec_version: str = "1.0"
