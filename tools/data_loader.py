@@ -1,4 +1,5 @@
 from __future__ import annotations
+import csv
 import hashlib
 import io
 import re
@@ -40,6 +41,20 @@ def load_dataset(source: bytes | BinaryIO, file_name: str, *, max_file_size: int
     if len(raw) > max_file_size:
         raise ValueError(f"File exceeds the {max_file_size // (1024 * 1024)} MB upload limit.")
     try:
+        if extension == ".csv":
+            header = next(csv.reader(io.StringIO(raw.decode("utf-8-sig"))), [])
+        else:
+            from openpyxl import load_workbook
+            workbook = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+            try:
+                header = list(next(workbook.active.iter_rows(min_row=1, max_row=1, values_only=True), []))
+            finally:
+                workbook.close()
+        if not header or any(value is None or not str(value).strip() for value in header):
+            raise ValueError("Column names must not be blank.")
+        normalized_headers = [str(value).strip() for value in header]
+        if len(normalized_headers) != len(set(normalized_headers)):
+            raise ValueError("Duplicate column names are not allowed.")
         if extension == ".csv":
             frame = pd.read_csv(io.BytesIO(raw), encoding="utf-8-sig")
         else:
