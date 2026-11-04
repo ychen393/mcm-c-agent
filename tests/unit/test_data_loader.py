@@ -37,4 +37,4 @@ def test_reject_blank_headers():
 
 def test_reject_corrupt_csv():
     with pytest.raises(ValueError, match="Could not read CSV"):
-        load_dataset(b"not,a,valid\n1,2\n", "corrupt.csv")
+        load_dataset(b"\xff", "corrupt.csv")
