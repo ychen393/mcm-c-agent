@@ -1,0 +1,115 @@
+# Phase B — Visual EDA Agent
+
+Status: **B0 contract and planning foundation implemented; awaiting review.** B1–B4 are not yet implemented.
+
+## Product goal
+
+Move from deterministic chart templates to problem-aware chart selection. Given an MCM Problem C statement and the Phase A dataset profile, the Visual EDA Planner proposes a concise, ranked set of charts that answer meaningful analytical questions.
+
+The system remains semi-autonomous: the agent proposes; a human reviews and approves; deterministic Python validates and executes.
+
+## Architecture
+
+```text
+Problem Statement + Dataset
+             |
+             v
+     Phase A EDA Profiler
+             |
+             v
+    Visual EDA Planner (LLM)
+             |
+             v
+     Typed ChartPlan / ChartSpec
+             |
+             v
+     ChartPlan Validator
+             |
+       Human Approval
+             |
+             v
+      Python Chart Executor
+             |
+             v
+      EDA Report + Provenance
+```
+
+Phase B ends after chart planning, validation, approval and execution. Evidence-grounded Insight Analyst and EDA Reviewer remain Phase C.
+
+## Non-negotiable boundaries
+
+- LLM selects and explains charts; Python computes all numeric metrics and renders figures.
+- No LLM-authored Python, SQL, shell commands, or executable expressions.
+- The planner may reference only exact columns present in the dataset profile.
+- Supported chart types are limited to the current executor catalog: histogram, time_series, bar, scatter, box_plot.
+- Units are copied only from user-provided dataset metadata; never inferred from column names.
+- The planner must avoid redundant/unsuitable charts and explain meaningful omissions.
+- A human approval action is required before executing an AI-proposed plan.
+- Missing problem statement, provider failure, invalid model output or validator failure must fall back to deterministic generic EDA, clearly labeled as not problem-aware.
+- Preserve source SHA-256, source columns, plotted row count, ChartSpec and computed metrics.
+
+## B0 — Contracts and prompt foundation
+
+- [x] Extend ChartSpec with rank, relevance_score and analytical_role.
+- [x] Extend ChartPlan with planning summary, problem alignment and planner/fallback provenance.
+- [x] Forbid unknown fields in ChartSpec and ChartPlan.
+- [x] Validate unique, ascending chart ranks.
+- [x] Update deterministic fallback plans with unique ranks and explicit generic fallback metadata.
+- [x] Add versioned Visual EDA Planner system prompt.
+- [x] Add unit tests for ranking, relevance score, provenance and strict schema.
+- [ ] User reviews B0 contract before B1 implementation.
+
+## B1 — Visual EDA Planner
+
+- [ ] Implement `agents/visual_eda_agent.py` using the existing `LLMFactory` / `BaseLLM` Multi-LLM adapter.
+- [ ] Supply problem statement, dataset metadata, column profiles, warnings and correlations; do not send full raw dataset contents.
+- [ ] Parse JSON output into ChartPlan; support one bounded repair attempt for malformed/schema-invalid output.
+- [ ] Attach provider, model and prompt version to plan provenance.
+- [ ] Validate against the real DataFrame before accepting the plan.
+- [ ] Add mocked-LLM tests; tests must not require real API credentials.
+
+## B2 — Selection quality and fallback
+
+- [ ] Rank charts by problem relevance with unique ordered ranks and 0–1 relevance scores.
+- [ ] Reject unknown columns, unsupported types, invalid axes, inadequate sample sizes and duplicate chart IDs/labels/ranks.
+- [ ] Add redundancy checks for repeated chart intent / identical field pairs.
+- [ ] Keep deterministic fallback when no problem statement or LLM is unavailable.
+- [ ] Record fallback reason and never label generic fallback as problem-aware.
+
+## B3 — Streamlit human-review workflow
+
+- [ ] Add a problem-statement / research-question field to Dataset Explorer.
+- [ ] Add AI planner toggle and provider/model status.
+- [ ] Generate and display a ranked chart-plan preview before chart execution.
+- [ ] Show chart type, source columns, analytical role, relevance score, question, rationale, priority and caveats.
+- [ ] Show skipped chart ideas and why they were omitted.
+- [ ] Require explicit user approval before Python execution.
+- [ ] Preserve deterministic fallback and report the selected planning strategy.
+
+## B4 — Evaluation and acceptance
+
+- [ ] Build chart-planning evaluation cases for trend, distribution, relationship, comparison, categorical and insufficient-data scenarios.
+- [ ] Measure problem relevance, field correctness, chart suitability, nonredundancy, omission rationale, schema validity and fallback behavior.
+- [ ] Verify exact source columns and units; zero unsupported columns and zero fabricated numeric claims.
+- [ ] Test missing API key, timeout, malformed JSON, invalid column, duplicate chart and empty plan.
+- [ ] Verify chart output provenance and report downloads.
+- [ ] Run full pytest and GitHub Actions.
+- [ ] User reviews the live Streamlit workflow before Phase B is closed.
+
+## Acceptance criteria
+
+1. With a problem statement and available LLM, the planner returns a schema-valid, ranked plan grounded in the dataset profile.
+2. Every chart references existing columns and an executor-supported chart type.
+3. The plan explains why each selected chart is useful and why important alternatives were omitted.
+4. Duplicate or unsuitable chart plans are rejected before execution.
+5. The user can inspect the full plan and must explicitly approve it before figures are generated.
+6. LLM/provider failure or missing problem statement results in a clearly labeled deterministic fallback, not a broken workflow.
+7. All generated metrics are computed by Python from the actual plotted observations and include dataset SHA-256 provenance.
+8. Unit tests cover success and failure paths without live LLM credentials.
+
+## B0 review checklist
+
+- [ ] ChartSpec rank and relevance_score are clear and useful.
+- [ ] ChartPlan metadata is sufficient to explain the plan and record provider/fallback status.
+- [ ] Prompt boundaries prohibit arbitrary code and unsupported chart types.
+- [ ] Human approval is retained as a mandatory execution gate.
