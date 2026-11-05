@@ -995,3 +995,42 @@ Follow-up polish:
 - Removed redundant Figure ID text while retaining the LaTeX reference.
 
 For a dataset confirmed to be the LBMA Gold Price PM, use the source label `LBMA Gold Price PM`, frequency `Business-day daily`, and unit `USD per troy ounce`. Do not apply these labels to another dataset without checking its source documentation.
+
+
+## 35. PRD v1.5 — Phase B Visual EDA Agent Implementation Start (2026-11-05)
+
+**Decision:** Begin Phase B on a dedicated branch `feature/m1b-visual-eda`, based on the Phase A development branch. Do not merge Phase A or Phase B into `main` until the corresponding user review and acceptance gates are complete.
+
+### 35.1 Scope
+Implement the Visual EDA Planner through the existing Multi-LLM adapter. It receives the MCM C problem statement and deterministic Phase A dataset profile, then proposes and ranks relevant charts. It does not generate research insights; Insight Analyst and EDA Reviewer remain Phase C.
+
+### 35.2 Human-in-the-loop
+The workflow is semi-autonomous: the planner proposes a typed ChartPlan; deterministic validation checks it against the uploaded DataFrame; the user reviews and explicitly approves the plan; only then does the Python executor render figures.
+
+### 35.3 Safety and evidence boundaries
+- LLM may only choose from executor-supported chart types and exact dataset column names.
+- LLM must not write executable Python, SQL, shell commands or arbitrary expressions.
+- LLM does not compute statistics. Python computes actual plotted metrics.
+- Units may only come from explicit dataset metadata.
+- Unsupported, redundant or infeasible chart proposals must be rejected or explained in skipped_reasons.
+- Missing problem statement, missing API credentials, provider failure or invalid model output must retain a deterministic generic fallback and clearly disclose that it is not problem-aware.
+- Persist chart-plan strategy, provider/model where applicable, ranking, relevance score, rationale, skipped reasons, dataset hash and chart provenance.
+
+### 35.4 Phase B sub-milestones
+- B0 Contracts and prompt foundation: typed ranking/relevance fields, plan provenance, strict schemas, rank validation, versioned planner prompt, tests and implementation plan.
+- B1 Visual EDA Planner: Multi-LLM call, dataset/problem context, JSON parsing, bounded repair and validation.
+- B2 Selection quality and fallback: redundancy/feasibility checks and deterministic fallback.
+- B3 Streamlit human review: problem input, ranked plan preview and explicit approval before execution.
+- B4 Evaluation and acceptance: planner quality cases, failure tests, full CI and local user review.
+
+### 35.5 Current implementation status
+B0 has been authored on `feature/m1b-visual-eda`:
+- ChartSpec: rank, relevance_score and analytical_role.
+- ChartPlan: planning_summary, problem_alignment, planner_provider, planner_model and fallback_reason.
+- Strict rejection of unknown ChartSpec / ChartPlan fields.
+- Unique ascending rank validation.
+- Deterministic fallback chart plans carry explicit generic-fallback metadata and stable ranks.
+- Versioned planner prompt and B0 contract tests added.
+- `docs/PHASE_B_PLAN.md` records the architecture, non-negotiable boundaries, staged tasks and acceptance criteria.
+
+B0 is awaiting user review. B1–B4 have not yet been implemented. No live LLM call has been made and no Phase B end-to-end workflow is claimed.
