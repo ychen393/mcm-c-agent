@@ -82,3 +82,17 @@ Then open `http://localhost:8502` and use **API Settings** (re-enter key if sess
 - Independent Google Docs mirror: https://docs.google.com/document/d/16zye72a1xP98hHKQpM6bm1GHvzInckVboni19n5_g_I/edit
 
 **Update protocol:** On every completed milestone or meaningful status change, update this snapshot and `docs/state/mcm_checkpoint.json` in the same PR. Keep the explicit evidence/source links; distinguish “implemented”, “tested”, “user verified”, and “approved”. GitHub is authoritative for code / actual development progress; Google Docs is a human-readable mirror. No claim of continuous synchronization unless a separate workflow is installed.
+
+## 7. Addendum — GitHub → Cursor pilot #6 (2026-11-05)
+
+**This addendum documents new collaboration progress, not a change to the MCM Phase B research acceptance state above.**
+
+- **Task dispatch confirmed:** Coordinator posted a `@cursor` comment on [Issue #6](https://github.com/ychen393/mcm-c-agent/issues/6); Cursor bot acknowledged and produced a [Cloud Agent run](https://cursor.com/agents/bc-f8c1004b-c923-4124-bf17-2cfc1362f6de).
+- **Cursor authored and pushed regression tests:** `test/6-api-settings-regression` at `cceb9641c1c5ec7eeb2d09d5ce7f679854cbb152`. Diff relative to `cursor/init-builder-reviewer-subagents-bdaf`: two API Settings regression test files and one governance assertion.
+- **Draft PR produced:** [PR #7](https://github.com/ychen393/mcm-c-agent/pull/7), created by the ChatGPT coordinator from the Cursor commits; targets the specified Cursor governance branch. **No merge.**
+- **Coordinator review recorded:** [PR #7 review](https://github.com/ychen393/mcm-c-agent/pull/7#pullrequestreview-5783181241), **COMMENT**, not approving independent reviewer signoff.
+- **Independent GitHub Actions test succeeded:** separate `test/6-ci-validation` branch based on the **same Cursor code commit** plus a test-only workflow. [Run #42008138145](https://github.com/ychen393/mcm-c-agent/actions/runs/42008138145), Python 3.11, `pytest -q`, 80 progress dots, exit success, no failed tests.
+- **Limits:** PR #7 itself has no standard workflow check because the standard `pull_request.branches` filter only includes `main` and `feature/**`, not this PR's `cursor/**` target. Independent read-only Reviewer/Claude Code was not connected; a Bugbot review report was not independently available, though Cursor commit text mentions Bugbot feedback. AST regression guards are not full Streamlit UI interaction tests.
+- **Current pilot verdict:** GitHub trigger → Cursor code → Draft PR → coordinator code review → separate GitHub Actions CI → user-facing status **demonstrated for a single pilot**. Unattended repeated PR monitoring, automatic review feedback, and PR-attached CI remain **not implemented**. Keep PR #7 Draft pending owner review; no auto-merge/deploy.
+
+**Next collaboration steps:** make CI trigger on governance / `cursor/**` target branches through a separately reviewed workflow change; configure genuinely isolated code review; then validate a second pilot end-to-end with PR-native checks. These steps do not block ongoing Phase B research acceptance tasks.
