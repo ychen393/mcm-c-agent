@@ -456,7 +456,7 @@ if "eda_report" in st.session_state:
             if meta:
                 spec = meta["spec"]
                 st.markdown(f"### Figure {chart_index:02d} · {spec['title']}")
-                st.caption(f"LaTeX reference: \\\\label{{{spec['figure_label']}}}")
+                st.caption(f"LaTeX reference: \\label{{{spec['figure_label']}}}")
                 st.image(chart_path, caption=spec["caption"], use_container_width=True)
                 st.markdown(f"**Analytical question:** {spec['analytical_question']}")
                 st.caption(
