@@ -127,7 +127,7 @@ Phase B ends after chart planning, validation, approval and execution. Evidence-
 - Strengthened ChartSpec axis-shape constraints and validator checks for time-series valid pairs, categorical bar axes, numeric axes, sample sufficiency and explicitly declared units.
 - Added `tests/unit/test_visual_eda_agent.py` for successful planning, context minimization, missing prompt, bounded repair, invalid-column fallback, provider timeout and invalid unit/type cases.
 
-Important integration boundary: B1 provides a tested planner service only. It is intentionally not wired into the current Streamlit EDA execution path yet, because that path auto-executes deterministic charts. B3 must add the user-visible plan preview and explicit approval gate before AI plans can reach the executor. No live API call or UI acceptance is claimed by B1.
+Important integration boundary: B1 provides the planner service; B3 now connects it to Streamlit through a two-step plan preview and explicit approval gate. No live API call or visual UI acceptance is claimed yet.
 
 
 ## B2/B3/B4 implementation notes — 2026-11-05
