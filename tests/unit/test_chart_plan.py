@@ -14,6 +14,7 @@ def spec(chart_id="chart_1", chart_type="histogram", x="value", y=None):
         chart_id=chart_id, chart_type=chart_type, title="Value overview",
         figure_label=f"fig:{chart_id}", x=x, y=y,
         x_label="Value", y_label="Frequency (count)",
+        rank=1, relevance_score=0.5, analytical_role="distribution",
         caption="Distribution of observed values in the dataset.",
         analytical_question="How are the observed values distributed?",
         rationale="Inspect spread before selecting the model.",
