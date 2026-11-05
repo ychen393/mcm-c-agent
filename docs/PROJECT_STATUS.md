@@ -8,14 +8,14 @@ Updated: 2026-11-05. This page is a manually maintained status snapshot, **not a
 | Phase B: Visual EDA planner | Implementation and CI exercised; user verified DeepSeek planning | `feature/m1b-visual-eda`, Draft PR #2; final milestone acceptance / merge still pending |
 | Phase B: API Settings | Implemented and used locally; key remains session scoped | Same PR #2 |
 | Multi-agent governance | Implemented as draft; CI passed | Draft PR #3 targeting `feature/m1b-visual-eda`, pending user approval |
-| Cursor subagent prompts | Builder and Reviewer instruction files only | `.cursor/agents/builder.md`, `.cursor/agents/reviewer.md`; not a connection, authorization, or completed review |
+| Cursor subagent prompts | Builder and Reviewer role files created; custom Task launches failed in tested Cloud session | `.cursor/agents/builder.md`, `.cursor/agents/reviewer.md`; observed invalid `subagent_type` for both; see `AGENTS.md` workaround |
 | Cursor autonomous builder | Not connected by this governance PR | Owner authorization & pilot required |
 | Claude Code independent review | Not connected by this governance PR | Owner authorization & pilot required |
 | Grok QA | Optional; not connected | Deferred pending benefit/cost evaluation |
 | Auto-merge, scheduled agents, protected branches | Not configured by governance documents | Admin/settings access and separate authorization required |
 
 ## Current next milestone
-Governance PR #3 and CI are ready for review. Cursor subagent prompts for Builder and Reviewer exist as local instruction files. Pilot Issue #4 stays blocked until the owner connects and authorizes Cursor and Claude Code and chooses least-privilege access and spending limits. Prompt files do not unblock that pilot. Then run a bounded **builder → reviewer → CI → decision package** pilot.
+Governance PR #3 and CI are ready for review. Cursor subagent prompts for Builder and Reviewer exist as local instruction files, but actual `builder` / `reviewer` Task launches were rejected by the tested Cloud runtime. Pilot Issue #4 stays blocked until the owner connects and authorizes Cursor and Claude Code and chooses least-privilege access and spending limits. Prompt files do not unblock that pilot. Then run a bounded **builder → reviewer → CI → decision package** pilot.
 
 ## Known cautions
 - Passing `pytest -q` does not establish real LLM quality, contest correctness, UI reliability or production readiness.
