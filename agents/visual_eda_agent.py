@@ -50,7 +50,7 @@ def _dataset_context(report: EDAReport) -> dict[str, Any]:
                     if key in numeric
                 }
                 or None,
-                "top_values": (profile.top_values or [])[:5] or None,
+                "top_value_counts": [item["count"] for item in (profile.top_values or [])[:5]] or None,
                 "datetime_min": profile.datetime_min,
                 "datetime_max": profile.datetime_max,
                 "unit": profile.unit,
