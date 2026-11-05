@@ -977,3 +977,21 @@ The user approved this revision after reviewing the first generated charts.
 
 ### 33.5 Change log
 v1.3 Approved — 2026-11-04: Phase A presentation, dataset context, explicit units, provenance and test coverage revision.
+
+
+## 34. PRD v1.4 — Screenshot Review Follow-up (2026-11-05)
+
+The user's local Streamlit screenshots confirm that the main Phase A chart presentation is visible: sequential figure numbers, histogram/time-series output, analytical questions, captions, plotted-row counts, metric cards, collapsed technical JSON and report download controls.
+
+Remaining manual checks:
+- User-entered source/frequency/units have not yet been exercised; the report still records source and units as not provided.
+- Unit-aware axis labels and the Dataset Context result summary are not yet visually verified.
+- The pasted Markdown copy contains a stray `#NAME?` and escaped image-link parentheses. The current renderer code does not emit `#NAME?`; verify the original raw download in a text editor before treating it as a renderer defect.
+
+Follow-up polish:
+- Unit example changed from the incorrect `USD per metric tonne` to `USD per troy ounce`.
+- Added `Business-day daily` as a frequency option.
+- Trend metric renamed to `First-to-last change (%)` to avoid implying a period return calculation other than first-to-last observed values.
+- Removed redundant Figure ID text while retaining the LaTeX reference.
+
+For a dataset confirmed to be the LBMA Gold Price PM, use the source label `LBMA Gold Price PM`, frequency `Business-day daily`, and unit `USD per troy ounce`. Do not apply these labels to another dataset without checking its source documentation.
