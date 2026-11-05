@@ -236,6 +236,7 @@ def test_validator_rejects_duplicate_analytical_intent():
         rationale="Inspect the spread of observed values.",
         analytical_role="distribution",
         rank=1,
+        relevance_score=0.5,
     )
     second = first.model_copy(
         update={
