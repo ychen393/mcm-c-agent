@@ -64,10 +64,58 @@ def test_cursor_subagent_prompts_keep_builder_and_reviewer_separate():
     assert ".cursor/agents/builder.md" in agents
     assert ".cursor/agents/reviewer.md" in agents
     status = (ROOT / "docs/PROJECT_STATUS.md").read_text(encoding="utf-8")
-    assert "instruction files only" in status
+    assert "local instruction files" in status
+    assert "invalid `subagent_type`" in status
 
 
-def test_pull_request_ci_runs_for_feature_branches():
+_CI_BASES = ("main", "feature/**", "cursor/**", "test/**")
+
+
+def _workflow_event_block(workflow: str, event: str) -> str:
+    """Return the mapping nested under one top-level `on:` event."""
+    lines = workflow.splitlines()
+    start = None
+    for index, line in enumerate(lines):
+        if line.startswith(f"  {event}:"):
+            start = index
+            break
+    assert start is not None, event
+    block: list[str] = []
+    for line in lines[start + 1 :]:
+        if line.startswith("  ") and not line.startswith("   ") and line.strip():
+            break
+        block.append(line)
+    return "\n".join(block)
+
+
+def test_pull_request_ci_covers_isolated_pr_bases_and_stays_read_only():
+    """Lock the PR-native trigger list and the permissions this workflow may have.
+
+    A push run on some other branch is not a pull-request check. The branches
+    filter is the pull request base, so cursor/** and test/** have to be present
+    or Draft PRs onto those bases never attach this workflow.
+    """
     ci = (ROOT / ".github/workflows/tests.yml").read_text(encoding="utf-8")
-    assert 'pull_request:' in ci
-    assert 'branches: ["main", "feature/**"]' in ci
+    assert "pull_request:" in ci
+    assert "push:" in ci
+
+    pull_request = _workflow_event_block(ci, "pull_request")
+    push = _workflow_event_block(ci, "push")
+    for base in _CI_BASES:
+        assert f'"{base}"' in pull_request or f"- {base}" in pull_request
+        assert f'"{base}"' in push or f"- {base}" in push
+    for activity in ("opened", "synchronize", "reopened", "ready_for_review"):
+        assert activity in pull_request
+
+    assert "permissions:" in ci
+    assert "contents: read" in ci
+    assert "contents: write" not in ci
+    assert "pull_request_target:" not in ci
+    assert "workflow_run:" not in ci
+    assert "secrets." not in ci
+    assert 'python-version: "3.11"' in ci
+    assert "timeout-minutes: 20" in ci
+    assert "persist-credentials: false" in ci
+    assert "pytest -q" in ci
+    assert "cancel-in-progress: true" in ci
+    assert "github.event_name" in ci

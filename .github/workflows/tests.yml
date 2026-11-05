@@ -1,16 +1,47 @@
 name: Python tests
 
+# Draft and ready pull requests both run this workflow: opened, synchronize,
+# and reopened fire while a pull request is still a draft. ready_for_review
+# covers the moment it leaves draft. The branches list is the pull request
+# base, which is why cursor/** and test/** must be listed explicitly.
+# push uses the same branch families so a branch or this workflow file is
+# tested before a pull request exists. Concurrency cancels only an older
+# in-flight run of the same event and ref. A push run does not cancel the
+# pull_request check, and rapid pushes do not leave a stack of live jobs.
 on:
   push:
-    branches: ["main", "feature/**"]
+    branches:
+      - main
+      - "feature/**"
+      - "cursor/**"
+      - "test/**"
   pull_request:
-    branches: ["main", "feature/**"]
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - main
+      - "feature/**"
+      - "cursor/**"
+      - "test/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-tests-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
