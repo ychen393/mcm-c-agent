@@ -3,7 +3,7 @@
 - `app/`: Streamlit presentation layer.
 - `core/`: shared state, graph orchestration, configuration and routing.
 - `llm/`: provider adapters and model factory.
-- `agents/`: domain agents (introduced in M2).
+- `agents/`: typed domain agents; Phase B Visual EDA Planner and versioned prompts.
 - `tools/`: deterministic tools and external execution interfaces.
 - `knowledge/`: paper ingestion and retrieval (M1).
 - `modeling/`: statistical and mathematical modeling (M3).
