@@ -17,7 +17,7 @@ def fallback_chart_plan(report) -> ChartPlan:
             caption=f"Distribution of observed values for {column}{unit_suffix}; missing values excluded.",
             analytical_question=f"How are values of {column} distributed?",
             rationale=f"Examine the spread and shape of observed values in {column}.",
-            priority="recommended", rank=len(charts) + 1, relevance_score=0.5,
+            priority="recommended", rank=len(charts) + 1, relevance_score=0.0,
             analytical_role="distribution",
             caveats=["Distribution alone does not imply causality or time ordering."],
         ))
@@ -37,7 +37,7 @@ def fallback_chart_plan(report) -> ChartPlan:
                 caption=f"Observed {value_col}{unit_suffix} across {date_col}{period}, ordered chronologically; missing pairs excluded.",
                 analytical_question=f"How does {value_col} change over {date_col}?",
                 rationale=f"Inspect temporal movement in {value_col} for trends and discontinuities.",
-                priority="recommended", rank=len(charts) + 1, relevance_score=0.5,
+                priority="recommended", rank=len(charts) + 1, relevance_score=0.0,
                 analytical_role="trend", caveats=["Descriptive trend; not a prediction."],
             ))
         if count >= 3: break
