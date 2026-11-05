@@ -244,7 +244,7 @@ def test_unknown_dataset_metadata_is_rejected():
 
 @pytest.mark.parametrize("file_name", ["黄金价格.csv", "USD指数.csv", "échantillon.csv", "🔍研究.csv"])
 def test_unicode_file_names_keep_display_but_use_ascii_dataset_ids(file_name):
-    raw = b"date,value\\n2026-01-01,10\\n2026-01-02,11\\n"
+    raw = b"date,value\n2026-01-01,10\n2026-01-02,11\n"
     first = build_dataset_bundle([(file_name, raw)], project_id="unicode")
     again = build_dataset_bundle([(file_name, raw)], project_id="unicode")
     ref = first.datasets[0]
@@ -256,7 +256,7 @@ def test_unicode_file_names_keep_display_but_use_ascii_dataset_ids(file_name):
 
 
 def test_windows_upload_path_is_stripped_before_storing_provenance():
-    raw = b"id,value\\n1,2\\n"
+    raw = b"id,value\n1,2\n"
     bundle = build_dataset_bundle(
         [(r"C:\\Users\\student\\data\\黄金价格.csv", raw)], project_id="paths"
     )
@@ -279,7 +279,7 @@ class _ReadSpy(io.BytesIO):
 
 
 def test_stream_input_is_bounded_by_per_file_size_before_materialization():
-    stream = _ReadSpy(b"col,value\\n" + b"1,2\\n" * 20)
+    stream = _ReadSpy(b"col,value\n" + b"1,2\n" * 20)
     with pytest.raises(ValueError, match="upload limit"):
         build_dataset_bundle(
             [("data.csv", stream)], project_id="bounded", max_file_size=15
@@ -289,8 +289,8 @@ def test_stream_input_is_bounded_by_per_file_size_before_materialization():
 
 
 def test_stream_input_is_bounded_by_remaining_aggregate_size():
-    first = b"id,value\\n1,2\\n"
-    stream = _ReadSpy(b"id,value\\n2,3\\n")
+    first = b"id,value\n1,2\n"
+    stream = _ReadSpy(b"id,value\n2,3\n")
     with pytest.raises(ValueError, match="aggregate limit"):
         build_dataset_bundle(
             [("first.csv", first), ("second.csv", stream)],
@@ -305,7 +305,7 @@ def test_stream_input_is_bounded_by_remaining_aggregate_size():
 def test_upload_generator_is_capped_without_consuming_unbounded_input():
     def uploads():
         for index in range(1000):
-            yield (f"{index}.csv", f"id,value\\n{index},2\\n".encode())
+            yield (f"{index}.csv", f"id,value\n{index},2\n".encode())
 
     with pytest.raises(ValueError, match="at most 5 files"):
         build_dataset_bundle(uploads(), project_id="bounded")
