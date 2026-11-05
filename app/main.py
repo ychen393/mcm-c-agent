@@ -102,7 +102,7 @@ def _render_chart_plan(plan: ChartPlan) -> None:
             rank_col, score_col, type_col = st.columns([0.7, 0.9, 1.2])
             rank_col.metric("Rank", chart.rank)
             score_col.metric(
-                "Relevance" if plan.strategy == "agent" else "Relevance",
+                "Relevance",
                 f"{chart.relevance_score:.0%}" if plan.strategy == "agent" else "Not scored",
             )
             type_col.metric("Chart type", chart.chart_type.replace("_", " ").title())
