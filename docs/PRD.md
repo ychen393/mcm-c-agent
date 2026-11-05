@@ -1034,3 +1034,38 @@ B0 has been authored on `feature/m1b-visual-eda`:
 - `docs/PHASE_B_PLAN.md` records the architecture, non-negotiable boundaries, staged tasks and acceptance criteria.
 
 B0 is awaiting user review. B1–B4 have not yet been implemented. No live LLM call has been made and no Phase B end-to-end workflow is claimed.
+
+
+## 36. PRD v1.6 — B0 Approval and B1 Planner Service (2026-11-05)
+
+**User decision:** B0 was approved in full. The user explicitly confirmed:
+- Chart ranking mechanism: approved.
+- Mandatory human review before chart execution: approved.
+- Deterministic EDA fallback when the LLM fails: approved.
+
+### 36.1 B1 implementation
+Added `agents/visual_eda_agent.py` with `plan_visual_eda()`, using the existing `LLMFactory` / `BaseLLM` provider adapter. The planner accepts a problem statement, EDAReport and DataFrame (the DataFrame is used only for deterministic validation).
+
+The model receives:
+- MCM problem statement;
+- compact dataset metadata and column profiles;
+- descriptive summaries, missingness/quality warnings and numeric correlations;
+- ChartPlan JSON Schema.
+
+The model does not receive the full uploaded DataFrame or raw CSV/XLSX rows. It does not write or execute code and does not calculate numeric results.
+
+### 36.2 Structured output and recovery
+- Parse model JSON into the strict Pydantic ChartPlan / ChartSpec contract.
+- Validate chart ranks, chart IDs, figure labels, supported chart types, actual source columns, axis types, sample sufficiency and declared units against the dataset.
+- Permit one bounded repair request for malformed or invalid output.
+- Missing problem statement, context preparation errors, provider initialization/invocation errors, or a second invalid response return a clearly labeled deterministic generic fallback with a recorded reason.
+- Record planner provider, model and prompt version for accepted AI plans.
+
+### 36.3 Current implementation status
+- B0 user review: approved.
+- B1 planner service: authored on `feature/m1b-visual-eda`.
+- Mocked-LLM tests cover successful plan generation, compact context construction, missing problem statement, bounded repair, invalid-column fallback, provider failure, unsupported units and invalid bar-chart axes.
+- ChartPlan validation was strengthened for axis shape and rank order.
+- B1 is a planner service only; it is deliberately not connected to the existing Streamlit auto-execution path. B3 must add the visible ranked plan preview and explicit approval action before an AI plan can reach Python execution.
+- No live LLM call, Streamlit UX acceptance or Phase B end-to-end acceptance is claimed yet.
+- GitHub Actions for the latest B1 commits are pending final verification at the time of this entry.
