@@ -64,7 +64,7 @@ def test_cursor_subagent_prompts_keep_builder_and_reviewer_separate():
     assert ".cursor/agents/builder.md" in agents
     assert ".cursor/agents/reviewer.md" in agents
     status = (ROOT / "docs/PROJECT_STATUS.md").read_text(encoding="utf-8")
-    assert "instruction files only" in status
+    assert "custom Task launches failed" in status
 
 
 def test_pull_request_ci_runs_for_feature_branches():
