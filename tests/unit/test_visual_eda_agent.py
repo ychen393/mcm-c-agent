@@ -290,3 +290,18 @@ def test_empty_agent_plan_is_preserved_when_planner_abstains():
     assert plan.charts == []
     assert plan.skipped_reasons
     assert len(llm.calls) == 1
+
+
+def test_planner_accepts_json_code_fence_from_provider():
+    dataset, report = sample()
+    llm = FakeLLM([f"```json\\n{valid_plan_json()}\\n```"])
+
+    plan = plan_visual_eda(
+        "Analyze the temporal movement in rentals.",
+        report,
+        dataset.frame,
+        llm=llm,
+    )
+
+    assert plan.strategy == "agent"
+    assert len(llm.calls) == 1
