@@ -92,9 +92,9 @@ Phase B ends after chart planning, validation, approval and execution. Evidence-
 - [x] Add an offline evaluator for strategy, chart-type coverage, required/prohibited columns, prohibited chart types, fallback reason and structural validity.
 - [ ] Measure problem relevance, field correctness, chart suitability, nonredundancy, omission rationale, schema validity and fallback behavior.
 - [x] Add automated checks for exact source columns, declared units, chart types, sample sufficiency, duplicate intent and zero fabricated numeric claims in the planner contract.
-- [ ] Test missing API key, timeout, malformed JSON, invalid column, duplicate chart and empty plan.
-- [ ] Verify chart output provenance and report downloads.
-- [ ] Run full pytest and GitHub Actions.
+- [x] Test missing API key, timeout, malformed/fenced JSON, invalid column/unit, duplicate analytical intent and empty-plan abstention.
+- [x] Verify chart output provenance and Markdown/JSON report generation; Streamlit download controls remain part of local UI acceptance.
+- [x] Run full pytest and GitHub Actions (58 tests passed on verified commit `1a0e18a48780dc6bb95b58333086c5912842f04f`).
 - [ ] User reviews the live Streamlit workflow before Phase B is closed.
 
 ## Acceptance criteria
@@ -110,10 +110,10 @@ Phase B ends after chart planning, validation, approval and execution. Evidence-
 
 ## B0 review checklist
 
-- [ ] ChartSpec rank and relevance_score are clear and useful.
-- [ ] ChartPlan metadata is sufficient to explain the plan and record provider/fallback status.
-- [ ] Prompt boundaries prohibit arbitrary code and unsupported chart types.
-- [ ] Human approval is retained as a mandatory execution gate.
+- [x] ChartSpec rank and relevance_score are clear and useful.
+- [x] ChartPlan metadata is sufficient to explain the plan and record provider/fallback status.
+- [x] Prompt boundaries prohibit arbitrary code and unsupported chart types.
+- [x] Human approval is retained as a mandatory execution gate.
 
 
 ## B1 implementation notes — 2026-11-05
@@ -138,4 +138,4 @@ Important integration boundary: B1 provides the planner service; B3 now connects
 - B3: a pending plan is invalidated if the dataset hash, problem statement, project ID, source/frequency/units, AI toggle or configured provider/model changes. User approval is required before chart rendering and artifact persistence.
 - B3: EDA JSON/Markdown reports include planning strategy, provider/model, ranking/relevance metadata and approval provenance.
 - B4: added six original synthetic chart-planning cases with fixture SHA-256 references and human scoring rubrics, plus `tools/chart_plan_evaluator.py` for automated contract/selection checks. CI validates case schema, fixture hashes and evaluator behavior. No live model benchmark scores are claimed.
-- Remaining acceptance: latest full CI must pass; user must run the Streamlit app locally, inspect the plan/approval flow and confirm the configured provider/key before Phase B can be closed.
+- Remaining acceptance: user must run the Streamlit app locally, inspect the plan/approval flow and confirm the configured provider/key before Phase B can be closed.
