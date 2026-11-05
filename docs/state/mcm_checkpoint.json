@@ -1,0 +1,108 @@
+{
+  "schema_version": "1.0",
+  "checkpoint_id": "mcm-c-2026-11-05-phase-b-live-planner",
+  "snapshot_date": "2026-11-05",
+  "kind": "point_in_time_manual_handoff_not_live_process_state",
+  "repository": "ychen393/mcm-c-agent",
+  "branches": {
+    "main": {
+      "sha": "c6fbb597f719ebe515bfe1720d511498505040af",
+      "status": "unchanged"
+    },
+    "phase_a": {
+      "name": "feature/m1a-data-eda",
+      "sha": "4ee9a4e49c755dd58d5393822b9ced7741530df5",
+      "pr": 1,
+      "status": "draft"
+    },
+    "phase_b": {
+      "name": "feature/m1b-visual-eda",
+      "sha": "31bfdb322a86d8f3efe2ea1eb93e4af5794b6efc",
+      "pr": 2,
+      "status": "draft"
+    },
+    "governance": {
+      "name": "feature/m1c-agent-governance",
+      "sha": "91bf8fdfcdc6588e83c28b1ba9d629a6cfa45a6c",
+      "pr": 3,
+      "status": "draft"
+    }
+  },
+  "milestones": {
+    "phase_a": {
+      "implementation": "implemented",
+      "manual_acceptance": "partially_verified",
+      "open": [
+        "metadata_and_unit_mapping_manual_check",
+        "raw_markdown_export_check"
+      ]
+    },
+    "phase_b": {
+      "b0": "user_approved",
+      "b1": "implemented_and_user_observed_live_ai",
+      "b2": "implemented",
+      "b3": "implemented_and_user_observed_plan",
+      "b4": "test_foundation_only",
+      "final_acceptance": "pending"
+    },
+    "phase_c": {
+      "status": "not_started"
+    },
+    "advanced_eda": {
+      "status": "not_started"
+    },
+    "multi_agent_cli": {
+      "status": "not_started"
+    }
+  },
+  "last_user_observed_result": {
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "planning_strategy": "agent",
+    "dataset_description": "historical gold price with Date and USD (PM) columns",
+    "charts": [
+      {
+        "rank": 1,
+        "type": "time_series",
+        "relevance_score": 0.98
+      },
+      {
+        "rank": 2,
+        "type": "histogram",
+        "relevance_score": 0.9
+      },
+      {
+        "rank": 3,
+        "type": "box_plot",
+        "relevance_score": 0.72
+      }
+    ],
+    "plan_human_approval": "not_confirmed",
+    "chart_execution": "not_confirmed",
+    "report_export": "not_confirmed"
+  },
+  "credentials": {
+    "storage": "local_streamlit_session_only",
+    "key_saved_in_repo": false,
+    "key_value": null,
+    "session_recovery": "re_enter_if_expired"
+  },
+  "next_step": {
+    "id": "MCM-B-ACCEPT-01",
+    "action": "Verify human approval and actual rendering/export of the three-chart DeepSeek plan",
+    "owner_gate": "approval_before_execution"
+  },
+  "deferred_multi_agent": {
+    "governance_pr": 3,
+    "pilot_issue": 4,
+    "cursor_connected": false,
+    "claude_connected": false,
+    "auto_merge_enabled": false
+  },
+  "source_links": [
+    "https://github.com/ychen393/mcm-c-agent/pull/1",
+    "https://github.com/ychen393/mcm-c-agent/pull/2",
+    "https://github.com/ychen393/mcm-c-agent/pull/3",
+    "https://github.com/ychen393/mcm-c-agent/issues/4"
+  ]
+}
