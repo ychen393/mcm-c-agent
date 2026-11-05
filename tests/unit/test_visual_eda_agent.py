@@ -265,7 +265,7 @@ def test_missing_api_key_uses_deterministic_fallback_without_network(test_settin
     )
 
     assert plan.strategy == "deterministic"
-    assert "Missing API key" in plan.fallback_reason
+    assert "LLM provider invocation failed" in plan.fallback_reason
 
 
 def test_empty_agent_plan_is_preserved_when_planner_abstains():
