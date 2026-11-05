@@ -54,9 +54,25 @@ def _parse_units(units_text: str, columns: list[str]) -> dict[str, str]:
     return column_units
 
 
-def _context_signature(data_source: str, frequency: str | None, units: dict[str, str]) -> str:
+def _context_signature(
+    project_id: str,
+    data_source: str,
+    frequency: str | None,
+    units: dict[str, str],
+    use_ai: bool,
+    provider: str,
+    model: str,
+) -> str:
     return json.dumps(
-        {"data_source": data_source.strip(), "frequency": frequency, "units": units},
+        {
+            "project_id": project_id,
+            "data_source": data_source.strip(),
+            "frequency": frequency,
+            "units": units,
+            "use_ai": use_ai,
+            "provider": provider,
+            "model": model,
+        },
         ensure_ascii=False,
         sort_keys=True,
     )
@@ -252,9 +268,13 @@ if uploaded_file is not None:
                 st.session_state["eda_pending_dataset_sha"] = dataset.sha256
                 st.session_state["eda_pending_problem_statement"] = problem_text
                 st.session_state["eda_pending_context_signature"] = _context_signature(
+                    project_id,
                     data_source,
                     frequency_value,
                     column_units,
+                    use_ai_planner,
+                    settings.llm_provider,
+                    settings.llm_model,
                 )
                 st.success("Chart plan generated. Review it below before approving execution.")
             except ValueError as exc:
