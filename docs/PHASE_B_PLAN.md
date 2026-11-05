@@ -70,27 +70,27 @@ Phase B ends after chart planning, validation, approval and execution. Evidence-
 
 ## B2 — Selection quality and fallback
 
-- [ ] Rank charts by problem relevance with unique ordered ranks and 0–1 relevance scores.
+- [x] Require explicit ranks beginning at 1 and 0–1 relevance scores; preserve ascending order.
 - [x] Reject unknown columns, unsupported types, invalid axes, inadequate sample sizes, invalid units and duplicate chart IDs/labels/ranks.
-- [ ] Add redundancy checks for repeated chart intent / identical field pairs.
+- [x] Add redundancy checks for repeated analytical intent and duplicate time-series/scatter field pairs.
 - [x] Keep deterministic fallback when no problem statement or LLM is unavailable.
 - [x] Record fallback reason and never label generic fallback as problem-aware.
 
 ## B3 — Streamlit human-review workflow
 
-- [ ] Add a problem-statement / research-question field to Dataset Explorer.
-- [ ] Add AI planner toggle and provider/model status.
-- [ ] Generate and display a ranked chart-plan preview before chart execution.
-- [ ] Show chart type, source columns, analytical role, relevance score, question, rationale, priority and caveats.
-- [ ] Show skipped chart ideas and why they were omitted.
-- [ ] Require explicit user approval before Python execution.
-- [ ] Preserve deterministic fallback and report the selected planning strategy.
+- [x] Use the MCM problem statement / research-question field in the Dataset Explorer.
+- [x] Add explicit AI planner opt-in toggle and show configured provider/model.
+- [x] Generate and display a ranked chart-plan preview before chart execution.
+- [x] Show chart type, source columns, analytical role, relevance score, question, rationale, priority and caveats.
+- [x] Show skipped chart ideas and why they were omitted.
+- [x] Require explicit user approval before Python execution; artifact persistence is also blocked without approval when a plan is supplied.
+- [x] Preserve deterministic fallback and report the selected planning strategy.
 
 ## B4 — Evaluation and acceptance
 
-- [ ] Build chart-planning evaluation cases for trend, distribution, relationship, comparison, categorical and insufficient-data scenarios.
+- [x] Add six chart-planning evaluation cases covering trend, distribution, relationship, categorical counts, insufficient time coverage and missing-context fallback.
 - [ ] Measure problem relevance, field correctness, chart suitability, nonredundancy, omission rationale, schema validity and fallback behavior.
-- [ ] Verify exact source columns and units; zero unsupported columns and zero fabricated numeric claims.
+- [x] Add automated checks for exact source columns, declared units, chart types, sample sufficiency, duplicate intent and zero fabricated numeric claims in the planner contract.
 - [ ] Test missing API key, timeout, malformed JSON, invalid column, duplicate chart and empty plan.
 - [ ] Verify chart output provenance and report downloads.
 - [ ] Run full pytest and GitHub Actions.
@@ -128,3 +128,13 @@ Phase B ends after chart planning, validation, approval and execution. Evidence-
 - Added `tests/unit/test_visual_eda_agent.py` for successful planning, context minimization, missing prompt, bounded repair, invalid-column fallback, provider timeout and invalid unit/type cases.
 
 Important integration boundary: B1 provides a tested planner service only. It is intentionally not wired into the current Streamlit EDA execution path yet, because that path auto-executes deterministic charts. B3 must add the user-visible plan preview and explicit approval gate before AI plans can reach the executor. No live API call or UI acceptance is claimed by B1.
+
+
+## B2/B3/B4 implementation notes — 2026-11-05
+
+- B2: ranking and relevance fields are required (not silently defaulted); validator enforces contiguous ranks, supported chart shapes, numeric/categorical axes, minimum valid observations, explicitly declared units, unique IDs/labels and duplicate analytical-intent / field-pair rejection.
+- B3: Streamlit now uses a two-step workflow: Generate chart plan → inspect ranked plan → Approve plan & generate charts. AI planning is opt-in; the UI warns that the problem statement and compact profile are sent to the configured provider, while raw dataset rows are not sent.
+- B3: a pending plan is invalidated if the dataset hash, problem statement, project ID, source/frequency/units, AI toggle or configured provider/model changes. User approval is required before chart rendering and artifact persistence.
+- B3: EDA JSON/Markdown reports include planning strategy, provider/model, ranking/relevance metadata and approval provenance.
+- B4: added six original synthetic chart-planning cases with fixture SHA-256 references and human scoring rubrics. CI validates case schema and fixture hashes. No live model benchmark scores are claimed.
+- Remaining acceptance: latest full CI must pass; user must run the Streamlit app locally, inspect the plan/approval flow and confirm the configured provider/key before Phase B can be closed.
