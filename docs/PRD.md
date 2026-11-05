@@ -1095,7 +1095,7 @@ Artifact persistence rejects an explicitly supplied chart plan unless the caller
 Added six original synthetic chart-planning cases covering temporal trends, distribution/outlier review, categorical counts, numeric relationships, insufficient time coverage and missing-context fallback. Each case includes a reference checklist, weighted human rubric, critical errors and fixture SHA-256 reference. Added an offline evaluator for strategy, chart-type/column coverage, prohibited fields/types, fallback reason and structural validity. CI checks case schema, fixture hashes and evaluator behavior.
 
 ### 37.5 Remaining acceptance gates
-- Latest full GitHub Actions run must pass after the final B1–B4 code changes.
+- GitHub Actions passed on verified commit `1a0e18a48780dc6bb95b58333086c5912842f04f`; pytest reported 58 passing tests.
 - User must run `streamlit run app/main.py` locally and visually inspect the two-step workflow.
 - A real configured provider/API key must be tested by the user; this implementation does not claim a live LLM request has been completed.
 - The six-case rubric is an evaluation specification, not a measured benchmark result. Model quality scores must be collected before claiming planner performance.
