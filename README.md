@@ -2,7 +2,7 @@
 
 A semi-autonomous multi-agent research workspace for exploring MCM Problem C. The system is designed to support evidence-based problem decomposition, data analysis, modeling, validation, and LaTeX paper preparation.
 
-> **Status:** M0.5 Evaluation baseline passed locally; M1-A Data-to-EDA implementation is in review on `feature/m1a-data-eda`.
+> **Status:** M0.5 evaluation baseline passed locally; Phase A Data-to-EDA is in review on `feature/m1a-data-eda`; Phase B Visual EDA Planner contracts are in development on `feature/m1b-visual-eda`.
 
 ## Product principles
 
