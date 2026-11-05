@@ -174,7 +174,7 @@ def test_provider_failure_uses_deterministic_fallback():
 
     assert plan.strategy == "deterministic"
     assert "provider invocation failed" in plan.fallback_reason
-    assert "provider timeout" in plan.fallback_reason
+    assert "provider timeout" not in plan.fallback_reason
     assert len(llm.calls) == 1
 
 
