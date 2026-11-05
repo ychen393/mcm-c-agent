@@ -22,8 +22,8 @@ class ChartSpec(BaseModel):
     analytical_question: str = Field(min_length=8)
     rationale: str = Field(min_length=8)
     priority: Literal["required", "recommended", "optional"] = "recommended"
-    rank: int = Field(default=1, ge=1, le=12)
-    relevance_score: float = Field(default=0.5, ge=0.0, le=1.0)
+    rank: int = Field(ge=1, le=12)
+    relevance_score: float = Field(ge=0.0, le=1.0)
     analytical_role: Literal["distribution", "trend", "comparison", "relationship", "composition", "data_quality", "domain_specific"] = "distribution"
     caveats: list[str] = Field(default_factory=list)
 
