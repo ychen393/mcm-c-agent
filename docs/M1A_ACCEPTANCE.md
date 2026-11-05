@@ -98,3 +98,22 @@ Revision acceptance checklist:
 - [ ] User re-runs the app and confirms the revised UI.
 
 Important: Source, frequency and units are not guessed from the data. Users may provide them; date range and approximate frequency are inferred from observed date values and labeled accordingly. Phase B/C remain separate milestones.
+
+
+## User screenshot review — 2026-11-05
+Observed in the submitted Streamlit screenshots:
+- [x] Figure 01 / Figure 02 numbering is visible.
+- [x] Histogram and chronological time-series chart render.
+- [x] Analytical question, captions, axis labels and plotted-row counts are visible.
+- [x] Metric cards render; technical metrics are collapsed by default.
+- [x] Dataset context input controls and Markdown/JSON download controls are visible.
+- [ ] User-entered data source, declared frequency and units have not yet been exercised; submitted report still says source/units are not provided.
+- [ ] Unit-aware chart axes therefore remain unverified.
+- [ ] Dataset Context output summary is not visible in the supplied screenshots.
+- [ ] Verify the raw Markdown download in a text editor: the pasted report copy contains a stray `#NAME?` line and escaped image-link parentheses. The current renderer source does not generate `#NAME?`; confirm whether this is a copy/conversion artifact or present in the actual downloaded file.
+
+Follow-up polish committed after screenshot review:
+- Corrected the unit example to `USD (PM) = USD per troy ounce` (the prior example said metric tonne and was inappropriate for the LBMA Gold Price).
+- Added `Business-day daily` as a declared-frequency option.
+- Renamed the trend percentage metric to `First-to-last change (%)` to clarify its calculation.
+- Removed the duplicate Figure ID line while retaining the LaTeX reference.
