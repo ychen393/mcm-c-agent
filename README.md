@@ -71,6 +71,8 @@ streamlit run app/main.py
 
 M1-A in review: deterministic CSV/XLSX loading, dataset profiling, descriptive statistics, quality warnings, correlations, trend/distribution charts, and JSON/Markdown artifacts. Not yet implemented: paper ingestion/RAG, sandboxed Python execution, model validation, LaTeX generation, and reviewer loops.
 
+M1-B.2 Slice 1 adds an in-memory registry for 1–5 CSV/XLSX files with independent profiles and provenance hashes. It does not join files, align dates, draw cross-dataset charts, or make an extra model call. See [Slice 1 dataset bundle](docs/M1B2_SLICE1_DATASET_BUNDLE.md).
+
 See [Project Structure](docs/PROJECT_STRUCTURE.md), [Development Plan](docs/DEVELOPMENT_PLAN.md), and [M0 Acceptance](docs/M0_ACCEPTANCE.md).
 
 ## Safety
