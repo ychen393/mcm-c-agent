@@ -233,6 +233,7 @@ if uploaded_file is not None:
             )
 
         if st.button("Generate chart plan", type="primary", key="generate_chart_plan"):
+            _clear_pending_plan()
             st.session_state.pop("eda_report", None)
             st.session_state.pop("eda_artifacts", None)
             st.session_state.pop("eda_report_dataset_sha", None)
