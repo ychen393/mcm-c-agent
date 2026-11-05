@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import json
 from collections import Counter
 from pathlib import Path
@@ -80,3 +81,29 @@ def test_eda_golden_statistics_match_fixtures():
     assert len(stations) == golden["joins"]["right_rows"]
     assert sum(row["station_id"] not in station_ids for row in daily) == golden["joins"]["unmatched_station_ids"]
     assert len(daily) == golden["joins"]["expected_join_rows"]
+
+
+def test_visual_eda_chart_planning_cases_match_schema_and_fixture_hashes():
+    schema = json.loads(
+        (EVAL / "schemas/evaluation_case.schema.json").read_text(encoding="utf-8")
+    )
+    validator = Draft202012Validator(schema)
+    cases = [
+        json.loads(line)
+        for line in (EVAL / "chart_planning_cases.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    assert len(cases) == 6
+    assert len({case["case_id"] for case in cases}) == len(cases)
+    assert all(case["suite"] == "eda" for case in cases)
+
+    for case in cases:
+        errors = list(validator.iter_errors(case))
+        assert not errors, (case["case_id"], errors)
+        for fixture_ref in case.get("fixture_refs", []):
+            fixture_path, expected_hash = fixture_ref.split("#sha256=", 1)
+            fixture_bytes = (ROOT / fixture_path).read_bytes()
+            assert hashlib.sha256(fixture_bytes).hexdigest() == expected_hash, case["case_id"]
+
+    assert {case["split"] for case in cases} == {"dev", "holdout", "regression"}
