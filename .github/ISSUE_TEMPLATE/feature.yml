@@ -1,0 +1,43 @@
+name: Agent development task
+description: Scoped implementation work with risk tier and acceptance gates
+title: "[Task] "
+labels: []
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective and context
+      description: State the expected user-visible outcome and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria and tests
+      description: Include positive, negative and regression cases.
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk tier (see AUTONOMY_POLICY)
+      options:
+        - L0 - docs
+        - L1 - reversible code
+        - L2 - research/product semantics
+        - L3 - security/infrastructure
+        - L4 - irreversible or financial
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Non-goals, dependencies and constraints
+      description: Note costs, data access, API keys, assumptions and files excluded.
+    validations:
+      required: true
+  - type: textarea
+    id: owner_gate
+    attributes:
+      label: Owner approval needed
+      placeholder: None for drafting; explicit owner approval before merge / deployment / spending as applicable.
