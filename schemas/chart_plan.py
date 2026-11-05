@@ -42,6 +42,7 @@ class ChartPlan(BaseModel):
     problem_alignment: str | None = None
     planner_provider: str | None = None
     planner_model: str | None = None
+    planner_prompt_version: str | None = None
     fallback_reason: str | None = None
     skipped_reasons: list[str] = Field(default_factory=list)
 
