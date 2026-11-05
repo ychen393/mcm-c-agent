@@ -17,6 +17,8 @@ def fallback_chart_plan(report) -> ChartPlan:
             caption=f"Distribution of observed values for {column}{unit_suffix}; missing values excluded.",
             analytical_question=f"How are values of {column} distributed?",
             rationale=f"Examine the spread and shape of observed values in {column}.",
+            priority="recommended", rank=len(charts) + 1, relevance_score=0.5,
+            analytical_role="distribution",
             caveats=["Distribution alone does not imply causality or time ordering."],
         ))
     count = 0
@@ -39,4 +41,8 @@ def fallback_chart_plan(report) -> ChartPlan:
                 analytical_role="trend", caveats=["Descriptive trend; not a prediction."],
             ))
         if count >= 3: break
-    return ChartPlan(charts=charts[:12], skipped_reasons=["Semantic selection requires a later Visual EDA Agent."])
+    return ChartPlan(
+        strategy="deterministic", planning_summary="Generic deterministic fallback based on available column types.",
+        fallback_reason="Problem-aware AI chart planning was not used.", charts=charts[:12],
+        skipped_reasons=["No problem-aware selection or semantic relevance ranking in deterministic fallback."],
+    )
