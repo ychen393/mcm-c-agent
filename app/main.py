@@ -2,6 +2,7 @@ import json
 import streamlit as st
 
 from core.config import get_settings
+from app.api_settings import build_runtime_settings, render_api_settings, SESSION_REVISION_KEY
 from core.graph import build_foundation_graph
 from core.state import new_research_state
 from schemas.chart_plan import ChartPlan
@@ -13,8 +14,16 @@ from tools.eda_engine import build_eda_report
 from tools.eda_artifacts import save_eda_artifacts
 from agents.visual_eda_agent import plan_visual_eda
 
-settings = get_settings()
+base_settings = get_settings()
+settings = build_runtime_settings(
+    base_settings, st.session_state.get("llm_session_config")
+)
 st.set_page_config(page_title=settings.app_name, page_icon="🧮", layout="wide")
+page = st.sidebar.radio("Navigation", ["Research Lab", "API Settings"], key="workspace_navigation")
+if page == "API Settings":
+    render_api_settings(base_settings)
+    st.stop()
+
 st.title("MCM C Research Lab")
 st.caption("A semi-autonomous research workspace for MCM Problem C")
 
@@ -62,6 +71,7 @@ def _context_signature(
     use_ai: bool,
     provider: str,
     model: str,
+    config_revision: int,
 ) -> str:
     return json.dumps(
         {
@@ -72,6 +82,7 @@ def _context_signature(
             "use_ai": use_ai,
             "provider": provider,
             "model": model,
+            "config_revision": config_revision,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -283,6 +294,7 @@ if uploaded_file is not None:
                     use_ai_planner,
                     settings.llm_provider,
                     settings.llm_model,
+                    st.session_state.get(SESSION_REVISION_KEY, 0),
                 )
                 st.success("Chart plan generated. Review it below before approving execution.")
             except ValueError as exc:
