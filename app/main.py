@@ -15,10 +15,10 @@ from tools.eda_artifacts import save_eda_artifacts
 from agents.visual_eda_agent import plan_visual_eda
 
 base_settings = get_settings()
+st.set_page_config(page_title=base_settings.app_name, page_icon="🧮", layout="wide")
 settings = build_runtime_settings(
     base_settings, st.session_state.get("llm_session_config")
 )
-st.set_page_config(page_title=settings.app_name, page_icon="🧮", layout="wide")
 page = st.sidebar.radio("Navigation", ["Research Lab", "API Settings"], key="workspace_navigation")
 if page == "API Settings":
     render_api_settings(base_settings)
