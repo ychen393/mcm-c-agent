@@ -16,6 +16,8 @@ def validate_chart_plan(
     chart_ids: set[str] = set()
     figure_labels: set[str] = set()
     ranks = [spec.rank for spec in plan.charts]
+    analytical_intents: set[tuple[str, str, str]] = set()
+    paired_fields: set[tuple[str, str, str]] = set()
     if len(ranks) != len(set(ranks)):
         raise ValueError("Duplicate chart rank")
     if ranks != list(range(1, len(ranks) + 1)):
@@ -30,6 +32,20 @@ def validate_chart_plan(
             raise ValueError(f"Duplicate figure_label: {spec.figure_label}")
         chart_ids.add(spec.chart_id)
         figure_labels.add(spec.figure_label)
+
+        intent_key = (spec.analytical_role, spec.x, spec.y or "")
+        if intent_key in analytical_intents:
+            raise ValueError(
+                f"Duplicate analytical intent for {spec.analytical_role}: {spec.x}, {spec.y}"
+            )
+        analytical_intents.add(intent_key)
+        if spec.chart_type in ("scatter", "time_series"):
+            pair = (spec.chart_type, spec.x, spec.y or "")
+            if spec.chart_type == "scatter" and spec.y:
+                pair = (spec.chart_type, *sorted((spec.x, spec.y)))
+            if pair in paired_fields:
+                raise ValueError(f"Duplicate source-field pair for {spec.chart_type}: {pair[1:]}")
+            paired_fields.add(pair)
 
         for name in (spec.x, spec.y):
             if name is not None and name not in frame.columns:
