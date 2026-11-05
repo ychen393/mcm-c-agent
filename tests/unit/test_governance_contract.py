@@ -3,7 +3,10 @@
 These tests verify the documentation contract only; they cannot prove that external
 coding agents, repository protections, or independent reviews are actually connected.
 """
+import json
 from pathlib import Path
+
+from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -119,3 +122,50 @@ def test_pull_request_ci_covers_isolated_pr_bases_and_stays_read_only():
     assert "pytest -q" in ci
     assert "cancel-in-progress: true" in ci
     assert "github.event_name" in ci
+
+
+def test_cowork_runbook_names_supported_tasks_and_stop_gates():
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    runbook = (ROOT / "docs/CURSOR_COWORK_RUNBOOK.md").read_text(encoding="utf-8")
+    builder = (ROOT / ".cursor/agents/builder.md").read_text(encoding="utf-8")
+    reviewer = (ROOT / ".cursor/agents/reviewer.md").read_text(encoding="utf-8")
+
+    assert "docs/CURSOR_COWORK_RUNBOOK.md" in agents
+    assert "no Task-level readonly switch" in agents
+    assert "generalPurpose" in agents
+    assert "bugbot" in agents
+    assert "security-review" in agents
+    assert "ci-investigator" in agents
+    assert "subagent_type=builder" in builder
+    assert "subagent_type=reviewer" in reviewer
+    assert "does not make a Cloud Task read-only" in reviewer
+
+    for required in (
+        "generalPurpose",
+        "bugbot",
+        "security-review",
+        "ci-investigator",
+        "Maximum two autonomous repair cycles",
+        "BLOCKED",
+        "do not auto-merge",
+        "pytest -q",
+        "contents: read",
+        "pull-requests: read",
+        "persist-credentials: false",
+        "not an AI reviewer",
+    ):
+        assert required in runbook
+    assert "Markdown `readonly: true` field as isolation" in agents
+
+
+def test_cowork_status_record_matches_schema_and_stores_no_secrets():
+    schema_path = ROOT / "docs/cowork/task-status.schema.json"
+    status_path = ROOT / "docs/cowork/issue-8-status.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    status = json.loads(status_path.read_text(encoding="utf-8"))
+    Draft202012Validator(schema).validate(status)
+    raw = json.dumps(status).lower()
+    for banned in ("api_key", "begin private", "sk-", "password=", ".env"):
+        assert banned not in raw
+    assert status["repair_attempts"] <= 2
+    assert status["reviewer"]["isolation"] in {"verified", "unavailable", "blocked"}

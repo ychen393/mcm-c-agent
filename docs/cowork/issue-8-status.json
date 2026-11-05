@@ -1,0 +1,37 @@
+{
+  "issue": "https://github.com/ychen393/mcm-c-agent/issues/8",
+  "branch": "feature/8-cursor-cowork-v1",
+  "base_branch": "cursor/init-builder-reviewer-subagents-bdaf",
+  "commit_sha": "b649f05d4b8b4c66b5b4c41d953f46d4e49e7605",
+  "pull_request": "https://github.com/ychen393/mcm-c-agent/pull/9",
+  "test_command": "pytest -q",
+  "check_runs": [
+    {
+      "url": "https://github.com/ychen393/mcm-c-agent/actions/runs/42010164757",
+      "event": "pull_request",
+      "conclusion": "success",
+      "head_sha": "b649f05d4b8b4c66b5b4c41d953f46d4e49e7605"
+    }
+  ],
+  "implementer": {
+    "identity": "Cursor Cloud agent bc-ac44af56-4736-4686-9fd2-9bb27e44349c",
+    "capability": "Main agent wrote the Stage A workflow on this branch. Run metadata names the model grok-4.7-high-fast. No second model is claimed. Supported implementation subagent remains generalPurpose.",
+    "task_id": "bc-ac44af56-4736-4686-9fd2-9bb27e44349c"
+  },
+  "reviewer": {
+    "identity": "bugbot",
+    "capability": "Requested subagent_type bugbot once against the Issue 8 diff. The Task schema rejected it before launch.",
+    "isolation": "blocked",
+    "findings": "Invalid option: expected one of generalPurpose, explore, debug, computerUse, videoReview, cursor-guide, ci-investigator, best-of-n-runner, ai-architect, deployment-expert, performance-optimizer. bugbot and security-review are absent. The builder session can still push. The Actions job Read-only review boundary is not an AI reviewer. Frontmatter readonly is not enforcement.",
+    "task_id": "not-launched"
+  },
+  "repair_attempts": 0,
+  "owner_approval": "pending",
+  "next_action": "Run the isolated test-only smoke pull request. Owner reviews the evidence. Do not merge.",
+  "status": "PARTIAL",
+  "blockers": [
+    "Reviewer isolation is blocked: this Cloud session has write tools and the Task schema has no readonly switch.",
+    "bugbot and security-review are not in this session's Task enum, so no specialized review ran.",
+    "Issue comments are blocked for this token (addComment: Resource not accessible by integration). Handoff is on the draft pull request."
+  ]
+}
