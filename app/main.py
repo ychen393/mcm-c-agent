@@ -126,6 +126,7 @@ with st.sidebar:
     st.info("M1-B · Visual EDA Agent")
     st.caption(f"Environment: {settings.app_env}")
     st.caption(f"LLM provider: {settings.llm_provider}")
+    st.caption(f"LLM model: {settings.llm_model}")
 
 left, right = st.columns([1.3, 1])
 with left:
@@ -232,6 +233,9 @@ if uploaded_file is not None:
             )
 
         if st.button("Generate chart plan", type="primary", key="generate_chart_plan"):
+            st.session_state.pop("eda_report", None)
+            st.session_state.pop("eda_artifacts", None)
+            st.session_state.pop("eda_report_dataset_sha", None)
             try:
                 column_units = _parse_units(
                     units_text,
