@@ -40,12 +40,21 @@ Build a semi-autonomous, verifiable MCM Problem C research system. Data analysis
 - **Grok — optional independent QA:** only after scope and costs are approved.
 - **GitHub Actions:** objective automated tests and guardrails, not a substitute for human approval.
 
-## Cursor subagent prompts
-Local role instructions are `.cursor/agents/builder.md` and `.cursor/agents/reviewer.md`. **Cloud Agent compatibility warning (observed 2026-11-05):** In the user's tested Cloud Task session, `subagent_type=builder` and `subagent_type=reviewer` were rejected as invalid enum values. Do **not** claim that these custom role names can be directly invoked in that environment. A role Markdown file does not prove runtime registration.
+## Cursor co-work invocation
+Operational steps, stop gates, and the machine-readable record are `docs/CURSOR_COWORK_RUNBOOK.md` and `docs/cowork/`. Role prompts remain `.cursor/agents/builder.md` and `.cursor/agents/reviewer.md`. Those files are instructions. They are not Task types. Frontmatter `readonly` is not a permission.
 
-**Safe Cloud workaround, requiring verification:** use an allowed built-in `generalPurpose` Task for the Builder and pass the Builder file contents as instructions; for Reviewer use an allowed built-in `generalPurpose` Task with `readonly: true` at the **tool invocation level** (if supported), and pass the Reviewer file contents as instructions. Run sequentially after Builder commit; give Reviewer the diff, issue and test evidence, not Builder's self-assessment. If the tool cannot enforce readonly, do not launch Reviewer as a writable task: stop and request a separately isolated read-only review session. Use separate sessions/models only when the UI/API actually confirms them. Neither this workaround nor model diversity is yet independently verified here.
+**Observed Cloud Task limits (2026-11-05):** `subagent_type=builder` and `subagent_type=reviewer` are rejected. The Task schema has no Task-level readonly switch. Do not call those custom names again. Do not treat a Markdown `readonly: true` field as isolation.
 
-The Builder implements one scoped issue. The Reviewer must be read-only and must not edit the Builder branch. These files do not connect an external account, authorize spending, or count as an independent review.
+Use only a built-in type the current session actually lists:
+- `generalPurpose` — implement one scoped issue. Put the Builder prompt in the task text.
+- `bugbot` — bug-oriented review of a real diff, only when that type is accepted. Record the task id or the rejection. Do not substitute another type and call it `bugbot`.
+- `security-review` — only for a security-scoped change, and only when that type is accepted.
+- `ci-investigator` — a failed GitHub Actions check. Do not invent a failure to invoke it.
+- `explore` and `debug` — inspection and a reproducible bug. They are not an independent reviewer.
+
+This repository has no demonstrated agent-to-agent messaging channel. The coordinator handoff is a GitHub pull request comment (issue comments from this token are not granted). Do not claim a second model was used unless the invocation result shows that model. Do not claim the reviewer was read-only unless a separate principal is limited to read. A builder session that can push is not a read-only reviewer.
+
+The Builder implements one scoped issue. An independent reviewer must not edit the Builder branch. These files do not connect an external account, authorize spending, or count as an independent review.
 
 ## Minimum PR evidence
 - Linked Issue and scope; files touched; tests with exact command/results; data/LLM cost impact; privacy impact; fallback and rollback steps; reviewer findings or "review pending"; approval requirement.

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "task-status.schema.json",
+  "title": "Cursor co-work task status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "issue",
+    "branch",
+    "base_branch",
+    "commit_sha",
+    "pull_request",
+    "test_command",
+    "check_runs",
+    "implementer",
+    "reviewer",
+    "repair_attempts",
+    "owner_approval",
+    "next_action",
+    "status",
+    "blockers"
+  ],
+  "properties": {
+    "issue": { "type": "string", "minLength": 1 },
+    "branch": { "type": "string", "minLength": 1 },
+    "base_branch": { "type": "string", "minLength": 1 },
+    "commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "SHA that the check_runs entries describe. The commit that last edited this file may be newer."
+    },
+    "pull_request": { "type": "string", "minLength": 1 },
+    "test_command": { "type": "string", "minLength": 1 },
+    "check_runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "event", "conclusion", "head_sha"],
+        "properties": {
+          "url": { "type": "string", "minLength": 1 },
+          "event": { "type": "string", "minLength": 1 },
+          "conclusion": { "type": "string", "minLength": 1 },
+          "head_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+        }
+      }
+    },
+    "implementer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "capability", "task_id"],
+      "properties": {
+        "identity": { "type": "string", "minLength": 1 },
+        "capability": { "type": "string", "minLength": 1 },
+        "task_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "capability", "isolation", "findings", "task_id"],
+      "properties": {
+        "identity": { "type": "string", "minLength": 1 },
+        "capability": { "type": "string", "minLength": 1 },
+        "isolation": { "enum": ["verified", "unavailable", "blocked"] },
+        "findings": { "type": "string", "minLength": 1 },
+        "task_id": { "type": "string" }
+      }
+    },
+    "repair_attempts": { "type": "integer", "minimum": 0, "maximum": 2 },
+    "owner_approval": { "type": "string", "minLength": 1 },
+    "next_action": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["PASS", "PARTIAL", "BLOCKED"] },
+    "blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "smoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branch", "base_branch", "pull_request", "commit_sha", "check_run"],
+      "properties": {
+        "branch": { "type": "string" },
+        "base_branch": { "type": "string" },
+        "pull_request": { "type": "string" },
+        "commit_sha": { "type": "string" },
+        "check_run": { "type": "string" }
+      }
+    }
+  }
+}
