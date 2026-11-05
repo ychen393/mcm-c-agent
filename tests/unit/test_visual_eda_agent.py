@@ -294,7 +294,7 @@ def test_empty_agent_plan_is_preserved_when_planner_abstains():
 
 def test_planner_accepts_json_code_fence_from_provider():
     dataset, report = sample()
-    llm = FakeLLM([f"```json\\n{valid_plan_json()}\\n```"])
+    llm = FakeLLM([f"```json\n{valid_plan_json()}\n```"])
 
     plan = plan_visual_eda(
         "Analyze the temporal movement in rentals.",
