@@ -196,7 +196,6 @@ def test_validator_rejects_unverified_units_and_numeric_bar_categories():
         caption="Observed values over the supplied dates.",
         analytical_question="How does value change over time?",
         rationale="Inspect temporal movement in the measured value.",
-        rank=1,
     )
     with pytest.raises(ValueError, match="only explicitly declared unit"):
         validate_chart_plan(ChartPlan(charts=[wrong_unit]), dataset.frame, report)
@@ -215,7 +214,6 @@ def test_validator_rejects_unverified_units_and_numeric_bar_categories():
         caption="Counts for values treated as categories.",
         analytical_question="How often does each numeric value occur?",
         rationale="Inspect the frequency of each numeric value.",
-        rank=1,
     )
     with pytest.raises(ValueError, match="categorical x column"):
         validate_chart_plan(ChartPlan(charts=[numeric_bar]), dataset.frame, report)
