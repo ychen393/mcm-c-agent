@@ -39,4 +39,4 @@ The application will append:
 - Missingness, quality warnings and numeric correlations
 - The JSON Schema for the required output
 
-Return valid JSON only.
+The application, not the model, will populate planner_provider, planner_model and planner_prompt_version. Set these fields to null if present in the output schema. The application also overwrites strategy with `agent` and fallback_reason with null after validation.\n\nReturn valid JSON only.
