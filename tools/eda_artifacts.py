@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib
@@ -10,6 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from schemas.chart_plan import ChartPlan
 from schemas.eda import EDAReport
 from tools.data_loader import LoadedDataset, safe_project_id
 
@@ -23,7 +25,13 @@ def save_eda_artifacts(
     dataset: LoadedDataset,
     report: EDAReport,
     output_root: Path,
+    *,
+    chart_plan: ChartPlan | None = None,
+    human_approved: bool = False,
 ) -> dict[str, str | list[str]]:
+    if chart_plan is not None and not human_approved:
+        raise PermissionError("Chart plan execution requires explicit human approval.")
+
     project_dir = output_root / safe_project_id(report.project_id) / "eda" / dataset.sha256[:12]
     project_dir.mkdir(parents=True, exist_ok=True)
     dataset_path = project_dir / f"{_safe_stem(dataset.file_name)}{dataset.file_extension}"
@@ -34,13 +42,19 @@ def save_eda_artifacts(
     temp_dataset.write_bytes(dataset.raw_bytes)
     os.replace(temp_dataset, dataset_path)
 
-    # Phase A: deterministic chart plan -> validated executor; no LLM calls.
+    # Legacy callers retain deterministic Phase A behavior. Any explicitly supplied
+    # plan must pass through the human approval gate before chart execution.
     from tools.chart_catalog import fallback_chart_plan
     from tools.chart_executor import execute_chart_plan
     from tools.chart_plan_validator import validate_chart_plan
 
-    plan = fallback_chart_plan(report)
-    validate_chart_plan(plan, dataset.frame)
+    plan = chart_plan or fallback_chart_plan(report)
+    validate_chart_plan(plan, dataset.frame, report)
+    if chart_plan is not None:
+        report.summary["chart_plan_approval"] = {
+            "status": "approved",
+            "approved_at_utc": datetime.now(timezone.utc).isoformat(),
+        }
     chart_results = execute_chart_plan(plan, dataset.frame, project_dir, dataset.sha256)
     chart_paths = [item.path for item in chart_results]
     report.chart_metadata = [item.model_dump(mode="json") for item in chart_results]
@@ -75,6 +89,9 @@ def render_markdown_report(report: EDAReport) -> str:
         f"- User-declared frequency: {data.temporal_frequency or 'Not provided'}",
         f"- Estimated frequency: {data.inferred_frequency or 'Not available'}",
         f"- Date period: {data.period_start or 'N/A'} to {data.period_end or 'N/A'}",
+        f"- Chart planning strategy: {report.chart_plan.get('strategy', 'not recorded')}",
+        f"- Planner: {report.chart_plan.get('planner_provider') or 'N/A'} / {report.chart_plan.get('planner_model') or 'N/A'}",
+        f"- Chart-plan approval: {report.summary.get('chart_plan_approval', {}).get('status', 'not recorded')}",
         "",
         "## Column units",
         "",
@@ -121,7 +138,9 @@ def render_markdown_report(report: EDAReport) -> str:
         for item in report.chart_metadata:
             spec = item["spec"]
             lines.extend([
-                f"### {spec['figure_label']} — {spec['title']}",
+                f"### Rank {spec['rank']} · {spec['figure_label']} — {spec['title']}",
+                f"**Relevance score:** {spec['relevance_score']:.0%}" if report.chart_plan.get("strategy") == "agent" else "**Relevance score:** Not scored",
+                f"**Analytical role:** {spec['analytical_role']}",
                 f"![{spec['title']}]({Path(item['path']).name})",
                 f"**Analytical question:** {spec['analytical_question']}",
                 f"**Caption:** {spec['caption']}",
@@ -130,7 +149,7 @@ def render_markdown_report(report: EDAReport) -> str:
                 f"**Plotted rows:** {item['plotted_rows']}",
                 f"**Source SHA-256:** {item['source_sha256']}",
                 f"**Computed metrics:** {item['metrics']}",
-                "**Insight status:** Not generated in Phase A; evidence-grounded interpretation is scheduled for Phase C.",
+                "**Insight status:** Not generated; evidence-grounded interpretation is scheduled for Phase C.",
                 "",
             ])
     else:

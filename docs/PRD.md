@@ -995,3 +995,126 @@ Follow-up polish:
 - Removed redundant Figure ID text while retaining the LaTeX reference.
 
 For a dataset confirmed to be the LBMA Gold Price PM, use the source label `LBMA Gold Price PM`, frequency `Business-day daily`, and unit `USD per troy ounce`. Do not apply these labels to another dataset without checking its source documentation.
+
+
+## 35. PRD v1.5 — Phase B Visual EDA Agent Implementation Start (2026-11-05)
+
+**Decision:** Begin Phase B on a dedicated branch `feature/m1b-visual-eda`, based on the Phase A development branch. Do not merge Phase A or Phase B into `main` until the corresponding user review and acceptance gates are complete.
+
+### 35.1 Scope
+Implement the Visual EDA Planner through the existing Multi-LLM adapter. It receives the MCM C problem statement and deterministic Phase A dataset profile, then proposes and ranks relevant charts. It does not generate research insights; Insight Analyst and EDA Reviewer remain Phase C.
+
+### 35.2 Human-in-the-loop
+The workflow is semi-autonomous: the planner proposes a typed ChartPlan; deterministic validation checks it against the uploaded DataFrame; the user reviews and explicitly approves the plan; only then does the Python executor render figures.
+
+### 35.3 Safety and evidence boundaries
+- LLM may only choose from executor-supported chart types and exact dataset column names.
+- LLM must not write executable Python, SQL, shell commands or arbitrary expressions.
+- LLM does not compute statistics. Python computes actual plotted metrics.
+- Units may only come from explicit dataset metadata.
+- Unsupported, redundant or infeasible chart proposals must be rejected or explained in skipped_reasons.
+- Missing problem statement, missing API credentials, provider failure or invalid model output must retain a deterministic generic fallback and clearly disclose that it is not problem-aware.
+- Persist chart-plan strategy, provider/model where applicable, ranking, relevance score, rationale, skipped reasons, dataset hash and chart provenance.
+
+### 35.4 Phase B sub-milestones
+- B0 Contracts and prompt foundation: typed ranking/relevance fields, plan provenance, strict schemas, rank validation, versioned planner prompt, tests and implementation plan.
+- B1 Visual EDA Planner: Multi-LLM call, dataset/problem context, JSON parsing, bounded repair and validation.
+- B2 Selection quality and fallback: redundancy/feasibility checks and deterministic fallback.
+- B3 Streamlit human review: problem input, ranked plan preview and explicit approval before execution.
+- B4 Evaluation and acceptance: planner quality cases, failure tests, full CI and local user review.
+
+### 35.5 Current implementation status
+B0 has been authored on `feature/m1b-visual-eda`:
+- ChartSpec: rank, relevance_score and analytical_role.
+- ChartPlan: planning_summary, problem_alignment, planner_provider, planner_model and fallback_reason.
+- Strict rejection of unknown ChartSpec / ChartPlan fields.
+- Unique ascending rank validation.
+- Deterministic fallback chart plans carry explicit generic-fallback metadata and stable ranks.
+- Versioned planner prompt and B0 contract tests added.
+- `docs/PHASE_B_PLAN.md` records the architecture, non-negotiable boundaries, staged tasks and acceptance criteria.
+
+B0 is awaiting user review. B1–B4 have not yet been implemented. No live LLM call has been made and no Phase B end-to-end workflow is claimed.
+
+
+## 36. PRD v1.6 — B0 Approval and B1 Planner Service (2026-11-05)
+
+**User decision:** B0 was approved in full. The user explicitly confirmed:
+- Chart ranking mechanism: approved.
+- Mandatory human review before chart execution: approved.
+- Deterministic EDA fallback when the LLM fails: approved.
+
+### 36.1 B1 implementation
+Added `agents/visual_eda_agent.py` with `plan_visual_eda()`, using the existing `LLMFactory` / `BaseLLM` provider adapter. The planner accepts a problem statement, EDAReport and DataFrame (the DataFrame is used only for deterministic validation).
+
+The model receives:
+- MCM problem statement;
+- compact dataset metadata and column profiles;
+- descriptive summaries, missingness/quality warnings and numeric correlations;
+- ChartPlan JSON Schema.
+
+The model does not receive the full uploaded DataFrame or raw CSV/XLSX rows. It does not write or execute code and does not calculate numeric results.
+
+### 36.2 Structured output and recovery
+- Parse model JSON into the strict Pydantic ChartPlan / ChartSpec contract.
+- Validate chart ranks, chart IDs, figure labels, supported chart types, actual source columns, axis types, sample sufficiency and declared units against the dataset.
+- Permit one bounded repair request for malformed or invalid output.
+- Missing problem statement, context preparation errors, provider initialization/invocation errors, or a second invalid response return a clearly labeled deterministic generic fallback with a recorded reason.
+- Record planner provider, model and prompt version for accepted AI plans.
+
+### 36.3 Current implementation status
+- B0 user review: approved.
+- B1 planner service: authored on `feature/m1b-visual-eda`.
+- Mocked-LLM tests cover successful plan generation, compact context construction, missing problem statement, bounded repair, invalid-column fallback, provider failure, unsupported units and invalid bar-chart axes.
+- ChartPlan validation was strengthened for axis shape and rank order.
+- B1 is a planner service only; it is deliberately not connected to the existing Streamlit auto-execution path. B3 must add the visible ranked plan preview and explicit approval action before an AI plan can reach Python execution.
+- No live LLM call, Streamlit UX acceptance or Phase B end-to-end acceptance is claimed yet.
+- GitHub Actions for the latest B1 commits are pending final verification at the time of this entry.
+
+
+## 37. PRD v1.7 — Visual EDA Planner UI and Evaluation Foundation (2026-11-05)
+
+### 37.1 User approval
+B0 decisions were approved by the user: ranked chart relevance, mandatory human review and deterministic fallback.
+
+### 37.2 B2 — Chart selection validation
+- Rank and relevance score are required ChartSpec fields; ranks must be contiguous and ascending from 1.
+- Reject duplicate chart IDs, figure labels, analytical intents and repeated time-series/scatter field pairs.
+- Validate actual source columns, supported chart types, axis data types, minimum valid observations and explicit unit declarations.
+- Bar charts currently represent categorical counts only. Grouped numeric aggregation is not supported and must not be implied by the planner.
+
+### 37.3 B3 — Streamlit review and approval
+The Dataset Explorer now provides a two-step workflow:
+1. Generate a chart plan using either an explicitly enabled AI planner or local deterministic fallback.
+2. Inspect the ranked plan, relevance scores, chart types, fields, analytical questions, rationale, caveats and omitted ideas; explicitly approve before charts are rendered.
+
+AI planning is opt-in. The UI discloses that the problem statement and compact dataset profile are sent to the configured provider; raw CSV/XLSX rows are not sent. A pending plan is invalidated if the dataset hash, problem statement, project ID, source/frequency/units, AI toggle or configured provider/model changes.
+
+Artifact persistence rejects an explicitly supplied chart plan unless the caller passes the human approval gate. Approved reports record the approval timestamp, planning strategy and provider/model/prompt provenance. Markdown and JSON exports retain chart rank, relevance, figure label, source fields and Python-computed metrics.
+
+### 37.4 B4 — Evaluation foundation
+Added six original synthetic chart-planning cases covering temporal trends, distribution/outlier review, categorical counts, numeric relationships, insufficient time coverage and missing-context fallback. Each case includes a reference checklist, weighted human rubric, critical errors and fixture SHA-256 reference. Added an offline evaluator for strategy, chart-type/column coverage, prohibited fields/types, fallback reason and structural validity. CI checks case schema, fixture hashes and evaluator behavior.
+
+### 37.5 Remaining acceptance gates
+- GitHub Actions passed on verified commit `1a0e18a48780dc6bb95b58333086c5912842f04f`; pytest reported 58 passing tests.
+- User must run `streamlit run app/main.py` locally and visually inspect the two-step workflow.
+- A real configured provider/API key must be tested by the user; this implementation does not claim a live LLM request has been completed.
+- The six-case rubric is an evaluation specification, not a measured benchmark result. Model quality scores must be collected before claiming planner performance.
+- Phase B must not be marked closed until local UI acceptance and the remaining evaluation gates are complete.
+
+## 38. PRD v1.8 — In-App API Settings (2026-11-05)
+
+**User request:** Replace the manual `.env`-only setup workflow with a browser-accessible API Settings page for MCM C Agent.
+
+**Implemented scope:**
+- Sidebar navigation to a dedicated API Settings view.
+- Choose DeepSeek, OpenAI, or Anthropic; provide a supported model ID; enter a password-masked API key.
+- Store keys in server-side Streamlit session state only; do not persist credentials to GitHub, `.env`, local report artifacts or telemetry.
+- Compose runtime LLM settings from the selected provider/model/key, overriding the project's cached `.env` values for the active session without modifying disk files.
+- Provide a real **Test connection** action and **Clear saved key** action.
+- Invalidate pending unapproved chart plans when credentials are saved, changed, or cleared.
+- Keep deterministic fallback behavior when LLM credentials are missing or provider calls fail.
+- Do not display raw provider exception messages to prevent accidental disclosure of credentials or other sensitive request details.
+
+**Security boundary:** The view is intended for local development use on localhost. Do not expose it publicly without authentication and a secure secret store. Session-only storage is not durable storage; credentials may need to be entered again after restart.
+
+**Validation:** Automated unit tests for provider/runtime settings, secret masking, no disk writes, and invalidation added. Real external API verification requires the user's key and local environment; it has not been performed by the assistant.
