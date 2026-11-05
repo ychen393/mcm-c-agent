@@ -2,7 +2,7 @@
   "issue": "https://github.com/ychen393/mcm-c-agent/issues/8",
   "branch": "feature/8-cursor-cowork-v1",
   "base_branch": "cursor/init-builder-reviewer-subagents-bdaf",
-  "commit_sha": "b649f05d4b8b4c66b5b4c41d953f46d4e49e7605",
+  "commit_sha": "feaf7f8bbd7f38427770bb1ed15431d75d116f41",
   "pull_request": "https://github.com/ychen393/mcm-c-agent/pull/9",
   "test_command": "pytest -q",
   "check_runs": [
@@ -11,27 +11,46 @@
       "event": "pull_request",
       "conclusion": "success",
       "head_sha": "b649f05d4b8b4c66b5b4c41d953f46d4e49e7605"
+    },
+    {
+      "url": "https://github.com/ychen393/mcm-c-agent/actions/runs/42010799216",
+      "event": "pull_request",
+      "conclusion": "success",
+      "head_sha": "feaf7f8bbd7f38427770bb1ed15431d75d116f41"
+    },
+    {
+      "url": "https://github.com/ychen393/mcm-c-agent/actions/runs/42010799365",
+      "event": "pull_request",
+      "conclusion": "success",
+      "head_sha": "feaf7f8bbd7f38427770bb1ed15431d75d116f41"
     }
   ],
   "implementer": {
     "identity": "Cursor Cloud agent bc-ac44af56-4736-4686-9fd2-9bb27e44349c",
-    "capability": "Main agent wrote the Stage A workflow on this branch. Run metadata names the model grok-4.7-high-fast. No second model is claimed. Supported implementation subagent remains generalPurpose.",
-    "task_id": "bc-ac44af56-4736-4686-9fd2-9bb27e44349c"
+    "capability": "Main agent wrote the workflow and docs. generalPurpose task bc-15dc0f55-b966-5e40-9c2f-07380618e9f6 wrote tests/unit/test_cowork_smoke.py. Run metadata names grok-4.7-high-fast. No second model is claimed.",
+    "task_id": "bc-15dc0f55-b966-5e40-9c2f-07380618e9f6"
   },
   "reviewer": {
     "identity": "bugbot",
-    "capability": "Requested subagent_type bugbot once against the Issue 8 diff. The Task schema rejected it before launch.",
+    "capability": "Requested subagent_type bugbot once. The Task schema rejected it before launch. security-review is also absent from the enum. ci-investigator was not called because no required check failed.",
     "isolation": "blocked",
-    "findings": "Invalid option: expected one of generalPurpose, explore, debug, computerUse, videoReview, cursor-guide, ci-investigator, best-of-n-runner, ai-architect, deployment-expert, performance-optimizer. bugbot and security-review are absent. The builder session can still push. The Actions job Read-only review boundary is not an AI reviewer. Frontmatter readonly is not enforcement.",
+    "findings": "Invalid option: expected one of generalPurpose, explore, debug, computerUse, videoReview, cursor-guide, ci-investigator, best-of-n-runner, ai-architect, deployment-expert, performance-optimizer. The builder session can still push. The Actions permission-boundary job is not an AI reviewer. Frontmatter readonly is not enforcement.",
     "task_id": "not-launched"
   },
   "repair_attempts": 0,
   "owner_approval": "pending",
-  "next_action": "Run the isolated test-only smoke pull request. Owner reviews the evidence. Do not merge.",
+  "next_action": "Owner reviews draft PRs 9 and 10. Do not merge. Create a separate read-only reviewer principal before calling co-work fully operational.",
   "status": "PARTIAL",
   "blockers": [
     "Reviewer isolation is blocked: this Cloud session has write tools and the Task schema has no readonly switch.",
     "bugbot and security-review are not in this session's Task enum, so no specialized review ran.",
-    "Issue comments are blocked for this token (addComment: Resource not accessible by integration). Handoff is on the draft pull request."
-  ]
+    "Issue comments are blocked for this token (addComment: Resource not accessible by integration). Handoff is on the draft pull requests."
+  ],
+  "smoke": {
+    "branch": "test/8-cowork-smoke",
+    "base_branch": "test/8-cowork-smoke-base",
+    "pull_request": "https://github.com/ychen393/mcm-c-agent/pull/10",
+    "commit_sha": "20f22ce5bbf51a77c3091957f7ec1bb6d22f2d72",
+    "check_run": "https://github.com/ychen393/mcm-c-agent/actions/runs/42010910434"
+  }
 }

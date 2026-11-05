@@ -9,7 +9,7 @@ Updated: 2026-11-05. This page is a manually maintained status snapshot, **not a
 | Phase B: API Settings | Implemented and used locally; key remains session scoped | Same PR #2 |
 | Multi-agent governance | Implemented as draft; CI passed | Draft PR #3 targeting `feature/m1b-visual-eda`, pending user approval |
 | Cursor subagent prompts | Builder and Reviewer role files created; custom Task launches failed in tested Cloud session | `.cursor/agents/builder.md`, `.cursor/agents/reviewer.md`; observed invalid `subagent_type` for both; frontmatter `readonly` is not enforcement |
-| Cursor co-work workflow | Issue #8 in progress on an isolated draft. PR-native pytest is attached for `cursor/**` bases. Independent read-only AI review is not established. | Draft PR #9, `docs/CURSOR_COWORK_RUNBOOK.md`, `docs/cowork/issue-8-status.json` |
+| Cursor co-work workflow | Issue #8 evidence is PARTIAL. PR-native pytest passed for a `cursor/**` base and a `test/**` base. Independent read-only AI review is BLOCKED. | Draft PR #9, smoke Draft PR #10, `docs/cowork/issue-8-status.json` |
 | Cursor autonomous builder | Not connected by this governance PR | Owner authorization & pilot required |
 | Claude Code independent review | Not connected by this governance PR | Owner authorization & pilot required |
 | Grok QA | Optional; not connected | Deferred pending benefit/cost evaluation |
