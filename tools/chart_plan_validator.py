@@ -6,7 +6,6 @@ from schemas.chart_plan import ChartPlan
 def validate_chart_plan(plan: ChartPlan, frame: pd.DataFrame) -> None:
     ids: set[str] = set()
     labels: set[str] = set()
-    ranks: set[int] = set()
     ordered_ranks = [spec.rank for spec in plan.charts]
     if len(ordered_ranks) != len(set(ordered_ranks)):
         raise ValueError("Duplicate chart rank")
@@ -17,7 +16,6 @@ def validate_chart_plan(plan: ChartPlan, frame: pd.DataFrame) -> None:
             raise ValueError("Duplicate chart_id or figure_label")
         ids.add(spec.chart_id)
         labels.add(spec.figure_label)
-        ranks.add(spec.rank)
         for name in [spec.x, spec.y]:
             if name is not None and name not in frame.columns:
                 raise ValueError(f"Unknown column: {name}")
