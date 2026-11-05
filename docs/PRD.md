@@ -1100,3 +1100,21 @@ Added six original synthetic chart-planning cases covering temporal trends, dist
 - A real configured provider/API key must be tested by the user; this implementation does not claim a live LLM request has been completed.
 - The six-case rubric is an evaluation specification, not a measured benchmark result. Model quality scores must be collected before claiming planner performance.
 - Phase B must not be marked closed until local UI acceptance and the remaining evaluation gates are complete.
+
+## 38. PRD v1.8 — In-App API Settings (2026-11-05)
+
+**User request:** Replace the manual `.env`-only setup workflow with a browser-accessible API Settings page for MCM C Agent.
+
+**Implemented scope:**
+- Sidebar navigation to a dedicated API Settings view.
+- Choose DeepSeek, OpenAI, or Anthropic; provide a supported model ID; enter a password-masked API key.
+- Store keys in server-side Streamlit session state only; do not persist credentials to GitHub, `.env`, local report artifacts or telemetry.
+- Compose runtime LLM settings from the selected provider/model/key, overriding the project's cached `.env` values for the active session without modifying disk files.
+- Provide a real **Test connection** action and **Clear saved key** action.
+- Invalidate pending unapproved chart plans when credentials are saved, changed, or cleared.
+- Keep deterministic fallback behavior when LLM credentials are missing or provider calls fail.
+- Do not display raw provider exception messages to prevent accidental disclosure of credentials or other sensitive request details.
+
+**Security boundary:** The view is intended for local development use on localhost. Do not expose it publicly without authentication and a secure secret store. Session-only storage is not durable storage; credentials may need to be entered again after restart.
+
+**Validation:** Automated unit tests for provider/runtime settings, secret masking, no disk writes, and invalidation added. Real external API verification requires the user's key and local environment; it has not been performed by the assistant.
