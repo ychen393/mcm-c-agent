@@ -1,0 +1,25 @@
+name: Issue 6 isolated CI validation
+
+on:
+  push:
+    branches:
+      - test/6-ci-validation
+
+permissions:
+  contents: read
+
+jobs:
+  regression-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact validation commit
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install project and tests
+        run: python -m pip install -e ".[dev]"
+      - name: Run all unit and integration tests
+        run: pytest -q
