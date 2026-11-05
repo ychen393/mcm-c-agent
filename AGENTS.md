@@ -40,6 +40,9 @@ Build a semi-autonomous, verifiable MCM Problem C research system. Data analysis
 - **Grok — optional independent QA:** only after scope and costs are approved.
 - **GitHub Actions:** objective automated tests and guardrails, not a substitute for human approval.
 
+## Cursor subagent prompts
+Local Cursor subagent instructions are `.cursor/agents/builder.md` and `.cursor/agents/reviewer.md`. Invoke them as `/builder` and `/reviewer`. The Builder implements one scoped issue. The Reviewer is read-only and does not edit the Builder branch. These files do not connect an external account, authorize spending, or count as an independent review.
+
 ## Minimum PR evidence
 - Linked Issue and scope; files touched; tests with exact command/results; data/LLM cost impact; privacy impact; fallback and rollback steps; reviewer findings or "review pending"; approval requirement.
 - An unverified feature is labeled unverified. Keep an accurate `docs/PROJECT_STATUS.md`.
