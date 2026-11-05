@@ -89,6 +89,7 @@ Phase B ends after chart planning, validation, approval and execution. Evidence-
 ## B4 — Evaluation and acceptance
 
 - [x] Add six chart-planning evaluation cases covering trend, distribution, relationship, categorical counts, insufficient time coverage and missing-context fallback.
+- [x] Add an offline evaluator for strategy, chart-type coverage, required/prohibited columns, prohibited chart types, fallback reason and structural validity.
 - [ ] Measure problem relevance, field correctness, chart suitability, nonredundancy, omission rationale, schema validity and fallback behavior.
 - [x] Add automated checks for exact source columns, declared units, chart types, sample sufficiency, duplicate intent and zero fabricated numeric claims in the planner contract.
 - [ ] Test missing API key, timeout, malformed JSON, invalid column, duplicate chart and empty plan.
@@ -136,5 +137,5 @@ Important integration boundary: B1 provides the planner service; B3 now connects
 - B3: Streamlit now uses a two-step workflow: Generate chart plan → inspect ranked plan → Approve plan & generate charts. AI planning is opt-in; the UI warns that the problem statement and compact profile are sent to the configured provider, while raw dataset rows are not sent.
 - B3: a pending plan is invalidated if the dataset hash, problem statement, project ID, source/frequency/units, AI toggle or configured provider/model changes. User approval is required before chart rendering and artifact persistence.
 - B3: EDA JSON/Markdown reports include planning strategy, provider/model, ranking/relevance metadata and approval provenance.
-- B4: added six original synthetic chart-planning cases with fixture SHA-256 references and human scoring rubrics. CI validates case schema and fixture hashes. No live model benchmark scores are claimed.
+- B4: added six original synthetic chart-planning cases with fixture SHA-256 references and human scoring rubrics, plus `tools/chart_plan_evaluator.py` for automated contract/selection checks. CI validates case schema, fixture hashes and evaluator behavior. No live model benchmark scores are claimed.
 - Remaining acceptance: latest full CI must pass; user must run the Streamlit app locally, inspect the plan/approval flow and confirm the configured provider/key before Phase B can be closed.
