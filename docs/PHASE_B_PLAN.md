@@ -139,3 +139,19 @@ Important integration boundary: B1 provides the planner service; B3 now connects
 - B3: EDA JSON/Markdown reports include planning strategy, provider/model, ranking/relevance metadata and approval provenance.
 - B4: added six original synthetic chart-planning cases with fixture SHA-256 references and human scoring rubrics, plus `tools/chart_plan_evaluator.py` for automated contract/selection checks. CI validates case schema, fixture hashes and evaluator behavior. No live model benchmark scores are claimed.
 - Remaining acceptance: user must run the Streamlit app locally, inspect the plan/approval flow and confirm the configured provider/key before Phase B can be closed.
+
+## B3.1 — Browser API Settings (2026-11-05)
+
+Implemented on `feature/m1b-visual-eda` following the user's request for in-app API configuration.
+
+- New sidebar navigation: **Research Lab** and **API Settings**.
+- Supported providers: DeepSeek, OpenAI, Anthropic. Model IDs are user-editable, endpoints are restricted to the official provider defaults.
+- API keys are entered through a password field and stored only in server-side Streamlit session state as Pydantic SecretStr; they are not written to `.env`, GitHub, logs, dataset reports, or chart-plan metadata.
+- A **Test connection** button sends a harmless short request using the saved model; it is a real billable provider request, not a simulated test.
+- **Clear saved key** removes session configuration. Replacing/clearing credentials invalidates any unapproved chart plan.
+- Session credentials override local `.env` credentials and model selection without changing the cached base settings.
+- Sensitive provider exception details are not exposed through connection errors or fallback messages.
+- Configuration is session-only: it may be lost on refresh/reconnect/restart and is not a multi-user production secret store.
+- For security, use only on localhost. Public hosting requires authentication and a dedicated secret-management mechanism.
+
+Testing: added `tests/unit/test_api_settings.py` to cover provider selection, runtime override, immutability, masked keys, rejected inputs, plan invalidation, and no file persistence. Live provider calls and UI visual acceptance remain to be performed by the user.
