@@ -19,7 +19,7 @@ def validate_chart_plan(
     if len(ranks) != len(set(ranks)):
         raise ValueError("Duplicate chart rank")
     if ranks != list(range(1, len(ranks) + 1)):
-        raise ValueError("Chart ranks must be unique, ascending and contiguous from 1")
+        raise ValueError("Chart ranks must be in ascending rank order and contiguous from 1")
 
     profiles = {column.name: column for column in report.dataset.columns} if report else {}
 
