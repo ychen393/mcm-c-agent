@@ -213,3 +213,35 @@ def test_validator_rejects_unverified_units_and_numeric_bar_categories():
     )
     with pytest.raises(ValueError, match="categorical x column"):
         validate_chart_plan(ChartPlan(charts=[numeric_bar]), dataset.frame, report)
+
+
+def test_validator_rejects_duplicate_analytical_intent():
+    dataset, report = sample()
+    first = ChartSpec(
+        chart_id="value_distribution",
+        chart_type="histogram",
+        title="Value distribution",
+        figure_label="fig:value_distribution",
+        x="value",
+        x_label="Value",
+        y_label="Frequency",
+        caption="Distribution of observed values in the dataset.",
+        analytical_question="How are the observed values distributed?",
+        rationale="Inspect the spread of observed values.",
+        analytical_role="distribution",
+        rank=1,
+    )
+    second = first.model_copy(
+        update={
+            "chart_id": "value_distribution_again",
+            "figure_label": "fig:value_distribution_again",
+            "title": "Another value distribution",
+            "rank": 2,
+        }
+    )
+    with pytest.raises(ValueError, match="Duplicate analytical intent"):
+        validate_chart_plan(
+            ChartPlan(charts=[first, second]),
+            dataset.frame,
+            report,
+        )
