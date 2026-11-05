@@ -10,6 +10,7 @@ import json
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from itertools import islice
 from pathlib import Path
 from typing import BinaryIO
 
@@ -86,9 +87,16 @@ def build_dataset_bundle(
     """
     if max_datasets < 1 or max_datasets > ABSOLUTE_MAX_DATASETS:
         raise ValueError(f"max_datasets must be between 1 and {ABSOLUTE_MAX_DATASETS}.")
+    if max_file_size < 1:
+        raise ValueError("max_file_size must be positive.")
     if max_aggregate_bytes < 1:
         raise ValueError("max_aggregate_bytes must be positive.")
-    normalized = _normalize_uploads(uploads)
+    normalized = _normalize_uploads(
+        uploads,
+        max_datasets=max_datasets,
+        max_file_size=max_file_size,
+        max_aggregate_bytes=max_aggregate_bytes,
+    )
     if not normalized:
         raise ValueError("Dataset bundle must contain at least one file.")
     if len(normalized) > max_datasets:
@@ -152,21 +160,50 @@ def build_bundle_profiles(
     return profiles
 
 
-def _normalize_uploads(uploads: Iterable[DatasetUpload | Upload]) -> list[tuple[str, bytes]]:
+def _normalize_uploads(
+    uploads: Iterable[DatasetUpload | Upload],
+    *,
+    max_datasets: int,
+    max_file_size: int,
+    max_aggregate_bytes: int,
+) -> list[tuple[str, bytes]]:
+    """Normalize bounded input without eagerly reading untrusted streams."""
     if isinstance(uploads, (str, bytes)):
         raise ValueError("Dataset bundle uploads must be an ordered list of files.")
     try:
-        items = list(uploads)
+        items = list(islice(iter(uploads), max_datasets + 1))
     except TypeError as exc:
         raise ValueError("Dataset bundle uploads must be an ordered list of files.") from exc
+    if len(items) > max_datasets:
+        raise ValueError(
+            f"Dataset bundle accepts at most {max_datasets} files; received more than {max_datasets}."
+        )
+
     normalized: list[tuple[str, bytes]] = []
+    total_bytes = 0
     for index, item in enumerate(items, start=1):
         file_name, source = _coerce_item(item, index)
-        raw = _read_bytes(source, index, file_name)
-        safe_name = Path(file_name).name
+        # pathlib on Linux does not strip Windows-style directory separators.
+        safe_name = Path(file_name.replace("\\", "/")).name
         if not safe_name or safe_name in {".", ".."}:
             raise ValueError(f"Upload {index} has an invalid file name.")
+
+        remaining = max_aggregate_bytes - total_bytes
+        raw = _read_bytes(
+            source, index, safe_name, max_bytes=min(max_file_size, remaining) + 1
+        )
+        if len(raw) > max_file_size:
+            raise ValueError(
+                f"Could not load '{safe_name}' (upload {index}): "
+                f"file exceeds the {max_file_size} byte upload limit."
+            )
+        if len(raw) > remaining:
+            raise ValueError(
+                "Combined upload size exceeds the aggregate limit of "
+                f"{max_aggregate_bytes} bytes at '{safe_name}' (upload {index})."
+            )
         normalized.append((safe_name, raw))
+        total_bytes += len(raw)
     return normalized
 
 
@@ -184,16 +221,30 @@ def _coerce_item(item: DatasetUpload | Upload, index: int) -> tuple[str, bytes |
     return file_name, source
 
 
-def _read_bytes(source: bytes | BinaryIO, index: int, file_name: str) -> bytes:
+def _read_bytes(
+    source: bytes | BinaryIO, index: int, file_name: str, *, max_bytes: int
+) -> bytes:
     if isinstance(source, bytes):
         return source
     read = getattr(source, "read", None)
     if read is None:
-        raise ValueError(f"Upload {index} ('{Path(file_name).name}') must be readable as bytes.")
-    raw = read()
-    if not isinstance(raw, bytes):
-        raise ValueError(f"Upload {index} ('{Path(file_name).name}') must be readable as bytes.")
-    return raw
+        raise ValueError(f"Upload {index} ('{file_name}') must be readable as bytes.")
+
+    chunks: list[bytes] = []
+    remaining = max_bytes
+    while remaining > 0:
+        chunk = read(remaining)
+        if not isinstance(chunk, bytes):
+            raise ValueError(f"Upload {index} ('{file_name}') must be readable as bytes.")
+        if len(chunk) > remaining:
+            raise ValueError(
+                f"Upload {index} ('{file_name}') ignored the bounded-read limit."
+            )
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
 
 
 def _reject_aggregate_overflow(uploads: list[tuple[str, bytes]], max_aggregate_bytes: int) -> None:
@@ -239,7 +290,9 @@ def _reject_duplicate_content(loaded_rows: list[LoadedDataset]) -> None:
 
 
 def _file_slug(file_name: str) -> str:
-    slug = "".join(char.lower() if char.isalnum() else "-" for char in Path(file_name).stem)
+    stem = Path(file_name.replace("\\", "/")).stem
+    # Preserve Unicode for display, but internal dataset IDs must be ASCII-safe.
+    slug = "".join(char.lower() if char.isascii() and char.isalnum() else "-" for char in stem)
     collapsed = "-".join(part for part in slug.split("-") if part)
     return (collapsed or "dataset")[:40]
 

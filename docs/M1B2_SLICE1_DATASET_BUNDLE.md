@@ -24,3 +24,9 @@ Status: data-layer only. The Streamlit app still uploads one file.
 - No Streamlit multi-file uploader.
 
 Those behaviors are later slices of #11 and #12. This registry never silently joins files.
+
+## Validation hardening (2026-11-05)
+
+- File paths from Windows and POSIX uploads are reduced to base names; non-ASCII file names remain visible while internal dataset IDs use ASCII-only slugs plus SHA-256.
+- Stream reads are bounded by remaining per-file and aggregate budgets; generators are capped before materialization.
+- The PR test workflow now includes `feature/**` target branches. Push-event success and PR-event success are separately reported.

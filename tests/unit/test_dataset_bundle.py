@@ -1,5 +1,6 @@
 import io
 import json
+import re
 
 import pandas as pd
 import pytest
@@ -239,3 +240,72 @@ def test_unknown_dataset_metadata_is_rejected():
     bundle = build_dataset_bundle([("only.csv", b"id,value\n1,2\n")], project_id="meta")
     with pytest.raises(ValueError, match="Unknown dataset ID"):
         build_bundle_profiles(bundle, data_source_by_dataset={"ds_missing_deadbeefdead": "nope"})
+
+
+@pytest.mark.parametrize("file_name", ["黄金价格.csv", "USD指数.csv", "échantillon.csv", "🔍研究.csv"])
+def test_unicode_file_names_keep_display_but_use_ascii_dataset_ids(file_name):
+    raw = b"date,value\\n2026-01-01,10\\n2026-01-02,11\\n"
+    first = build_dataset_bundle([(file_name, raw)], project_id="unicode")
+    again = build_dataset_bundle([(file_name, raw)], project_id="unicode")
+    ref = first.datasets[0]
+    assert ref.file_name == ref.display_name == file_name
+    assert re.fullmatch(r"ds_[a-z0-9-]+_[0-9a-f]{12}(?:_[0-9]+)?", ref.dataset_id)
+    assert ref.dataset_id == again.datasets[0].dataset_id
+    assert first.fingerprint == again.fingerprint
+    assert build_bundle_profiles(first)[ref.dataset_id].report.dataset.row_count == 2
+
+
+def test_windows_upload_path_is_stripped_before_storing_provenance():
+    raw = b"id,value\\n1,2\\n"
+    bundle = build_dataset_bundle(
+        [(r"C:\\Users\\student\\data\\黄金价格.csv", raw)], project_id="paths"
+    )
+    ref = bundle.datasets[0]
+    assert ref.file_name == "黄金价格.csv"
+    assert ref.display_name == "黄金价格.csv"
+    assert "Users" not in json.dumps(bundle.manifest.model_dump())
+    assert "\\\\" not in ref.file_name
+
+
+class _ReadSpy(io.BytesIO):
+    def __init__(self, payload):
+        super().__init__(payload)
+        self.read_sizes = []
+
+    def read(self, size=-1):
+        self.read_sizes.append(size)
+        assert 0 < size <= 100
+        return super().read(size)
+
+
+def test_stream_input_is_bounded_by_per_file_size_before_materialization():
+    stream = _ReadSpy(b"col,value\\n" + b"1,2\\n" * 20)
+    with pytest.raises(ValueError, match="upload limit"):
+        build_dataset_bundle(
+            [("data.csv", stream)], project_id="bounded", max_file_size=15
+        )
+    assert stream.read_sizes and all(0 < n <= 16 for n in stream.read_sizes)
+    assert stream.tell() <= 16
+
+
+def test_stream_input_is_bounded_by_remaining_aggregate_size():
+    first = b"id,value\\n1,2\\n"
+    stream = _ReadSpy(b"id,value\\n2,3\\n")
+    with pytest.raises(ValueError, match="aggregate limit"):
+        build_dataset_bundle(
+            [("first.csv", first), ("second.csv", stream)],
+            project_id="bounded",
+            max_file_size=100,
+            max_aggregate_bytes=len(first) + 3,
+        )
+    assert stream.read_sizes and all(0 < n <= 4 for n in stream.read_sizes)
+    assert stream.tell() <= 4
+
+
+def test_upload_generator_is_capped_without_consuming_unbounded_input():
+    def uploads():
+        for index in range(1000):
+            yield (f"{index}.csv", f"id,value\\n{index},2\\n".encode())
+
+    with pytest.raises(ValueError, match="at most 5 files"):
+        build_dataset_bundle(uploads(), project_id="bounded")
