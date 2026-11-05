@@ -154,12 +154,12 @@ def plan_visual_eda(
     try:
         planner = llm or LLMFactory.create(settings or get_settings())
     except Exception as exc:
-        return _fallback(report, frame, f"Could not initialize LLM provider: {exc}")
+        return _fallback(report, frame, f"Could not initialize LLM provider ({type(exc).__name__}). Check API settings.")
 
     try:
         response = planner.invoke(messages)
     except Exception as exc:
-        return _fallback(report, frame, f"LLM provider invocation failed: {type(exc).__name__}: {exc}")
+        return _fallback(report, frame, f"LLM provider invocation failed ({type(exc).__name__}). Check API settings, network, and account access.")
 
     first_content = response.content
     try:
@@ -188,7 +188,7 @@ def plan_visual_eda(
                 report,
                 frame,
                 "Planner output remained invalid after one repair attempt: "
-                f"{type(repair_error).__name__}: {repair_error}",
+                f"{type(repair_error).__name__}. Check model output or provider settings.",
             )
 
     return plan.model_copy(
