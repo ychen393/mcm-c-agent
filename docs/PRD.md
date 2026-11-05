@@ -1069,3 +1069,34 @@ The model does not receive the full uploaded DataFrame or raw CSV/XLSX rows. It 
 - B1 is a planner service only; it is deliberately not connected to the existing Streamlit auto-execution path. B3 must add the visible ranked plan preview and explicit approval action before an AI plan can reach Python execution.
 - No live LLM call, Streamlit UX acceptance or Phase B end-to-end acceptance is claimed yet.
 - GitHub Actions for the latest B1 commits are pending final verification at the time of this entry.
+
+
+## 37. PRD v1.7 — Visual EDA Planner UI and Evaluation Foundation (2026-11-05)
+
+### 37.1 User approval
+B0 decisions were approved by the user: ranked chart relevance, mandatory human review and deterministic fallback.
+
+### 37.2 B2 — Chart selection validation
+- Rank and relevance score are required ChartSpec fields; ranks must be contiguous and ascending from 1.
+- Reject duplicate chart IDs, figure labels, analytical intents and repeated time-series/scatter field pairs.
+- Validate actual source columns, supported chart types, axis data types, minimum valid observations and explicit unit declarations.
+- Bar charts currently represent categorical counts only. Grouped numeric aggregation is not supported and must not be implied by the planner.
+
+### 37.3 B3 — Streamlit review and approval
+The Dataset Explorer now provides a two-step workflow:
+1. Generate a chart plan using either an explicitly enabled AI planner or local deterministic fallback.
+2. Inspect the ranked plan, relevance scores, chart types, fields, analytical questions, rationale, caveats and omitted ideas; explicitly approve before charts are rendered.
+
+AI planning is opt-in. The UI discloses that the problem statement and compact dataset profile are sent to the configured provider; raw CSV/XLSX rows are not sent. A pending plan is invalidated if the dataset hash, problem statement, project ID, source/frequency/units, AI toggle or configured provider/model changes.
+
+Artifact persistence rejects an explicitly supplied chart plan unless the caller passes the human approval gate. Approved reports record the approval timestamp, planning strategy and provider/model/prompt provenance. Markdown and JSON exports retain chart rank, relevance, figure label, source fields and Python-computed metrics.
+
+### 37.4 B4 — Evaluation foundation
+Added six original synthetic chart-planning cases covering temporal trends, distribution/outlier review, categorical counts, numeric relationships, insufficient time coverage and missing-context fallback. Each case includes a reference checklist, weighted human rubric, critical errors and fixture SHA-256 reference. CI checks the case schema and fixture hashes.
+
+### 37.5 Remaining acceptance gates
+- Latest full GitHub Actions run must pass after the final B1–B4 code changes.
+- User must run `streamlit run app/main.py` locally and visually inspect the two-step workflow.
+- A real configured provider/API key must be tested by the user; this implementation does not claim a live LLM request has been completed.
+- The six-case rubric is an evaluation specification, not a measured benchmark result. Model quality scores must be collected before claiming planner performance.
+- Phase B must not be marked closed until local UI acceptance and the remaining evaluation gates are complete.
