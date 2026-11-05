@@ -124,7 +124,7 @@ def _fallback(report: EDAReport, frame: pd.DataFrame, reason: str) -> ChartPlan:
             "planner_prompt_version": PROMPT_VERSION,
         }
     )
-    validate_chart_plan(plan, frame)
+    validate_chart_plan(plan, frame, report)
     return plan
 
 
@@ -164,7 +164,7 @@ def plan_visual_eda(
     first_content = response.content
     try:
         plan = _parse_plan(first_content)
-        validate_chart_plan(plan, frame)
+        validate_chart_plan(plan, frame, report)
     except Exception as first_error:
         repair_messages = messages + [
             {"role": "assistant", "content": first_content},
@@ -181,7 +181,7 @@ def plan_visual_eda(
         try:
             repaired = planner.invoke(repair_messages)
             plan = _parse_plan(repaired.content)
-            validate_chart_plan(plan, frame)
+            validate_chart_plan(plan, frame, report)
             response = repaired
         except Exception as repair_error:
             return _fallback(
