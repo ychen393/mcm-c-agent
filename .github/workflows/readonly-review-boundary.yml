@@ -1,0 +1,51 @@
+name: Read-only review boundary
+
+# Permission demonstration only. This workflow is not an AI reviewer and it
+# does not launch Cursor. It exists so a pull request can show a GitHub job
+# whose token cannot push. Reviewer isolation for the Cloud agent stays
+# blocked until the owner creates a separate read-only principal.
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - main
+      - "feature/**"
+      - "cursor/**"
+      - "test/**"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: readonly-boundary-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  permission-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Record coordinates and reject secret-like paths
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          echo "pull_request=${PR_NUMBER} base=${BASE_REF} head=${HEAD_SHA}"
+          echo "This job is a GitHub permission boundary. It is not an AI reviewer."
+          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > changed-paths.txt
+          if grep -E '(^|/)\.env$|(^|/)id_rsa$|\.pem$|(^|/)credentials\.json$' changed-paths.txt; then
+            echo "secret-like path in the pull request diff"
+            exit 1
+          fi
+          echo "no secret-like paths in the diff"

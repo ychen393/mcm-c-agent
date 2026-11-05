@@ -158,6 +158,23 @@ def test_cowork_runbook_names_supported_tasks_and_stop_gates():
     assert "Markdown `readonly: true` field as isolation" in agents
 
 
+def test_readonly_boundary_workflow_is_not_an_ai_reviewer():
+    path = ROOT / ".github/workflows/readonly-review-boundary.yml"
+    text = path.read_text(encoding="utf-8")
+    pull_request = _workflow_event_block(text, "pull_request")
+    for base in _CI_BASES:
+        assert f'"{base}"' in pull_request or f"- {base}" in pull_request
+    assert "contents: read" in text
+    assert "pull-requests: read" in text
+    assert "persist-credentials: false" in text
+    assert "pull_request_target:" not in text
+    assert "contents: write" not in text
+    assert "secrets." not in text
+    assert "not an AI reviewer" in text
+    assert "permission-boundary:" in text
+    assert "push:" not in text
+
+
 def test_cowork_status_record_matches_schema_and_stores_no_secrets():
     schema_path = ROOT / "docs/cowork/task-status.schema.json"
     status_path = ROOT / "docs/cowork/issue-8-status.json"
