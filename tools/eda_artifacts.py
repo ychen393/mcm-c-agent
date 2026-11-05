@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib
@@ -10,6 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from schemas.chart_plan import ChartPlan
 from schemas.eda import EDAReport
 from tools.data_loader import LoadedDataset, safe_project_id
 
@@ -23,6 +25,9 @@ def save_eda_artifacts(
     dataset: LoadedDataset,
     report: EDAReport,
     output_root: Path,
+    *,
+    chart_plan: ChartPlan | None = None,
+    human_approved: bool = False,
 ) -> dict[str, str | list[str]]:
     project_dir = output_root / safe_project_id(report.project_id) / "eda" / dataset.sha256[:12]
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -34,13 +39,21 @@ def save_eda_artifacts(
     temp_dataset.write_bytes(dataset.raw_bytes)
     os.replace(temp_dataset, dataset_path)
 
-    # Phase A: deterministic chart plan -> validated executor; no LLM calls.
+    # Legacy callers retain deterministic Phase A behavior. Any explicitly supplied
+    # plan must pass through the human approval gate before chart execution.
     from tools.chart_catalog import fallback_chart_plan
     from tools.chart_executor import execute_chart_plan
     from tools.chart_plan_validator import validate_chart_plan
 
-    plan = fallback_chart_plan(report)
-    validate_chart_plan(plan, dataset.frame)
+    if chart_plan is not None and not human_approved:
+        raise PermissionError("Chart plan execution requires explicit human approval.")
+    plan = chart_plan or fallback_chart_plan(report)
+    validate_chart_plan(plan, dataset.frame, report)
+    if chart_plan is not None:
+        report.summary["chart_plan_approval"] = {
+            "status": "approved",
+            "approved_at_utc": datetime.now(timezone.utc).isoformat(),
+        }
     chart_results = execute_chart_plan(plan, dataset.frame, project_dir, dataset.sha256)
     chart_paths = [item.path for item in chart_results]
     report.chart_metadata = [item.model_dump(mode="json") for item in chart_results]
