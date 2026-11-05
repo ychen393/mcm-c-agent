@@ -67,6 +67,34 @@ def test_all_context_signature_calls_supply_config_revision():
         )
 
 
+def test_context_signature_embeds_config_revision():
+    source = Path("app/main.py").read_text(encoding="utf-8")
+    module = ast.parse(source)
+    function = next(
+        node for node in module.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_context_signature"
+    )
+    dumps_calls = [
+        node for node in ast.walk(function)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "dumps"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "json"
+    ]
+    assert len(dumps_calls) == 1
+    payload = dumps_calls[0].args[0]
+    assert isinstance(payload, ast.Dict)
+    revision_values = [
+        value
+        for key, value in zip(payload.keys, payload.values, strict=True)
+        if isinstance(key, ast.Constant) and key.value == "config_revision"
+    ]
+    assert len(revision_values) == 1
+    assert isinstance(revision_values[0], ast.Name)
+    assert revision_values[0].id == "config_revision"
+
+
 def test_revision_lookup_rejects_wrong_session_key():
     wrong_key = ast.parse("st.session_state.get('other_revision', 0)").body[0]
     assert isinstance(wrong_key, ast.Expr)
