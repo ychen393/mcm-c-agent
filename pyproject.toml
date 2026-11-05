@@ -22,6 +22,8 @@ dependencies = [
   "pgvector>=0.3.0",
   "pandas>=2.2.0",
   "numpy>=1.26.0",
+  "openpyxl>=3.1.5",
+  "matplotlib>=3.9.0",
   "structlog>=24.4.0",
 ]
 
@@ -32,7 +34,7 @@ science = ["scipy>=1.14.0", "scikit-learn>=1.5.0", "statsmodels>=0.14.0", "matpl
 pdf = ["pymupdf>=1.24.0", "pymupdf4llm>=0.0.10"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["core", "llm", "agents", "schemas", "database"]
+packages = ["core", "llm", "agents", "schemas", "database", "tools"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

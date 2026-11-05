@@ -902,3 +902,96 @@ PD-05：引入垂直切片交付和建模质量策略。已批准。
 v1.1 Approved — 2026-11-04
 - 新增可执行验收标准、评估集方案、垂直切片路线、版权与 2027 竞赛合规 Gate、Checkpoint/Sandbox 技术决策建议、建模质量策略。
 - 用户于 2026-11-04 批准五项变更；本版本成为正式 PRD v1.1 基线。
+
+
+## 32. PRD v1.2 — Visual EDA & Chart Intelligence (Approved 2026-11-04)
+
+**Decision:** User approved the proposed Visual EDA Agent architecture on 2026-11-04. This section is the approved v1.2 product direction, not evidence that every phase is implemented.
+
+### 32.1 User value
+Given a dataset and MCM C problem statement, choose charts for their analytical purpose rather than generating histograms for every numeric column. Each chart must include clear labels, a figure reference, caption, the question it answers, data-supported findings, insights, limitations, and next-step implications.
+
+### 32.2 Architecture
+Dataset Loader → Deterministic EDA Profiler → Visual EDA Agent (chart planner) → Chart Plan Validator → Python Chart Executor → Insight Analyst → EDA Reviewer → EDA Report.
+
+LLM plans and interprets; Python computes actual values and renders charts. Do not run arbitrary LLM-authored Python as part of chart planning. Any quantitative claims must be supported by actual computed metrics and provenance. No invented data, figures or causal inferences.
+
+### 32.3 ChartSpec contract
+A chart specification includes: chart_id, chart_type, title, figure_label (LaTeX-compatible identifier), x/y source columns, axis labels and optional units, legend, caption, analytical_question, rationale, priority, caveats, transform and aggregation where supported. Execution results include plotted row counts, dataset hash, input fields, chart path and computed metrics.
+
+Insight objects (Phase C) must distinguish observation, numeric finding, research insight, limitation, next step and evidence_refs. Insights are not valid without data evidence.
+
+### 32.4 Chart selection
+Support common table, categorical, time-series, comparative and domain-specific charts through a typed catalog. Financial return, volatility, drawdown and normalized asset comparisons are optional specialized capabilities, not universal defaults. The planner must select charts with clear value, reject redundant/unsuitable charts, and explain when a chart should not be generated.
+
+When the problem statement is absent or the LLM is unavailable, deterministic fallback EDA must still work and be labeled as generic rather than problem-aware analysis.
+
+### 32.5 Chart presentation and paper reuse
+UI and exported Markdown/JSON must bind a plot to its Figure Label, title, axes with units, caption, analytical question, actual metrics and later Insight. LaTeX paper generation will reuse the figure label, image path, caption and evidence references. Full label coverage and zero unsupported quantitative findings are release requirements.
+
+### 32.6 Phased implementation
+- **Phase A (first):** structured ChartSpec, Chart Catalog, validator, deterministic Python executor, labels, computed metrics and provenance. Preserve legacy chart output as fallback.
+- **Phase B:** connect Visual EDA Agent through existing Multi-LLM Adapter; plan and rank charts using the question and dataset profile.
+- **Phase C:** connect Insight Analyst and Reviewer to produce and verify evidence-grounded findings, insights, limitations and proposed follow-up analysis.
+- **Phase D:** refine Streamlit report cards, LaTeX export hooks and evaluation cases for relevance, nonredundancy, grounding and reproducibility.
+
+### 32.7 Progress
+Phase A code authored on `feature/m1a-data-eda` on 2026-11-04; isolated local chart-runtime tests passed (4/4). Whole-project CI, Streamlit UX acceptance and the user's approval remain pending. Phases B–D have not been implemented.
+
+### 32.8 Change log
+v1.2 Approved — 2026-11-04: user confirmed Visual EDA Agent + image labels + evidence-grounded findings/insights architecture; implementation gated by phased review.
+
+
+## 33. PRD v1.3 — Phase A Presentation & Dataset Context Revision (Approved 2026-11-04)
+
+The user approved this revision after reviewing the first generated charts.
+
+### 33.1 Dataset context
+- Optional user-entered data source.
+- User-declared temporal frequency, kept separate from estimated frequency.
+- Date range inferred from valid date-like columns.
+- Explicit per-column units; units are never guessed from column names.
+- Unit mappings validated against uploaded column names.
+- Source, declared frequency, estimated frequency, date range and units saved in JSON and Markdown.
+
+### 33.2 Chart presentation
+- Every chart displays sequential Figure numbering and a stable LaTeX figure label.
+- Display title, caption, analytical question, axis labels/units, source columns and dataset hash.
+- Key metrics are rendered as cards; raw JSON is placed in an expandable technical-details section.
+- Chart metadata includes source columns, plotted row count, dataset SHA-256, chart spec version and generation timestamp.
+- User-provided units are applied to relevant axis labels.
+
+### 33.3 Evidence boundaries
+- Python computes all numeric metrics from plotted observations.
+- Estimated frequency is explicitly labeled as an estimate.
+- Source, units and declared frequency are user-provided, not inferred.
+- Phase A does not generate narrative Insights; this is clearly stated in the UI and exports.
+- Insight Analyst and evidence Reviewer remain Phase C scope.
+
+### 33.4 Implementation status
+- Implemented on `feature/m1a-data-eda`: metadata schema, date-range/frequency estimation, user-entered source/frequency/units, unit-aware chart labels, metric-card UI, JSON expander and Markdown provenance.
+- Added tests for metadata, units, frequency estimation, chart provenance and report exports.
+- An intermediate CI run found a floating-point exact-equality assertion in a new test; it was changed to use numeric tolerance. Final CI for the latest commit remains to be verified.
+- User must re-run Streamlit for final visual acceptance.
+- No merge to `main` has been performed.
+
+### 33.5 Change log
+v1.3 Approved — 2026-11-04: Phase A presentation, dataset context, explicit units, provenance and test coverage revision.
+
+
+## 34. PRD v1.4 — Screenshot Review Follow-up (2026-11-05)
+
+The user's local Streamlit screenshots confirm that the main Phase A chart presentation is visible: sequential figure numbers, histogram/time-series output, analytical questions, captions, plotted-row counts, metric cards, collapsed technical JSON and report download controls.
+
+Remaining manual checks:
+- User-entered source/frequency/units have not yet been exercised; the report still records source and units as not provided.
+- Unit-aware axis labels and the Dataset Context result summary are not yet visually verified.
+- The pasted Markdown copy contains a stray `#NAME?` and escaped image-link parentheses. The current renderer code does not emit `#NAME?`; verify the original raw download in a text editor before treating it as a renderer defect.
+
+Follow-up polish:
+- Unit example changed from the incorrect `USD per metric tonne` to `USD per troy ounce`.
+- Added `Business-day daily` as a frequency option.
+- Trend metric renamed to `First-to-last change (%)` to avoid implying a period return calculation other than first-to-last observed values.
+- Removed redundant Figure ID text while retaining the LaTeX reference.
+
+For a dataset confirmed to be the LBMA Gold Price PM, use the source label `LBMA Gold Price PM`, frequency `Business-day daily`, and unit `USD per troy ounce`. Do not apply these labels to another dataset without checking its source documentation.
