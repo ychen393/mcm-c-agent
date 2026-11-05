@@ -291,15 +291,27 @@ if uploaded_file is not None:
             current_frequency = (
                 None if frequency_choice.startswith("Not specified") else frequency_choice
             )
-            current_units = _parse_units(
-                units_text,
-                dataset.frame.columns.astype(str).tolist(),
-            )
-            current_signature = _context_signature(data_source, current_frequency, current_units)
-            context_changed = (
-                problem_text != st.session_state.get("eda_pending_problem_statement")
-                or current_signature != st.session_state.get("eda_pending_context_signature")
-            )
+            try:
+                current_units = _parse_units(
+                    units_text,
+                    dataset.frame.columns.astype(str).tolist(),
+                )
+                current_signature = _context_signature(
+                    project_id,
+                    data_source,
+                    current_frequency,
+                    current_units,
+                    use_ai_planner,
+                    settings.llm_provider,
+                    settings.llm_model,
+                )
+                context_changed = (
+                    problem_text != st.session_state.get("eda_pending_problem_statement")
+                    or current_signature != st.session_state.get("eda_pending_context_signature")
+                )
+            except ValueError as exc:
+                context_changed = True
+                st.warning(str(exc))
             _render_chart_plan(pending_plan)
 
             if context_changed:
