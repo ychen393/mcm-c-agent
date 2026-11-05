@@ -43,6 +43,30 @@ def test_project_status_does_not_claim_connected_external_agents():
     assert "not a live dashboard" in status
 
 
+def test_cursor_subagent_prompts_keep_builder_and_reviewer_separate():
+    builder = (ROOT / ".cursor/agents/builder.md").read_text(encoding="utf-8")
+    reviewer = (ROOT / ".cursor/agents/reviewer.md").read_text(encoding="utf-8")
+
+    assert "name: builder" in builder
+    assert "readonly: false" in builder
+    assert "pytest -q" in builder
+    assert "Do not mark the change as independently reviewed." in builder
+    assert "Pushing to `main`" in builder
+
+    assert "name: reviewer" in reviewer
+    assert "readonly: true" in reviewer
+    assert "edit the Builder branch" in reviewer
+    assert "A second model is not a substitute for numeric or integration tests." in reviewer
+    assert "Do not write that the change is approved to merge." in reviewer
+    assert "Claude Code" in reviewer
+
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    assert ".cursor/agents/builder.md" in agents
+    assert ".cursor/agents/reviewer.md" in agents
+    status = (ROOT / "docs/PROJECT_STATUS.md").read_text(encoding="utf-8")
+    assert "instruction files only" in status
+
+
 def test_pull_request_ci_runs_for_feature_branches():
     ci = (ROOT / ".github/workflows/tests.yml").read_text(encoding="utf-8")
     assert 'pull_request:' in ci
