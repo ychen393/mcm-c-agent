@@ -1092,7 +1092,7 @@ AI planning is opt-in. The UI discloses that the problem statement and compact d
 Artifact persistence rejects an explicitly supplied chart plan unless the caller passes the human approval gate. Approved reports record the approval timestamp, planning strategy and provider/model/prompt provenance. Markdown and JSON exports retain chart rank, relevance, figure label, source fields and Python-computed metrics.
 
 ### 37.4 B4 — Evaluation foundation
-Added six original synthetic chart-planning cases covering temporal trends, distribution/outlier review, categorical counts, numeric relationships, insufficient time coverage and missing-context fallback. Each case includes a reference checklist, weighted human rubric, critical errors and fixture SHA-256 reference. CI checks the case schema and fixture hashes.
+Added six original synthetic chart-planning cases covering temporal trends, distribution/outlier review, categorical counts, numeric relationships, insufficient time coverage and missing-context fallback. Each case includes a reference checklist, weighted human rubric, critical errors and fixture SHA-256 reference. Added an offline evaluator for strategy, chart-type/column coverage, prohibited fields/types, fallback reason and structural validity. CI checks case schema, fixture hashes and evaluator behavior.
 
 ### 37.5 Remaining acceptance gates
 - Latest full GitHub Actions run must pass after the final B1–B4 code changes.
