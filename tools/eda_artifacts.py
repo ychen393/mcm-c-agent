@@ -29,6 +29,9 @@ def save_eda_artifacts(
     chart_plan: ChartPlan | None = None,
     human_approved: bool = False,
 ) -> dict[str, str | list[str]]:
+    if chart_plan is not None and not human_approved:
+        raise PermissionError("Chart plan execution requires explicit human approval.")
+
     project_dir = output_root / safe_project_id(report.project_id) / "eda" / dataset.sha256[:12]
     project_dir.mkdir(parents=True, exist_ok=True)
     dataset_path = project_dir / f"{_safe_stem(dataset.file_name)}{dataset.file_extension}"
@@ -45,8 +48,6 @@ def save_eda_artifacts(
     from tools.chart_executor import execute_chart_plan
     from tools.chart_plan_validator import validate_chart_plan
 
-    if chart_plan is not None and not human_approved:
-        raise PermissionError("Chart plan execution requires explicit human approval.")
     plan = chart_plan or fallback_chart_plan(report)
     validate_chart_plan(plan, dataset.frame, report)
     if chart_plan is not None:
