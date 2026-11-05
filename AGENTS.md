@@ -41,7 +41,11 @@ Build a semi-autonomous, verifiable MCM Problem C research system. Data analysis
 - **GitHub Actions:** objective automated tests and guardrails, not a substitute for human approval.
 
 ## Cursor subagent prompts
-Local Cursor subagent instructions are `.cursor/agents/builder.md` and `.cursor/agents/reviewer.md`. Invoke them as `/builder` and `/reviewer`. The Builder implements one scoped issue. The Reviewer is read-only and does not edit the Builder branch. These files do not connect an external account, authorize spending, or count as an independent review.
+Local role instructions are `.cursor/agents/builder.md` and `.cursor/agents/reviewer.md`. **Cloud Agent compatibility warning (observed 2026-11-05):** In the user's tested Cloud Task session, `subagent_type=builder` and `subagent_type=reviewer` were rejected as invalid enum values. Do **not** claim that these custom role names can be directly invoked in that environment. A role Markdown file does not prove runtime registration.
+
+**Safe Cloud workaround, requiring verification:** use an allowed built-in `generalPurpose` Task for the Builder and pass the Builder file contents as instructions; for Reviewer use an allowed built-in `generalPurpose` Task with `readonly: true` at the **tool invocation level** (if supported), and pass the Reviewer file contents as instructions. Run sequentially after Builder commit; give Reviewer the diff, issue and test evidence, not Builder's self-assessment. If the tool cannot enforce readonly, do not launch Reviewer as a writable task: stop and request a separately isolated read-only review session. Use separate sessions/models only when the UI/API actually confirms them. Neither this workaround nor model diversity is yet independently verified here.
+
+The Builder implements one scoped issue. The Reviewer must be read-only and must not edit the Builder branch. These files do not connect an external account, authorize spending, or count as an independent review.
 
 ## Minimum PR evidence
 - Linked Issue and scope; files touched; tests with exact command/results; data/LLM cost impact; privacy impact; fallback and rollback steps; reviewer findings or "review pending"; approval requirement.
