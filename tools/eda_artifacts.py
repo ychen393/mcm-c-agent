@@ -139,7 +139,8 @@ def render_markdown_report(report: EDAReport) -> str:
             spec = item["spec"]
             lines.extend([
                 f"### Rank {spec['rank']} · {spec['figure_label']} — {spec['title']}",
-                f"**Relevance score:** {spec['relevance_score']:.0%} · **Analytical role:** {spec['analytical_role']}",
+                f"**Relevance score:** {spec['relevance_score']:.0%}" if report.chart_plan.get("strategy") == "agent" else "**Relevance score:** Not scored",
+                f"**Analytical role:** {spec['analytical_role']}",
                 f"![{spec['title']}]({Path(item['path']).name})",
                 f"**Analytical question:** {spec['analytical_question']}",
                 f"**Caption:** {spec['caption']}",
