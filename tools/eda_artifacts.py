@@ -89,6 +89,9 @@ def render_markdown_report(report: EDAReport) -> str:
         f"- User-declared frequency: {data.temporal_frequency or 'Not provided'}",
         f"- Estimated frequency: {data.inferred_frequency or 'Not available'}",
         f"- Date period: {data.period_start or 'N/A'} to {data.period_end or 'N/A'}",
+        f"- Chart planning strategy: {report.chart_plan.get('strategy', 'not recorded')}",
+        f"- Planner: {report.chart_plan.get('planner_provider') or 'N/A'} / {report.chart_plan.get('planner_model') or 'N/A'}",
+        f"- Chart-plan approval: {report.summary.get('chart_plan_approval', {}).get('status', 'not recorded')}",
         "",
         "## Column units",
         "",
@@ -135,7 +138,8 @@ def render_markdown_report(report: EDAReport) -> str:
         for item in report.chart_metadata:
             spec = item["spec"]
             lines.extend([
-                f"### {spec['figure_label']} — {spec['title']}",
+                f"### Rank {spec['rank']} · {spec['figure_label']} — {spec['title']}",
+                f"**Relevance score:** {spec['relevance_score']:.0%} · **Analytical role:** {spec['analytical_role']}",
                 f"![{spec['title']}]({Path(item['path']).name})",
                 f"**Analytical question:** {spec['analytical_question']}",
                 f"**Caption:** {spec['caption']}",
@@ -144,7 +148,7 @@ def render_markdown_report(report: EDAReport) -> str:
                 f"**Plotted rows:** {item['plotted_rows']}",
                 f"**Source SHA-256:** {item['source_sha256']}",
                 f"**Computed metrics:** {item['metrics']}",
-                "**Insight status:** Not generated in Phase A; evidence-grounded interpretation is scheduled for Phase C.",
+                "**Insight status:** Not generated; evidence-grounded interpretation is scheduled for Phase C.",
                 "",
             ])
     else:
