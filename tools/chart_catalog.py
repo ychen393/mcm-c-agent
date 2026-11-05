@@ -35,7 +35,8 @@ def fallback_chart_plan(report) -> ChartPlan:
                 caption=f"Observed {value_col}{unit_suffix} across {date_col}{period}, ordered chronologically; missing pairs excluded.",
                 analytical_question=f"How does {value_col} change over {date_col}?",
                 rationale=f"Inspect temporal movement in {value_col} for trends and discontinuities.",
-                caveats=["Descriptive trend; not a prediction."],
+                priority="recommended", rank=len(charts) + 1, relevance_score=0.5,
+                analytical_role="trend", caveats=["Descriptive trend; not a prediction."],
             ))
         if count >= 3: break
     return ChartPlan(charts=charts[:12], skipped_reasons=["Semantic selection requires a later Visual EDA Agent."])
