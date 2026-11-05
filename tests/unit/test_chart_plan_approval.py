@@ -18,6 +18,8 @@ def test_explicit_chart_plan_requires_human_approval(tmp_path):
     with pytest.raises(PermissionError, match="explicit human approval"):
         save_eda_artifacts(dataset, report, tmp_path, chart_plan=plan)
 
+    assert list(tmp_path.iterdir()) == []
+
 
 def test_approved_chart_plan_is_persisted_with_approval_provenance(tmp_path):
     dataset = load_dataset(
