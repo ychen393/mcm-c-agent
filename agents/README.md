@@ -11,7 +11,7 @@ Agent implementations are introduced incrementally as vertical slices with typed
 - **Recovery:** one bounded repair attempt for malformed or invalid output; deterministic generic EDA fallback for missing problem statement, provider errors or repeated invalid output.
 - **Safety:** the model proposes chart specifications only. It cannot provide executable code or calculate metrics. Python validates source columns, chart types, sample sufficiency and declared units.
 
-The planner service is implemented and covered by mocked-LLM tests. It is not connected to the Streamlit execution path yet: B3 must first introduce the plan preview and explicit human approval gate.
+The planner service is connected to the Streamlit Dataset Explorer through an explicit opt-in, ranked plan preview and mandatory approval gate. Mocked-LLM tests cover provider and validation failure paths.
 
 ## Planned later agents
 
