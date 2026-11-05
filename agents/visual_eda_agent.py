@@ -104,8 +104,8 @@ def _build_messages(problem_statement: str, report: EDAReport) -> list[dict[str,
 def _parse_plan(content: str) -> ChartPlan:
     cleaned = content.strip()
     if cleaned.startswith("```"):
-        cleaned = re.sub(r"^\`\`\`(?:json)?\s*", "", cleaned, count=1, flags=re.IGNORECASE)
-        cleaned = re.sub(r"\s*\`\`\`$", "", cleaned, count=1)
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, count=1, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```$", "", cleaned, count=1)
     try:
         payload = json.loads(cleaned)
     except json.JSONDecodeError as exc:
