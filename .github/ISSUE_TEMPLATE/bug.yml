@@ -1,0 +1,30 @@
+name: Bug / regression
+description: Reproducible defect with impact and tests
+title: "[Bug] "
+labels: []
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected versus observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction and environment
+      description: Do not include raw API keys, private data or tokens.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Severity, root-cause hypothesis and risk tier
+    validations:
+      required: true
+  - type: textarea
+    id: regression
+    attributes:
+      label: Proposed regression test / definition of done
+    validations:
+      required: true
