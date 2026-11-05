@@ -252,3 +252,43 @@ def test_validator_rejects_duplicate_analytical_intent():
             dataset.frame,
             report,
         )
+
+
+def test_missing_api_key_uses_deterministic_fallback_without_network(test_settings):
+    dataset, report = sample()
+    test_settings.deepseek_api_key = None
+    test_settings.llm_api_key = None
+
+    plan = plan_visual_eda(
+        "Analyze the temporal movement of rentals.",
+        report,
+        dataset.frame,
+        settings=test_settings,
+    )
+
+    assert plan.strategy == "deterministic"
+    assert "Missing API key" in plan.fallback_reason
+
+
+def test_empty_agent_plan_is_preserved_when_planner_abstains():
+    dataset, report = sample()
+    empty = ChartPlan(
+        strategy="agent",
+        planning_summary="The available fields do not support a useful chart for this question.",
+        problem_alignment="The requested analysis cannot be answered by the available dataset.",
+        charts=[],
+        skipped_reasons=["No chart meets the required evidence and sample-size constraints."],
+    ).model_dump_json()
+    llm = FakeLLM([empty])
+
+    plan = plan_visual_eda(
+        "Analyze an outcome that is not present in this dataset.",
+        report,
+        dataset.frame,
+        llm=llm,
+    )
+
+    assert plan.strategy == "agent"
+    assert plan.charts == []
+    assert plan.skipped_reasons
+    assert len(llm.calls) == 1
