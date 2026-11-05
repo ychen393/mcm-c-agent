@@ -324,6 +324,7 @@ if uploaded_file is not None:
                     use_ai_planner,
                     settings.llm_provider,
                     settings.llm_model,
+                    st.session_state.get(SESSION_REVISION_KEY, 0),
                 )
                 context_changed = (
                     problem_text != st.session_state.get("eda_pending_problem_statement")
