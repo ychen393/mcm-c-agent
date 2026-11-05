@@ -76,3 +76,11 @@ def test_validator_rejects_duplicate_or_unsorted_chart_ranks():
 def test_chart_plan_rejects_unknown_fields():
     with pytest.raises(ValidationError):
         ChartPlan.model_validate({"strategy": "agent", "untrusted_code": "print('hello')"})
+
+
+def test_chart_rank_and_relevance_score_are_required_fields():
+    payload = chart(1, "missing_rank_score").model_dump()
+    payload.pop("rank")
+    payload.pop("relevance_score")
+    with pytest.raises(ValidationError):
+        ChartSpec.model_validate(payload)
