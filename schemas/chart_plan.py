@@ -11,8 +11,8 @@ class ChartSpec(BaseModel):
     chart_type: ChartType
     title: str = Field(min_length=3, max_length=180)
     figure_label: str = Field(pattern=r"^fig:[a-z][a-z0-9_-]{0,63}$")
-    x: str
-    y: str | None = None
+    x: str = Field(min_length=1)
+    y: str | None = Field(default=None, min_length=1)
     x_label: str = Field(min_length=1)
     y_label: str = Field(min_length=1)
     x_unit: str | None = None
@@ -31,6 +31,10 @@ class ChartSpec(BaseModel):
     def validate_shape(self):
         if self.chart_type in ("time_series", "scatter") and not self.y:
             raise ValueError(f"{self.chart_type} requires y")
+        if self.chart_type in ("histogram", "box_plot", "bar") and self.y is not None:
+            raise ValueError(f"{self.chart_type} does not accept y")
+        if self.y == self.x:
+            raise ValueError("x and y must reference different columns")
         return self
 
 class ChartPlan(BaseModel):
