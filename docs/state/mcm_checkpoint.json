@@ -95,15 +95,46 @@
   "deferred_multi_agent": {
     "governance_pr": 3,
     "pilot_issue": 4,
-    "cursor_connected": false,
+    "cursor_connected": true,
     "claude_connected": false,
-    "auto_merge_enabled": false
+    "auto_merge_enabled": false,
+    "cursor_connection_method": "GitHub @cursor mention, confirmed through Cursor bot acknowledgement and code commits",
+    "last_pilot": {
+      "issue": 6,
+      "run_url": "https://cursor.com/agents/bc-f8c1004b-c923-4124-bf17-2cfc1362f6de",
+      "code_branch": "test/6-api-settings-regression",
+      "code_sha": "cceb9641c1c5ec7eeb2d09d5ce7f679854cbb152",
+      "pr": 7,
+      "pr_status": "draft",
+      "pr_created_by": "ChatGPT coordinator after Cursor code push",
+      "coordinator_review_id": 5783181241,
+      "coordinator_review_status": "COMMENT_not_owner_approval",
+      "ci_validation": {
+        "branch": "test/6-ci-validation",
+        "run_id": 42008138145,
+        "run_status": "success",
+        "command": "pytest -q",
+        "progress_dots": 80,
+        "failed": 0,
+        "pr_attached": false
+      },
+      "independent_readonly_reviewer": "not_connected",
+      "pilot_verdict": "partial_workflow_demonstrated",
+      "merge_authorized": false,
+      "remaining": [
+        "native_ci_trigger_for_cursor_branch_targets",
+        "enforced_readonly_independent_reviewer",
+        "future_automatic_status_monitoring"
+      ]
+    }
   },
   "source_links": [
     "https://github.com/ychen393/mcm-c-agent/pull/1",
     "https://github.com/ychen393/mcm-c-agent/pull/2",
     "https://github.com/ychen393/mcm-c-agent/pull/3",
-    "https://github.com/ychen393/mcm-c-agent/issues/4"
+    "https://github.com/ychen393/mcm-c-agent/issues/4",
+    "https://github.com/ychen393/mcm-c-agent/pull/7",
+    "https://github.com/ychen393/mcm-c-agent/actions/runs/42008138145"
   ],
   "google_docs_mirror": "https://docs.google.com/document/d/16zye72a1xP98hHKQpM6bm1GHvzInckVboni19n5_g_I/edit"
 }
