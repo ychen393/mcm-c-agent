@@ -51,15 +51,15 @@ if uploaded_file is not None:
         st.dataframe(dataset.frame.head(20), use_container_width=True)
         st.caption(f"SHA-256: {dataset.sha256}")
         with st.expander("Dataset context (optional)", expanded=False):
-            data_source = st.text_input("Data source", placeholder="e.g., World Bank / Kaggle / official competition dataset", key="eda_data_source")
+            data_source = st.text_input("Data source", placeholder="e.g., LBMA Gold Price PM / official source URL", key="eda_data_source")
             frequency_choice = st.selectbox(
                 "Data frequency",
-                ["Not specified — estimate from dates", "Daily", "Weekly", "Monthly", "Quarterly", "Annual", "Irregular"],
+                ["Not specified — estimate from dates", "Business-day daily", "Daily", "Weekly", "Monthly", "Quarterly", "Annual", "Irregular"],
                 key="eda_frequency",
             )
             units_text = st.text_area(
                 "Column units (one per line: column_name = unit)",
-                placeholder="USD (PM) = USD per metric tonne\nDate = YYYY-MM-DD",
+                placeholder="USD (PM) = USD per troy ounce",
                 key="eda_column_units",
                 height=80,
             )
@@ -150,7 +150,7 @@ if "eda_report" in st.session_state:
         metric_labels = {
             "count": "Observations", "median": "Median", "min": "Minimum", "max": "Maximum",
             "mean": "Mean", "first": "First value", "last": "Last value",
-            "change": "Absolute change", "change_pct": "Change (%)",
+            "change": "Absolute change", "change_pct": "First-to-last change (%)",
         }
         for chart_index, chart_path in enumerate(artifacts["chart_paths"], start=1):
             meta = next((m for m in report_data.get("chart_metadata", []) if m["path"] == chart_path), None)
@@ -159,7 +159,6 @@ if "eda_report" in st.session_state:
                 st.markdown(f"### Figure {chart_index:02d} · {spec['title']}")
                 st.caption(f"LaTeX reference: \\label{{{spec['figure_label']}}}")
                 st.image(chart_path, caption=spec["caption"], use_container_width=True)
-                st.markdown(f"**Figure ID:** {spec['figure_label']}")
                 st.markdown(f"**Analytical question:** {spec['analytical_question']}")
                 st.caption(f"Axes: {spec['x_label']} / {spec['y_label']} · Plotted rows: {meta['plotted_rows']}")
                 preferred_order = (["count", "median", "min", "max"] if spec["chart_type"] in ("histogram", "box_plot")
