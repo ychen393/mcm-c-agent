@@ -1,6 +1,6 @@
 # Phase B — Visual EDA Agent
 
-Status: **B0 contract and planning foundation implemented; awaiting review.** B1–B4 are not yet implemented.
+Status: **B0 approved by the user; B1 planner service implemented with automated tests in CI.** B2–B4 remain in progress.
 
 ## Product goal
 
@@ -57,24 +57,24 @@ Phase B ends after chart planning, validation, approval and execution. Evidence-
 - [x] Update deterministic fallback plans with unique ranks and explicit generic fallback metadata.
 - [x] Add versioned Visual EDA Planner system prompt.
 - [x] Add unit tests for ranking, relevance score, provenance and strict schema.
-- [ ] User reviews B0 contract before B1 implementation.
+- [x] User approved chart ranking, mandatory human approval and deterministic fallback (2026-11-05).
 
 ## B1 — Visual EDA Planner
 
-- [ ] Implement `agents/visual_eda_agent.py` using the existing `LLMFactory` / `BaseLLM` Multi-LLM adapter.
-- [ ] Supply problem statement, dataset metadata, column profiles, warnings and correlations; do not send full raw dataset contents.
-- [ ] Parse JSON output into ChartPlan; support one bounded repair attempt for malformed/schema-invalid output.
-- [ ] Attach provider, model and prompt version to plan provenance.
-- [ ] Validate against the real DataFrame before accepting the plan.
-- [ ] Add mocked-LLM tests; tests must not require real API credentials.
+- [x] Implement `agents/visual_eda_agent.py` using the existing `LLMFactory` / `BaseLLM` Multi-LLM adapter.
+- [x] Supply problem statement, compact dataset metadata, column profiles, warnings and correlations; do not send full raw dataset rows.
+- [x] Parse JSON output into ChartPlan; support one bounded repair attempt for malformed/schema-invalid output.
+- [x] Attach provider, model and prompt version to plan provenance.
+- [x] Validate against the real DataFrame and declared units before accepting the plan.
+- [x] Add mocked-LLM tests for success, malformed output, one repair, invalid columns, provider failure and fallback; no live API credentials required.
 
 ## B2 — Selection quality and fallback
 
 - [ ] Rank charts by problem relevance with unique ordered ranks and 0–1 relevance scores.
-- [ ] Reject unknown columns, unsupported types, invalid axes, inadequate sample sizes and duplicate chart IDs/labels/ranks.
+- [x] Reject unknown columns, unsupported types, invalid axes, inadequate sample sizes, invalid units and duplicate chart IDs/labels/ranks.
 - [ ] Add redundancy checks for repeated chart intent / identical field pairs.
-- [ ] Keep deterministic fallback when no problem statement or LLM is unavailable.
-- [ ] Record fallback reason and never label generic fallback as problem-aware.
+- [x] Keep deterministic fallback when no problem statement or LLM is unavailable.
+- [x] Record fallback reason and never label generic fallback as problem-aware.
 
 ## B3 — Streamlit human-review workflow
 
@@ -113,3 +113,18 @@ Phase B ends after chart planning, validation, approval and execution. Evidence-
 - [ ] ChartPlan metadata is sufficient to explain the plan and record provider/fallback status.
 - [ ] Prompt boundaries prohibit arbitrary code and unsupported chart types.
 - [ ] Human approval is retained as a mandatory execution gate.
+
+
+## B1 implementation notes — 2026-11-05
+
+- Added `agents/visual_eda_agent.py` with `plan_visual_eda()`.
+- The planner uses the existing `LLMFactory` / `BaseLLM` adapter and supports dependency injection for deterministic tests.
+- The LLM receives the problem statement, a compact profile derived from EDAReport, and the ChartPlan JSON Schema; it does not receive the full DataFrame or raw CSV/XLSX rows.
+- Model output is parsed into ChartPlan and validated against the actual DataFrame and declared column units.
+- A single bounded repair attempt is made for malformed JSON or schema/data validation errors.
+- Missing problem statement, context preparation failure, provider initialization/invocation failure, or a second invalid response returns a deterministic generic fallback with a recorded reason.
+- Added `planner_prompt_version` provenance.
+- Strengthened ChartSpec axis-shape constraints and validator checks for time-series valid pairs, categorical bar axes, numeric axes, sample sufficiency and explicitly declared units.
+- Added `tests/unit/test_visual_eda_agent.py` for successful planning, context minimization, missing prompt, bounded repair, invalid-column fallback, provider timeout and invalid unit/type cases.
+
+Important integration boundary: B1 provides a tested planner service only. It is intentionally not wired into the current Streamlit EDA execution path yet, because that path auto-executes deterministic charts. B3 must add the user-visible plan preview and explicit approval gate before AI plans can reach the executor. No live API call or UI acceptance is claimed by B1.
