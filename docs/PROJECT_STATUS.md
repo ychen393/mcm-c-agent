@@ -7,14 +7,14 @@ Updated: 2026-11-05. This page is a manually maintained status snapshot, **not a
 | Phase A: deterministic EDA | Implemented, visual review largely completed; residual metadata/export checks | `feature/m1a-data-eda`, Draft PR #1 |
 | Phase B: Visual EDA planner | Implementation and CI exercised; user verified DeepSeek planning | `feature/m1b-visual-eda`, Draft PR #2; final milestone acceptance / merge still pending |
 | Phase B: API Settings | Implemented and used locally; key remains session scoped | Same PR #2 |
-| Multi-agent governance | Draft policies/templates on separate branch | Draft PR to `feature/m1b-visual-eda`, pending user approval |
+| Multi-agent governance | Implemented as draft; CI passed | Draft PR #3 targeting `feature/m1b-visual-eda`, pending user approval |
 | Cursor autonomous builder | Not connected by this governance PR | Owner authorization & pilot required |
 | Claude Code independent review | Not connected by this governance PR | Owner authorization & pilot required |
 | Grok QA | Optional; not connected | Deferred pending benefit/cost evaluation |
 | Auto-merge, scheduled agents, protected branches | Not configured by governance documents | Admin/settings access and separate authorization required |
 
 ## Current next milestone
-Establish a bounded **builder → reviewer → CI → decision package** pilot. Use a low-risk Issue, isolated branch and draft PR. Owner decides if actual external integrations should be installed and what permissions/cost limits to grant.
+Governance PR #3 and CI are ready for review. Pilot Issue #4 is created but blocked until owner connects/authorizes Cursor and Claude Code and chooses least-privilege access and spending limits. Then run a bounded **builder → reviewer → CI → decision package** pilot.
 
 ## Known cautions
 - Passing `pytest -q` does not establish real LLM quality, contest correctness, UI reliability or production readiness.
