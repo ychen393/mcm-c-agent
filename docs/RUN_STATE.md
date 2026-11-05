@@ -79,5 +79,6 @@ Then open `http://localhost:8502` and use **API Settings** (re-enter key if sess
 - Phase B acceptance: `docs/PHASE_B_PLAN.md`
 - Next steps: `docs/NEXT_ACTIONS.md`
 - Machine-readable snapshot: `docs/state/mcm_checkpoint.json`
+- Independent Google Docs mirror: https://docs.google.com/document/d/16zye72a1xP98hHKQpM6bm1GHvzInckVboni19n5_g_I/edit
 
 **Update protocol:** On every completed milestone or meaningful status change, update this snapshot and `docs/state/mcm_checkpoint.json` in the same PR. Keep the explicit evidence/source links; distinguish “implemented”, “tested”, “user verified”, and “approved”. GitHub is authoritative for code / actual development progress; Google Docs is a human-readable mirror. No claim of continuous synchronization unless a separate workflow is installed.
