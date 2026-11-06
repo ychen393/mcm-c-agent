@@ -28,7 +28,7 @@ def test_two_fixes_then_fail_exhausts():
         replay(log+fix(12,"e"*40),owner=O,builder=B)
 def test_failed_ci_spends_fix_slot():
     log=start()[:2]+[e(2,"ci_fail","actions",sha=A,ci_event="pull_request",url=URL)]
-    log+=fix(3,C)+[review(6,C)]+fix(7,D)+[e(10,"ci_fail","actions",sha=D,ci_event="pull_request",url=URL)]
+    log+=fix(3,C)+[review(6,C)]+fix(7,D)[:2]+[e(9,"ci_fail","actions",sha=D,ci_event="pull_request",url=URL)]
     assert replay(log,owner=O,builder=B)["stage"]=="EXHAUSTED"
 def test_no_stale_review():
     with pytest.raises(LoopError,match="Stale"):
