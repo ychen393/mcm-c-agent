@@ -66,8 +66,41 @@ def test_snapshot_review_and_fix():
     assert snapshot("APPROVED")["stage"]=="READY_FOR_OWNER"
     assert snapshot("CHANGES_REQUESTED",old=True)["observed_fixes"]==1
     assert snapshot("CHANGES_REQUESTED",old=True)["stage"]=="NEEDS_FIX_AUTH"
-def test_snapshot_ci_failure():
-    assert snapshot("APPROVED",conclusion="failure")["stage"]=="NEEDS_FIX_AUTH"
+@pytest.mark.parametrize("conclusion", [
+    "failure", "timed_out", "cancelled", "startup_failure",
+    "action_required", "neutral", "skipped", None,
+])
+def test_snapshot_completed_non_success_requires_fix_authorization(conclusion):
+    # A terminal CI run must never leave the observer waiting indefinitely.
+    assert snapshot("APPROVED", conclusion=conclusion)["stage"] == "NEEDS_FIX_AUTH"
+
+
+@pytest.mark.parametrize("conclusion", [
+    "failure", "timed_out", "cancelled", "startup_failure",
+    "action_required", "neutral", "skipped", None,
+])
+def test_snapshot_completed_non_success_exhausts_after_two_fixes(conclusion):
+    pr = {"number": 99, "head": {"sha": D, "ref": "feature/demo"}, "user": {"login": B}}
+    commits = [{"sha": A}, {"sha": C}, {"sha": D}]
+    reviews = [
+        {"commit_id": A, "state": "CHANGES_REQUESTED", "user": {"login": R}, "submitted_at": "1"},
+        {"commit_id": C, "state": "CHANGES_REQUESTED", "user": {"login": R}, "submitted_at": "2"},
+    ]
+    runs = [{"name": "Python tests", "event": "pull_request", "head_sha": D,
+             "head_branch": "feature/demo", "status": "completed",
+             "conclusion": conclusion, "html_url": URL, "id": 1}]
+    result = github_snapshot(pr, reviews, commits, runs)
+    assert result["stage"] == "EXHAUSTED"
+    assert result["observed_fixes"] == 2
+
+
+@pytest.mark.parametrize("status", ["queued", "in_progress", "requested", "waiting", "pending"])
+def test_snapshot_unfinished_ci_still_waits(status):
+    pr = {"number": 99, "head": {"sha": C, "ref": "feature/demo"}, "user": {"login": B}}
+    runs = [{"name": "Python tests", "event": "pull_request", "head_sha": C,
+             "head_branch": "feature/demo", "status": status,
+             "conclusion": None, "html_url": URL, "id": 1}]
+    assert github_snapshot(pr, [], [{"sha": C}], runs)["stage"] == "AWAIT_CI"
 def test_documented_permissions():
     from pathlib import Path
     root=Path(__file__).resolve().parents[2]
