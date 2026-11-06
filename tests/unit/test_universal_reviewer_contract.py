@@ -19,7 +19,8 @@ def test_universal_reviewer_role_and_boundaries():
 def test_mcm_profile_is_separate_and_state_safe():
     core = CORE.read_text(encoding="utf-8")
     profile = PROFILE.read_text(encoding="utf-8")
-    assert "MCM" not in core or "MCM:" in core  # generic core does not require MCM-only domain rules
+    assert "Statistical and mathematical validity" not in core
+    assert ".cursor/review-profiles/mcm.md" in core
     for term in ("docs/AUTONOMY_POLICY.md", "docs/mcm-runtime-checkpoint",
                  "timed_out", "cancelled", "startup_failure",
                  "Phase B", "owner review"):
