@@ -2,7 +2,7 @@
 
 > **This describes the DEVELOPMENT orchestration, not the LangGraph research agents inside the product.** A role prompt is **not** a running Cloud Agent; a Cursor Cloud conversation is a run, not a permanent role; a GitHub Action is not an independent AI reviewer.
 
-Machine-readable role definitions: [agent-registry.json](agent-registry.json). Task inventory: [task-registry.json](task-registry.json). Operating procedure: [COORDINATOR_RUNBOOK.md](COORDINATOR_RUNBOOK.md).
+**Live GitHub task snapshot:** [Coordinator V2](COORDINATOR_LIVE_VIEW_V2.md). This is an event-driven Actions artifact, **not** a Cursor-native live dashboard.\n\nMachine-readable role definitions: [agent-registry.json](agent-registry.json). Task inventory: [task-registry.json](task-registry.json). Operating procedure: [COORDINATOR_RUNBOOK.md](COORDINATOR_RUNBOOK.md).
 
 ## One project, explicit hierarchy
 
