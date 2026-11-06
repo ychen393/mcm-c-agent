@@ -5,9 +5,9 @@
 ## Entry point and ownership
 
 - Repository: `ychen393/mcm-c-agent`. Source of truth: actual issue/PR/commit/CI and current GitHub state.
-- Existing Cursor Project: `Cursor Subagent Workflow` (user's UI). This repository **cannot** reconfigure or rename the Project, reparent historical sessions or prove that its built-in Coordinator is connected.
+- Existing Cursor Project: **Cursor Subagent Workflow**. Verified Coordinator session: https://cursor.com/agents/bc-a1f8594c-95fc-4e50-a705-2774b4984644 (2026-11-06 pilot). This repository still **cannot** reparent historical sessions or hard-enforce billing caps.
 - Scope: development organization only. Product LangGraph Agents are a separate layer.
-- Main Coordinator: scope work, select a role, track outstanding gates, and return a decision package to owner; it is not a paid background agent.
+- Main Coordinator: this Project session scopes work, selects a role, tracks outstanding gates, and returns a decision package to owner. Under the $0 gate it must not launch child Cloud Agents without fresh owner authorization.
 - Registry links: `docs/agents/agent-registry.json` / `docs/agents/task-registry.json`.
 
 ## One task = one traceable identity

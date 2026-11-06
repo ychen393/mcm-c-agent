@@ -2,6 +2,7 @@
   "version": 1,
   "mode": "bootstrap-inventory-not-live-sync",
   "project": "MCM C Agent — Development",
+  "project_session": "https://cursor.com/agents/bc-a1f8594c-95fc-4e50-a705-2774b4984644",
   "last_manual_snapshot_date": "2026-11-06",
   "entries": [
     {
@@ -11,13 +12,15 @@
       "role": "builder",
       "parent": "coordinator",
       "session": "https://cursor.com/agents/bc-ac44af56-4736-4686-9fd2-9bb27e44349c",
-      "session_verified": "recorded-in-issue8",
+      "session_verified": "recorded-in-issue8-status-json",
+      "smoke_session": "https://cursor.com/agents/bc-15dc0f55-b966-5e40-9c2f-07380618e9f6",
       "branch": "feature/8-cursor-cowork-v1",
       "base": "cursor/init-builder-reviewer-subagents-bdaf",
       "status": "PARTIAL",
       "evidence": [
         "https://github.com/ychen393/mcm-c-agent/issues/8",
-        "https://github.com/ychen393/mcm-c-agent/pull/9"
+        "https://github.com/ychen393/mcm-c-agent/pull/9",
+        "https://github.com/ychen393/mcm-c-agent/pull/10"
       ],
       "next_gate": "independent reviewer still blocked; no automatic merge"
     },
@@ -31,12 +34,13 @@
       "session_verified": "not-recorded",
       "branch": "feature/15-bounded-review-loop",
       "base": "feature/8-cursor-cowork-v1",
+      "head_sha_observed": "ded0d0e13d3f0b88160168ac8d52532798f9d6ec",
       "status": "AWAIT_INDEPENDENT_REVIEW",
       "evidence": [
         "https://github.com/ychen393/mcm-c-agent/pull/16",
         "https://github.com/ychen393/mcm-c-agent/actions/runs/42181085567"
       ],
-      "next_gate": "Bugbot new-head review not evidenced; owner decides"
+      "next_gate": "Bugbot covered cb0793a only; latest HEAD needs fresh review; owner decides"
     },
     {
       "task_id": "universal-reviewer-config",
@@ -70,6 +74,22 @@
         "https://github.com/ychen393/mcm-c-agent/actions/runs/42187701647"
       ],
       "next_gate": "Check latest exact HEAD, CI, and readiness artifact before acceptance"
+    },
+    {
+      "task_id": "coordinator-pilot-project",
+      "issue": null,
+      "pr": 20,
+      "role": "coordinator",
+      "parent": "coordinator",
+      "session": "https://cursor.com/agents/bc-a1f8594c-95fc-4e50-a705-2774b4984644",
+      "session_verified": "this-pilot-run",
+      "branch": "feature/agent-coordination-registry-v1",
+      "base": "feature/review-status-automation-v1",
+      "status": "OWNER_DECISION_REQUIRED",
+      "evidence": [
+        "https://github.com/ychen393/mcm-c-agent/pull/20"
+      ],
+      "next_gate": "Owner accepts registry + Project organization; no merge to main; no child Cloud Agents without new authorization"
     }
   ]
 }

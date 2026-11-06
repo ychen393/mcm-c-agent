@@ -25,7 +25,7 @@ flowchart TD
 
 | Role | Runtime | Responsibility | Verified reality |
 | --- | --- | --- | --- |
-| Coordinator | ChatGPT + GitHub, with Cursor Projects integration **not validated** | Scope, dispatch decisions, status, owner handoff | Coordinator work is human-assisted |
+| Coordinator | Cursor Project **Cursor Subagent Workflow** ([session](https://cursor.com/agents/bc-a1f8594c-95fc-4e50-a705-2774b4984644)) + GitHub | Scope, dispatch decisions, status, owner handoff | Pilot validated 2026-11-06; no autonomous child dispatch |
 | Builder | Cursor main Cloud Agent / supported `generalPurpose` | Code, tests, one owned Draft PR | Pilot only, not continuous dispatch |
 | CI + Read-only Status | GitHub Actions | Objective tests and report | Evidence exists on PR #18 earlier HEAD |
 | Cursor Bugbot | Cursor review service | Flag code defects | Review of PR #16 old SHA exists; not the fix SHA |
