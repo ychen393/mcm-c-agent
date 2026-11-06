@@ -1,0 +1,28 @@
+name: Bounded review loop (read-only observer)
+# No Cursor Cloud invocation or merge. A read-only Actions job is not an AI reviewer.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [main, "feature/**", "cursor/**", "test/**"]
+  pull_request_review:
+    types: [submitted, dismissed]
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Read PR CI and review evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python -m tools.cowork_review_loop github --repo "$GITHUB_REPOSITORY" --pr "$PR_NUMBER"
