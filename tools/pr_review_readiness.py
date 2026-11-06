@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -53,7 +54,22 @@ def evaluate(pr: dict, runs: list[dict], reviews: list[dict]) -> dict:
         gate = "NEEDS_FIX_AUTH"
     else:
         gate = "OWNER_DECISION_REQUIRED"
+    action_by_gate = {
+        "NEEDS_FIX_AUTH": "Prepare a scoped fix proposal; owner must approve any Builder run.",
+        "AWAIT_CI": "Await a completed PR-attached Python tests check for this HEAD.",
+        "AWAIT_INDEPENDENT_REVIEW": "Await a separately permission-restricted reviewer.",
+        "OWNER_DECISION_REQUIRED": "Present evidence for owner decision; never auto-merge.",
+    }
     return {
+        "next_action": action_by_gate[gate],
+        "handoff": {
+            "pr": number,
+            "head_sha": head,
+            "request": action_by_gate[gate],
+            "requires_fresh_owner_authorization": True,
+            "authorized_cloud_runs": 0,
+            "automatic_fix_enabled": False,
+        },
         "pr": number,
         "head_sha": head,
         "gate": gate,
@@ -96,7 +112,8 @@ def markdown(report: dict) -> str:
         f"- CI evidence: {report['ci_url'] or 'not found'}\n"
         f"- Distinct-account GitHub review: {report['review_status']}\n"
         f"- Review evidence: {report['review_url'] or 'not found'}\n"
-        "- AI reviewer tool isolation: **NOT VERIFIED**\n"
+        f"- Next action: {report['next_action']}\\n"
+        "- AI reviewer tool isolation: **NOT VERIFIED**\\n"
         "- Automatic Cloud dispatch: **OFF**; auto-merge: **OFF**\n\n"
         "This is a deterministic status report, **not** an AI code review or merge approval.\n"
     )
@@ -105,22 +122,33 @@ def markdown(report: dict) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", required=True)
+    parser.add_argument("--wait-seconds", type=int, default=0)
     parser.add_argument("--event", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=Path("review-readiness.json"))
     args = parser.parse_args()
     try:
         if not args.repo or "/" not in args.repo:
             raise ValueError("Invalid repository")
+        if not 0 <= args.wait_seconds <= 150:
+            raise ValueError("wait-seconds must be between 0 and 150")
         event = json.loads(args.event.read_text(encoding="utf-8"))
         number = event["pull_request"]["number"]
         token = os.environ.get("GH_TOKEN", "")
         pr = read_api(args.repo, f"pulls/{number}", token)
         reviews = read_api(args.repo, f"pulls/{number}/reviews?per_page=100", token)
         sha = quote(pr["head"]["sha"], safe="")
-        runs = read_api(
-            args.repo, f"actions/runs?event=pull_request&head_sha={sha}&per_page=100", token
-        )["workflow_runs"]
-        report = evaluate(pr, runs, reviews)
+        deadline = time.monotonic() + args.wait_seconds
+        while True:
+            runs = read_api(
+                args.repo, f"actions/runs?event=pull_request&head_sha={sha}&per_page=100", token
+            )["workflow_runs"]
+            report = evaluate(pr, runs, reviews)
+            if report["gate"] != "AWAIT_CI" or time.monotonic() >= deadline:
+                break
+            latest = read_api(args.repo, f"pulls/{number}", token)
+            if latest["head"]["sha"] != pr["head"]["sha"]:
+                raise ValueError("PR HEAD moved; await next synchronization event")
+            time.sleep(min(10, max(0, deadline - time.monotonic())))
         args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
         summary = markdown(report)
         print(summary)
