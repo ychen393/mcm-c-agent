@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "mode": "bootstrap-inventory-not-live-sync",
+  "project": "MCM C Agent — Development",
+  "last_manual_snapshot_date": "2026-11-06",
+  "entries": [
+    {
+      "task_id": "cowork-issue8",
+      "issue": 8,
+      "pr": 9,
+      "role": "builder",
+      "parent": "coordinator",
+      "session": "https://cursor.com/agents/bc-ac44af56-4736-4686-9fd2-9bb27e44349c",
+      "session_verified": "recorded-in-issue8",
+      "branch": "feature/8-cursor-cowork-v1",
+      "base": "cursor/init-builder-reviewer-subagents-bdaf",
+      "status": "PARTIAL",
+      "evidence": [
+        "https://github.com/ychen393/mcm-c-agent/issues/8",
+        "https://github.com/ychen393/mcm-c-agent/pull/9"
+      ],
+      "next_gate": "independent reviewer still blocked; no automatic merge"
+    },
+    {
+      "task_id": "repair-loop-issue15",
+      "issue": 15,
+      "pr": 16,
+      "role": "coordinator",
+      "parent": "coordinator",
+      "session": null,
+      "session_verified": "not-recorded",
+      "branch": "feature/15-bounded-review-loop",
+      "base": "feature/8-cursor-cowork-v1",
+      "status": "AWAIT_INDEPENDENT_REVIEW",
+      "evidence": [
+        "https://github.com/ychen393/mcm-c-agent/pull/16",
+        "https://github.com/ychen393/mcm-c-agent/actions/runs/42181085567"
+      ],
+      "next_gate": "Bugbot new-head review not evidenced; owner decides"
+    },
+    {
+      "task_id": "universal-reviewer-config",
+      "issue": null,
+      "pr": 17,
+      "role": "universal-reviewer",
+      "parent": "coordinator",
+      "session": null,
+      "session_verified": "not-launched",
+      "branch": "feature/universal-reviewer-v1",
+      "base": "feature/8-cursor-cowork-v1",
+      "status": "CONFIG_ONLY",
+      "evidence": [
+        "https://github.com/ychen393/mcm-c-agent/pull/17"
+      ],
+      "next_gate": "Cloud role and read-only principal require separate verification"
+    },
+    {
+      "task_id": "review-readiness-pr18",
+      "issue": null,
+      "pr": 18,
+      "role": "ci",
+      "parent": "coordinator",
+      "session": null,
+      "session_verified": "not-applicable-actions",
+      "branch": "feature/review-status-automation-v1",
+      "base": "feature/universal-reviewer-v1",
+      "status": "LATEST_HEAD_UNVERIFIED",
+      "evidence": [
+        "https://github.com/ychen393/mcm-c-agent/pull/18",
+        "https://github.com/ychen393/mcm-c-agent/actions/runs/42187701647"
+      ],
+      "next_gate": "Check latest exact HEAD, CI, and readiness artifact before acceptance"
+    }
+  ]
+}
