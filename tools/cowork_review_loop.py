@@ -108,7 +108,9 @@ def github_snapshot(pr, reviews, commits, runs):
     current.sort(key=lambda r:(r.get("created_at") or "",r.get("id",0)))
     ci = current[-1] if current else None
     passed = bool(ci and ci.get("status") == "completed" and ci.get("conclusion") == "success")
-    failed = bool(ci and ci.get("status") == "completed" and ci.get("conclusion") == "failure")
+    # Any completed non-successful check is terminal, not still awaiting CI.
+    # This includes failure, timed_out, cancelled, startup_failure, and skipped.
+    failed = bool(ci and ci.get("status") == "completed" and not passed)
     if fixes > MAX_FIXES:
         stage = "EXHAUSTED"
     elif not passed:
