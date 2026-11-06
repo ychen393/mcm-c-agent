@@ -112,8 +112,8 @@ def markdown(report: dict) -> str:
         f"- CI evidence: {report['ci_url'] or 'not found'}\n"
         f"- Distinct-account GitHub review: {report['review_status']}\n"
         f"- Review evidence: {report['review_url'] or 'not found'}\n"
-        f"- Next action: {report['next_action']}\\n"
-        "- AI reviewer tool isolation: **NOT VERIFIED**\\n"
+        f"- Next action: {report['next_action']}\n"
+        "- AI reviewer tool isolation: **NOT VERIFIED**\n"
         "- Automatic Cloud dispatch: **OFF**; auto-merge: **OFF**\n\n"
         "This is a deterministic status report, **not** an AI code review or merge approval.\n"
     )
