@@ -1,0 +1,45 @@
+name: PR review readiness (read-only)
+
+# This workflow only reads GitHub data; it does NOT call Cursor, Bugbot or any AI.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [main, "feature/**", "cursor/**", "test/**"]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: review-readiness-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Read PR, CI, and reviewer state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python -m tools.pr_review_readiness
+          --repo "$GITHUB_REPOSITORY"
+          --event "$GITHUB_EVENT_PATH"
+          --output review-readiness.json
+          --wait-seconds 120
+      - name: Store machine-readable readiness packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-readiness
+          path: review-readiness.json
+          retention-days: 7
