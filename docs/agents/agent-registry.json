@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "scope": "development-agents-only",
+  "project": "MCM C Agent — Development",
+  "project_home": "https://cursor.com/agents",
+  "source_of_truth": "GitHub issues, PRs, exact commit and checks; Cursor session IDs only where evidenced",
+  "cost_policy": {
+    "extra_billed_usd": 0,
+    "cloud_invocation": "requires fresh specific owner authorization",
+    "auto_merge": false,
+    "autonomous_cloud_dispatch": false
+  },
+  "roles": [
+    {
+      "id": "coordinator",
+      "name": "Development Coordinator",
+      "runtime": "ChatGPT + GitHub; Cursor Projects Coordinator is a proposed separate integration",
+      "implementation": "active-human-assisted",
+      "responsibility": [
+        "Define scoped issue and risk",
+        "Select role and track deliverables",
+        "Check SHA-matched CI and review evidence",
+        "Prepare owner decision"
+      ],
+      "may_write": [
+        "isolated feature branch when specifically authorized",
+        "draft PR documentation"
+      ],
+      "must_not": [
+        "self-approve independent review",
+        "start cloud tasks without separate authorization",
+        "merge or deploy"
+      ],
+      "config": "AGENTS.md",
+      "verification": "GitHub Issue #8 and staged PR handoffs; Cursor Projects orchestration not verified"
+    },
+    {
+      "id": "builder",
+      "name": "Builder",
+      "runtime": "Cursor Cloud main agent or supported generalPurpose task",
+      "implementation": "pilot-verified-not-autonomous",
+      "responsibility": [
+        "Implement scoped issue on isolated branch",
+        "Write tests and Draft PR",
+        "Handoff exact SHA"
+      ],
+      "may_write": [
+        "owned isolated task branch"
+      ],
+      "must_not": [
+        "edit main",
+        "approve own PR",
+        "exceed repair/cost authorization"
+      ],
+      "config": ".cursor/agents/builder.md",
+      "verification": "Issue #8, PR #9/#10; task bc-15dc0f55-b966-5e40-9c2f-07380618e9f6"
+    },
+    {
+      "id": "ci",
+      "name": "Deterministic CI / Status Reporter",
+      "runtime": "GitHub Actions",
+      "implementation": "verified-on-pr18-earlier-head",
+      "responsibility": [
+        "Run PR-native tests",
+        "Produce evidence-linked status JSON and next-action packet"
+      ],
+      "may_write": [
+        "workflow artifacts and job summaries"
+      ],
+      "must_not": [
+        "act as AI reviewer",
+        "dispatch Cloud Agent",
+        "merge or approve"
+      ],
+      "config": ".github/workflows/review-readiness.yml",
+      "verification": "PR #18 CI #42187701647; latest head must be checked separately"
+    },
+    {
+      "id": "bugbot",
+      "name": "Cursor Bugbot",
+      "runtime": "Cursor Bugbot service; review posted on GitHub",
+      "implementation": "observed-on-pr16-old-head",
+      "responsibility": [
+        "Review PR diff for potential software defects"
+      ],
+      "may_write": [
+        "GitHub review only when explicitly authorized and provider permits"
+      ],
+      "must_not": [
+        "claim independent math proof",
+        "auto-fix without authorization"
+      ],
+      "config": "external Cursor Bugbot settings",
+      "verification": "PR #16 Bugbot review for cb0793a only; new HEAD review unverified"
+    },
+    {
+      "id": "universal-reviewer",
+      "name": "Universal Reviewer (planned)",
+      "runtime": "Cursor Cloud separate restricted principal (not connected)",
+      "implementation": "configuration-only-blocked",
+      "responsibility": [
+        "Inspect exact diff, tests and security",
+        "Apply project review profile",
+        "Return evidence-linked findings"
+      ],
+      "may_write": [
+        "review report after independently verified access"
+      ],
+      "must_not": [
+        "modify builder code",
+        "self-approve",
+        "exceed budget"
+      ],
+      "config": ".cursor/agents/universal-reviewer.md",
+      "verification": "PR #17 configuration; no permission-isolated Cloud run"
+    },
+    {
+      "id": "mcm-profile",
+      "name": "MCM Domain Review Profile",
+      "runtime": "review rules loaded by a separately authorized reviewer",
+      "implementation": "configuration-only",
+      "responsibility": [
+        "Math/stat assumptions and provenance checks",
+        "Chart evidence and MCM research gate checks"
+      ],
+      "may_write": [],
+      "must_not": [
+        "change research checkpoints",
+        "certify math without proof"
+      ],
+      "config": ".cursor/review-profiles/mcm.md",
+      "verification": "PR #17 profile, not a launched Agent"
+    }
+  ]
+}
