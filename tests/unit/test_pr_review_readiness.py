@@ -93,3 +93,26 @@ def test_workflow_has_strict_read_only_permissions():
     assert "pull_request_target" not in text
     assert "persist-credentials: false" in text
     assert "@cursor" not in text
+
+
+@pytest.mark.parametrize("conclusion,expected", [
+    ("success", "AWAIT_INDEPENDENT_REVIEW"),
+    ("timed_out", "NEEDS_FIX_AUTH"),
+    ("cancelled", "NEEDS_FIX_AUTH"),
+])
+def test_handoff_packet_never_authorizes_cloud_or_merge(conclusion, expected):
+    outcome = evaluate(PR, run(conclusion=conclusion), [])
+    packet = outcome["handoff"]
+    assert outcome["gate"] == expected
+    assert packet["head_sha"] == SHA
+    assert packet["requires_fresh_owner_authorization"] is True
+    assert packet["authorized_cloud_runs"] == 0
+    assert packet["automatic_fix_enabled"] is False
+    assert outcome["can_merge"] is False
+
+
+def test_summary_includes_actionable_next_step():
+    report = evaluate(PR, run(conclusion="failure"), [])
+    summary = markdown(report)
+    assert report["next_action"] in summary
+    assert "owner must approve" in summary
