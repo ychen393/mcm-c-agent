@@ -1,6 +1,6 @@
 # MCM C Agent — Project & Collaboration Status
 
-Updated: 2026-11-05. This page is a manually maintained status snapshot, **not a live dashboard**.
+Updated: 2026-11-06. This page is a manually maintained status snapshot, **not a live dashboard**.
 
 | Area | Status | Evidence / next gate |
 | --- | --- | --- |
@@ -10,6 +10,7 @@ Updated: 2026-11-05. This page is a manually maintained status snapshot, **not a
 | Multi-agent governance | Implemented as draft; CI passed | Draft PR #3 targeting `feature/m1b-visual-eda`, pending user approval |
 | Cursor subagent prompts | Builder and Reviewer role files created; custom Task launches failed in tested Cloud session | `.cursor/agents/builder.md`, `.cursor/agents/reviewer.md`; observed invalid `subagent_type` for both; frontmatter `readonly` is not enforcement |
 | Cursor co-work workflow | Issue #8 evidence is PARTIAL. PR-native pytest passed for a `cursor/**` base and a `test/**` base. Independent read-only AI review is BLOCKED. | Draft PR #9, smoke Draft PR #10, `docs/cowork/issue-8-status.json` |
+| Agent layer map | Documented only. Runtime limits are unchanged. | `docs/CURSOR_AGENT_LAYERS.md`. Issue #8 stays PARTIAL; reviewer isolation stays BLOCKED. |
 | Cursor autonomous builder | Not connected by this governance PR | Owner authorization & pilot required |
 | Claude Code independent review | Not connected by this governance PR | Owner authorization & pilot required |
 | Grok QA | Optional; not connected | Deferred pending benefit/cost evaluation |

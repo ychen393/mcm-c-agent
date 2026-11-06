@@ -41,7 +41,7 @@ Build a semi-autonomous, verifiable MCM Problem C research system. Data analysis
 - **GitHub Actions:** objective automated tests and guardrails, not a substitute for human approval.
 
 ## Cursor co-work invocation
-Operational steps, stop gates, and the machine-readable record are `docs/CURSOR_COWORK_RUNBOOK.md` and `docs/cowork/`. Role prompts remain `.cursor/agents/builder.md` and `.cursor/agents/reviewer.md`. Those files are instructions. They are not Task types. Frontmatter `readonly` is not a permission.
+Operational steps, stop gates, and the machine-readable record are `docs/CURSOR_COWORK_RUNBOOK.md` and `docs/cowork/`. Where each layer is visible — local IDE chat, Cloud Agent, nested Task, role prompt file, or GitHub Actions — is `docs/CURSOR_AGENT_LAYERS.md`. Role prompts remain `.cursor/agents/builder.md` and `.cursor/agents/reviewer.md`. Those files are instructions. They are not Task types. Frontmatter `readonly` is not a permission.
 
 **Observed Cloud Task limits (2026-11-05):** `subagent_type=builder` and `subagent_type=reviewer` are rejected. The Task schema has no Task-level readonly switch. Do not call those custom names again. Do not treat a Markdown `readonly: true` field as isolation.
 

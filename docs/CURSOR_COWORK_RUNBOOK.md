@@ -2,6 +2,8 @@
 
 Operational guide for Issue #8. This file describes what the current Cloud session can actually run. It does not connect a new account, grant a permission, or approve a merge.
 
+Which layer is a sidebar chat, which layer is a nested Task, and which names are only prompt files: `docs/CURSOR_AGENT_LAYERS.md`. That page repeats the Issue #8 record: overall status `PARTIAL`, reviewer isolation `blocked`.
+
 ## Roles
 
 | Role | Who runs it | What they may do |
