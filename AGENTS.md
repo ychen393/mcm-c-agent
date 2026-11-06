@@ -12,6 +12,10 @@ Build a semi-autonomous, verifiable MCM Problem C research system. Data analysis
 4. GitHub Issues and PRs for scoped work and review.
 5. The Google Docs PRD is a synchronized reference; changes to it require an explicit maintenance workflow. Never assume an agent has Google Docs access.
 
+## Development Agent coordination — project index
+
+Use [docs/agents/AGENT_REGISTRY.md](docs/agents/AGENT_REGISTRY.md) as the human entry point for the development agent hierarchy, role responsibilities, real versus proposed runtime status and task/session tracing. The machine-readable [role registry](docs/agents/agent-registry.json) and [task inventory](docs/agents/task-registry.json) are **manually maintained snapshots**, not live Cursor Project synchronization. [Coordinator runbook](docs/agents/COORDINATOR_RUNBOOK.md) describes how to record a Cloud run and return an owner-gated handoff. Never treat a role prompt, GitHub Action, or Cloud conversation title as proof of an independently executing/isolated AI Reviewer.
+
 ## Workflow
 - Work from a scoped Issue with acceptance criteria. One agent owns one work branch / PR.
 - Current development baseline: `feature/m1b-visual-eda`; do not push directly to `main`.
