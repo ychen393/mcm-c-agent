@@ -235,3 +235,43 @@ def test_single_to_multi_and_back_keeps_single_file_provenance(monkeypatch):
     )
     assert int(preview["value"].max()) == 30
     assert sales_sha not in " ".join(_subheaders(at))
+
+
+def _project_box(at: AppTest):
+    return next(box for box in at.text_input if box.label == "Project ID for saved artifacts")
+
+
+def test_project_id_change_does_not_present_the_old_approved_report(monkeypatch):
+    _forbid_planner(monkeypatch)
+    at = _load_sales(_app())
+    at = _project_box(at).set_value("mcm-a").run()
+    at = _approve_plan(_generate_plan(at))
+    assert at.session_state["eda_report_project_id"] == "mcm-a"
+    assert at.session_state["eda_report"]["project_id"] == "mcm-a"
+    assert "Artifacts saved under" in _messages(at)
+    assert "mcm-a" in _messages(at)
+
+    at = _project_box(at).set_value("mcm-a").run()
+    assert "EDA Summary" in _subheaders(at)
+    assert at.session_state["eda_report_project_id"] == "mcm-a"
+
+    at = _project_box(at).set_value("mcm-b").run()
+    text = _messages(at)
+    assert "EDA Summary" not in _subheaders(at)
+    assert not list(at.image)
+    assert not list(at.download_button)
+    assert "Chart-plan approval" not in text
+    assert "Artifacts saved under" not in text
+    assert "approved for project mcm-a" in text
+    assert "not shown as output for the current project ID" in text
+    assert at.session_state["eda_report"]["project_id"] == "mcm-a"
+    assert at.session_state["eda_report_project_id"] == "mcm-a"
+
+    at = _project_box(at).set_value("mcm-a").run()
+    assert "EDA Summary" in _subheaders(at)
+    assert "mcm-a" in _messages(at)
+    assert "mcm-b" not in _messages(at)
+
+    at.file_uploader[0].set_value([("weather.csv", WEATHER, "text/csv")]).run()
+    _assert_saved_report_hidden(at)
+    assert "previous saved report was cleared" in _messages(at)

@@ -131,12 +131,28 @@ def _restore_dataset_context() -> None:
             st.session_state[key] = st.session_state[kept]
 
 
+def _clear_saved_report() -> None:
+    st.session_state.pop("eda_report", None)
+    st.session_state.pop("eda_artifacts", None)
+    st.session_state.pop("eda_report_dataset_sha", None)
+    st.session_state.pop("eda_report_project_id", None)
+
+
+def _saved_report_matches_current(file_identity: str | None, project_id: str) -> bool:
+    """Show an approved report only for the file and project that produced it."""
+    return pending_plan_matches(
+        st.session_state.get("eda_report_dataset_sha"),
+        file_identity,
+    ) and st.session_state.get("eda_report_project_id") == project_id
+
+
 def _drop_stale_approval(current_identity: str | None) -> None:
     """Drop plan and report state that does not belong to the current dataset.
 
     ``current_identity`` is the single-file SHA-256, or None when the selection
-    is empty, rejected, too large, or more than one file. Widget values the
-    user typed (source, units, frequency, problem text) are left in place.
+    is empty, rejected, too large, or more than one file. A project-ID change
+    keeps the saved report in session and hides it until that project returns.
+    Widget values the user typed (source, units, frequency, problem text) stay.
     """
     plan_identity = st.session_state.get("eda_pending_dataset_sha")
     plan_is_stale = bool(plan_identity) and not pending_plan_matches(
@@ -150,9 +166,7 @@ def _drop_stale_approval(current_identity: str | None) -> None:
         _clear_pending_plan()
         st.info("The uploaded dataset changed. The previous unapproved chart plan was cleared.")
     if report_is_stale:
-        st.session_state.pop("eda_report", None)
-        st.session_state.pop("eda_artifacts", None)
-        st.session_state.pop("eda_report_dataset_sha", None)
+        _clear_saved_report()
         if not plan_is_stale:
             st.info("The uploaded dataset changed. The previous saved report was cleared.")
 
@@ -466,9 +480,7 @@ else:
 
             if st.button("Generate chart plan", type="primary", key="generate_chart_plan"):
                 _clear_pending_plan()
-                st.session_state.pop("eda_report", None)
-                st.session_state.pop("eda_artifacts", None)
-                st.session_state.pop("eda_report_dataset_sha", None)
+                _clear_saved_report()
                 try:
                     column_units = _parse_units(
                         units_text,
@@ -589,6 +601,7 @@ else:
                         st.session_state["eda_report"] = pending_report.model_dump(mode="json")
                         st.session_state["eda_artifacts"] = artifacts
                         st.session_state["eda_report_dataset_sha"] = dataset.sha256
+                        st.session_state["eda_report_project_id"] = pending_report.project_id
                         _clear_pending_plan()
                         st.success(
                             "Approved chart plan executed. Reports and charts have been saved."
@@ -599,10 +612,22 @@ else:
         else:
             _render_multi_dataset_eda(bundle)
 
-report_matches_selection = pending_plan_matches(
+report_matches_selection = _saved_report_matches_current(accepted_identity, project_id)
+saved_project_id = st.session_state.get("eda_report_project_id")
+file_still_loaded = pending_plan_matches(
     st.session_state.get("eda_report_dataset_sha"),
     accepted_identity,
 )
+if (
+    "eda_report" in st.session_state
+    and file_still_loaded
+    and saved_project_id
+    and saved_project_id != project_id
+):
+    st.info(
+        f"This saved report was approved for project {saved_project_id}. "
+        "It is not shown as output for the current project ID."
+    )
 if "eda_report" in st.session_state and report_matches_selection:
     report_data = st.session_state["eda_report"]
     artifacts = st.session_state["eda_artifacts"]
