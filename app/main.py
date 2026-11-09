@@ -25,6 +25,7 @@ from tools.dataset_bundle import (
 )
 from tools.eda_artifacts import save_eda_artifacts
 from tools.eda_engine import build_eda_report
+from tools.dataset_relationships import discover_relationships, preview_join
 
 base_settings = get_settings()
 st.set_page_config(page_title=base_settings.app_name, page_icon="🧮", layout="wide")
@@ -297,6 +298,66 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
             view = describe_independent_eda(ref, profiles[ref.dataset_id])
             preview = bundle.loaded_dataset(ref.dataset_id).frame.head(20)
             _render_independent_profile(view, preview)
+
+    st.divider()
+    st.subheader("Dataset relationships & safe join preview")
+    st.caption(
+        "Candidate keys are suggestions based on exact column names and observed values. "
+        "No automatic join, coercion, resampling, upload to a model, or persistent merge."
+    )
+    candidates = discover_relationships(bundle)
+    if candidates:
+        st.dataframe(
+            [
+                {
+                    "Left": item.left_id,
+                    "Right": item.right_id,
+                    "Key": item.left_key,
+                    "Overlap": item.overlap,
+                    "Cardinality": item.relationship,
+                    "Left missing": item.left_missing,
+                    "Right missing": item.right_missing,
+                    "Left duplicate keys": item.left_duplicates,
+                    "Right duplicate keys": item.right_duplicates,
+                    "Eligible for preview": item.safe_to_preview,
+                    "Caveat": item.reason,
+                }
+                for item in candidates
+            ],
+            use_container_width=True,
+        )
+    else:
+        st.warning("No defensible shared key found; cannot safely join automatically.")
+    id_options = [ref.dataset_id for ref in bundle.datasets]
+    left_id = st.selectbox("Left dataset", id_options, key="join_left_dataset")
+    right_options = [item for item in id_options if item != left_id]
+    right_id = st.selectbox("Right dataset", right_options, key="join_right_dataset")
+    left_frame = bundle.loaded_dataset(left_id).frame
+    right_frame = bundle.loaded_dataset(right_id).frame
+    left_key = st.selectbox("Left join key", list(left_frame.columns), key="join_left_key")
+    right_key = st.selectbox("Right join key", list(right_frame.columns), key="join_right_key")
+    join_type = st.selectbox("Preview join type", ["inner", "left"], key="join_type")
+    if st.button("Preview join (no data saved)", key="preview_join"):
+        try:
+            report, sample = preview_join(
+                bundle, left_id, right_id, left_key, right_key, how=join_type
+            )
+        except (ValueError, KeyError, TypeError) as exc:
+            st.error(f"Cannot safely join: {exc}")
+        else:
+            st.success(
+                f"Preview only · {report.relationship} · "
+                f"{len(sample)} displayed rows (at most 50)"
+            )
+            st.caption(
+                f"Sources: {left_id} ({bundle.loaded_dataset(left_id).sha256}) / "
+                f"{right_id} ({bundle.loaded_dataset(right_id).sha256})"
+            )
+            st.warning(
+                "This is a structural preview, not an approved scientific data integration. "
+                "Check semantic meaning, units and timezones before interpreting results."
+            )
+            st.dataframe(sample, use_container_width=True)
 
 
 def _render_chart_plan(plan: ChartPlan) -> None:
