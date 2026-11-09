@@ -21,7 +21,7 @@ No server is deployed and no Cursor Project pages are modified. A GitHub artifac
 - Github review existence alone is not tool isolation; `isolated_ai_reviewer_verified` remains false.
 - Missing CI is `AWAIT_CI`, inaccessible API calls become `FETCH_BLOCKED`. No hallucinated success.
 - The project-level Coordinator in Cursor is a separate product UI; these artifacts only provide a unified *external* task list and deep links back to observed sessions.
-- Workflow has only GitHub **read** permissions. It creates no issues, PR comments, Cloud agents, Cursor Automations or billable AI calls. GitHub Actions minutes/storage may count against plan quotas; **USD $0 extra billed budget** remains the user policy.
+- Workflow has only GitHub **read** permissions. It creates no issues, PR comments, Cloud agents, Cursor Automations or billable AI calls. GitHub Actions minutes/storage may count against plan quotas; **USD $50 cumulative extra billed MCM project budget** is the updated user policy (2026-11-09). Auto Top-up is reportedly disabled; do not treat this as proof of a hard limit.
 
 ## Further integration gate
 
