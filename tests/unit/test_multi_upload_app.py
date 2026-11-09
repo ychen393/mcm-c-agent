@@ -1,6 +1,7 @@
 """Streamlit AppTest coverage for multi-file intake. No model provider is called."""
 from pathlib import Path
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 APP_PATH = Path(__file__).resolve().parents[2] / "app" / "main.py"
@@ -16,6 +17,45 @@ def _app() -> AppTest:
 
 def _button_labels(at: AppTest) -> list[str]:
     return [button.label for button in at.button]
+
+
+def _subheaders(at: AppTest) -> list[str]:
+    return [header.value for header in at.subheader]
+
+
+def _forbid_planner(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _called(*_args, **_kwargs):
+        raise AssertionError("Visual EDA planner must not be called in this test.")
+
+    monkeypatch.setattr("agents.visual_eda_agent.plan_visual_eda", _called)
+
+
+def _load_sales(at: AppTest) -> AppTest:
+    return at.file_uploader[0].set_value([("sales.csv", SALES, "text/csv")]).run()
+
+
+def _generate_plan(at: AppTest) -> AppTest:
+    generate = next(button for button in at.button if button.label == "Generate chart plan")
+    return generate.click().run()
+
+
+def _approve_plan(at: AppTest) -> AppTest:
+    approved = next(
+        button for button in at.button if button.label == "Approve plan & generate charts"
+    ).click().run()
+    assert "EDA Summary" in _subheaders(approved)
+    assert "eda_report" in approved.session_state
+    assert approved.session_state["eda_report_dataset_sha"]
+    return approved
+
+
+def _assert_saved_report_hidden(at: AppTest) -> None:
+    assert "EDA Summary" not in _subheaders(at)
+    assert "eda_report" not in at.session_state
+    assert "eda_artifacts" not in at.session_state
+    assert "eda_report_dataset_sha" not in at.session_state
+    assert "eda_pending_plan" not in at.session_state
+    assert not list(at.image)
 
 
 def _messages(at: AppTest) -> str:
@@ -117,3 +157,81 @@ def test_invalid_duplicate_and_oversized_selections_are_rejected_in_the_ui():
     ]
     at.file_uploader[0].set_value(too_many).run()
     assert "at most 5 files" in _messages(at)
+
+
+def test_clearing_the_uploader_drops_a_pending_plan(monkeypatch):
+    _forbid_planner(monkeypatch)
+    at = _generate_plan(_load_sales(_app()))
+    assert "eda_pending_plan" in at.session_state
+    next(box for box in at.text_input if box.label == "Data source").set_value("LBMA gold").run()
+    next(box for box in at.selectbox if box.label == "Data frequency").set_value("Daily").run()
+    units = next(area for area in at.text_area if area.label.startswith("Column units"))
+    units.set_value("value = USD").run()
+
+    at.file_uploader[0].set_value(None).run()
+    assert "previous unapproved chart plan was cleared" in _messages(at)
+    assert "Approve plan & generate charts" not in _button_labels(at)
+    assert "eda_pending_plan" not in at.session_state
+    assert "EDA Summary" not in _subheaders(at)
+    assert at.session_state["kept_eda_data_source"] == "LBMA gold"
+    assert at.session_state["kept_eda_frequency"] == "Daily"
+    assert at.session_state["kept_eda_column_units"] == "value = USD"
+
+    at.file_uploader[0].set_value([("sales.csv", SALES, "text/csv")]).run()
+    source = next(box.value for box in at.text_input if box.label == "Data source")
+    frequency = next(box.value for box in at.selectbox if box.label == "Data frequency")
+    units = next(area for area in at.text_area if area.label.startswith("Column units"))
+    assert source == "LBMA gold"
+    assert frequency == "Daily"
+    assert units.value == "value = USD"
+
+
+def test_rejected_selection_hides_an_approved_report(monkeypatch):
+    _forbid_planner(monkeypatch)
+    duplicate = b"id,value\n1,10\n"
+    too_many = [
+        (f"part-{index}.csv", f"id,value\n{index},{index}\n".encode(), "text/csv")
+        for index in range(6)
+    ]
+    rejected_selections = [
+        None,
+        [("one.csv", duplicate, "text/csv"), ("two.csv", duplicate, "text/csv")],
+        too_many,
+    ]
+    for selection in rejected_selections:
+        at = _approve_plan(_generate_plan(_load_sales(_app())))
+        at.file_uploader[0].set_value(selection).run()
+        _assert_saved_report_hidden(at)
+        assert "previous saved report was cleared" in _messages(at)
+
+
+def test_single_to_multi_and_back_keeps_single_file_provenance(monkeypatch):
+    _forbid_planner(monkeypatch)
+    at = _approve_plan(_generate_plan(_load_sales(_app())))
+    sales_sha = at.session_state["eda_report_dataset_sha"]
+
+    at.file_uploader[0].set_value(
+        [
+            ("sales.csv", SALES, "text/csv"),
+            ("weather.csv", WEATHER, "text/csv"),
+        ]
+    ).run()
+    _assert_saved_report_hidden(at)
+    text = _messages(at)
+    assert "does not join files" in text
+    assert "Generate chart plan" not in _button_labels(at)
+    assert "Use AI Visual EDA Planner" not in [box.label for box in at.checkbox]
+    assert "ds_sales_" in text and "ds_weather_" in text
+
+    at.file_uploader[0].set_value([("sales.csv", SALES, "text/csv")]).run()
+    assert "Generate chart plan" in _button_labels(at)
+    assert "EDA Summary" not in _subheaders(at)
+    assert "eda_report" not in at.session_state
+    captions = [caption.value for caption in at.caption]
+    assert any("Dataset ID: ds_sales_" in item for item in captions)
+    assert not any("ds_weather_" in item for item in captions)
+    preview = next(
+        frame.value for frame in at.dataframe if list(frame.value.columns) == ["date", "value"]
+    )
+    assert int(preview["value"].max()) == 30
+    assert sales_sha not in " ".join(_subheaders(at))

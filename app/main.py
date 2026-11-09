@@ -113,17 +113,48 @@ def _context_signature(
     )
 
 
+_DATASET_CONTEXT_KEYS = ("eda_data_source", "eda_frequency", "eda_column_units")
+
+
+def _remember_dataset_context() -> None:
+    """Copy typed dataset notes out of widget state before a selection change."""
+    for key in _DATASET_CONTEXT_KEYS:
+        if key in st.session_state:
+            st.session_state[f"kept_{key}"] = st.session_state[key]
+
+
+def _restore_dataset_context() -> None:
+    """Put saved notes back when the single-file fields are created again."""
+    for key in _DATASET_CONTEXT_KEYS:
+        kept = f"kept_{key}"
+        if key not in st.session_state and kept in st.session_state:
+            st.session_state[key] = st.session_state[kept]
+
+
 def _drop_stale_approval(current_identity: str | None) -> None:
-    """Clear a pending plan or saved report that belongs to a different upload set."""
+    """Drop plan and report state that does not belong to the current dataset.
+
+    ``current_identity`` is the single-file SHA-256, or None when the selection
+    is empty, rejected, too large, or more than one file. Widget values the
+    user typed (source, units, frequency, problem text) are left in place.
+    """
     plan_identity = st.session_state.get("eda_pending_dataset_sha")
-    if plan_identity and not pending_plan_matches(plan_identity, current_identity):
+    plan_is_stale = bool(plan_identity) and not pending_plan_matches(
+        plan_identity, current_identity
+    )
+    report_identity = st.session_state.get("eda_report_dataset_sha")
+    report_is_stale = bool(report_identity) and not pending_plan_matches(
+        report_identity, current_identity
+    )
+    if plan_is_stale:
         _clear_pending_plan()
         st.info("The uploaded dataset changed. The previous unapproved chart plan was cleared.")
-    report_identity = st.session_state.get("eda_report_dataset_sha")
-    if report_identity and not pending_plan_matches(report_identity, current_identity):
+    if report_is_stale:
         st.session_state.pop("eda_report", None)
         st.session_state.pop("eda_artifacts", None)
         st.session_state.pop("eda_report_dataset_sha", None)
+        if not plan_is_stale:
+            st.info("The uploaded dataset changed. The previous saved report was cleared.")
 
 
 def _numeric_stat(column: dict, key: str):
@@ -352,13 +383,18 @@ uploaded_files = st.file_uploader(
     key="dataset_uploader",
 )
 uploaded_files = list(uploaded_files or [])
+accepted_identity: str | None = None
+_remember_dataset_context()
 
 if len(uploaded_files) > ABSOLUTE_MAX_DATASETS:
     st.error(
         f"Dataset bundle accepts at most {ABSOLUTE_MAX_DATASETS} files; "
         f"received {len(uploaded_files)}."
     )
-elif uploaded_files:
+    _drop_stale_approval(None)
+elif not uploaded_files:
+    _drop_stale_approval(None)
+else:
     try:
         bundle = build_dataset_bundle(
             [(uploaded.name, uploaded.getvalue()) for uploaded in uploaded_files],
@@ -366,12 +402,15 @@ elif uploaded_files:
         )
     except ValueError as exc:
         st.error(str(exc))
+        _drop_stale_approval(None)
     except Exception as exc:
         st.error(f"Dataset processing failed: {type(exc).__name__}: {exc}")
+        _drop_stale_approval(None)
     else:
         dataset_count = len(bundle.datasets)
         single_sha = bundle.datasets[0].sha256 if dataset_count == 1 else None
-        _drop_stale_approval(approval_identity(dataset_count, single_sha))
+        accepted_identity = approval_identity(dataset_count, single_sha)
+        _drop_stale_approval(accepted_identity)
         if chart_planning_allowed(dataset_count):
             dataset_ref = bundle.datasets[0]
             dataset = bundle.loaded_dataset(dataset_ref.dataset_id)
@@ -388,6 +427,7 @@ elif uploaded_files:
             )
 
             with st.expander("Dataset context (optional)", expanded=False):
+                _restore_dataset_context()
                 data_source = st.text_input(
                     "Data source",
                     placeholder="e.g., LBMA Gold Price PM / official source URL",
@@ -559,7 +599,11 @@ elif uploaded_files:
         else:
             _render_multi_dataset_eda(bundle)
 
-if "eda_report" in st.session_state:
+report_matches_selection = pending_plan_matches(
+    st.session_state.get("eda_report_dataset_sha"),
+    accepted_identity,
+)
+if "eda_report" in st.session_state and report_matches_selection:
     report_data = st.session_state["eda_report"]
     artifacts = st.session_state["eda_artifacts"]
     st.subheader("EDA Summary")

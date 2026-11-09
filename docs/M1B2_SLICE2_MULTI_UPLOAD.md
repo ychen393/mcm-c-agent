@@ -8,7 +8,7 @@ Status: Streamlit intake on top of the Slice 1 registry. No join and no model ca
 - Every accepted selection is loaded with `build_dataset_bundle`, so the existing per-file 20 MiB limit, 50 MiB aggregate limit, row and column caps, and duplicate-content rejection still apply.
 - Each file is shown with its stable dataset ID, display name, SHA-256, and qualified column names (`dataset_id.column_name`).
 - Two or more files produce one independent EDA section each: row and column counts, missingness, numeric summaries, quality warnings, and optional source, unit, and frequency notes. Within-dataset correlations stay inside that file's section.
-- A pending single-file chart plan is cleared when the uploaded bytes change, when the selection becomes more than one file, or when the API Settings revision changes (existing behavior).
+- A pending single-file chart plan and a saved single-file report are cleared when the uploaded bytes change, when the selection is removed, rejected, or larger than five files, or when it becomes more than one file. The saved report is shown only while that same file is the current single dataset. Typed source, unit, and frequency notes are kept. An API Settings revision still clears a pending plan.
 - One file still uses the existing chart-plan, human-approval, and artifact path. The approval identity remains that file's SHA-256.
 
 ## What this slice does not do
