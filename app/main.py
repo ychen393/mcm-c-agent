@@ -10,6 +10,7 @@ from app.dataset_workspace import (
     describe_independent_eda,
     pending_plan_matches,
 )
+from app.relationship_panel import render_relationship_panel
 from core.config import get_settings
 from core.graph import build_foundation_graph
 from core.state import new_research_state
@@ -297,6 +298,11 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
             view = describe_independent_eda(ref, profiles[ref.dataset_id])
             preview = bundle.loaded_dataset(ref.dataset_id).frame.head(20)
             _render_independent_profile(view, preview)
+    render_relationship_panel(
+        bundle,
+        column_units_by_dataset=units,
+        temporal_frequency_by_dataset=frequencies,
+    )
 
 
 def _render_chart_plan(plan: ChartPlan) -> None:
