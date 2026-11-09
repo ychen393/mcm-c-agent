@@ -1,18 +1,31 @@
 import json
+
 import streamlit as st
 
+from agents.visual_eda_agent import plan_visual_eda
+from app.api_settings import SESSION_REVISION_KEY, build_runtime_settings, render_api_settings
+from app.dataset_workspace import (
+    approval_identity,
+    chart_planning_allowed,
+    describe_independent_eda,
+    pending_plan_matches,
+)
 from core.config import get_settings
-from app.api_settings import build_runtime_settings, render_api_settings, SESSION_REVISION_KEY
 from core.graph import build_foundation_graph
 from core.state import new_research_state
 from schemas.chart_plan import ChartPlan
 from schemas.eda import EDAReport
 from tools.chart_catalog import fallback_chart_plan
 from tools.chart_plan_validator import validate_chart_plan
-from tools.data_loader import load_dataset
-from tools.eda_engine import build_eda_report
+from tools.dataset_bundle import (
+    ABSOLUTE_MAX_DATASETS,
+    DatasetBundle,
+    build_bundle_profiles,
+    build_dataset_bundle,
+)
 from tools.eda_artifacts import save_eda_artifacts
-from agents.visual_eda_agent import plan_visual_eda
+from tools.eda_engine import build_eda_report
+from tools.dataset_relationships import discover_relationships, preview_join
 
 base_settings = get_settings()
 st.set_page_config(page_title=base_settings.app_name, page_icon="🧮", layout="wide")
@@ -26,6 +39,18 @@ if page == "API Settings":
 
 st.title("MCM C Research Lab")
 st.caption("A semi-autonomous research workspace for MCM Problem C")
+
+FREQUENCY_OPTIONS = [
+    "Not specified — estimate from dates",
+    "Business-day daily",
+    "Daily",
+    "Weekly",
+    "Monthly",
+    "Quarterly",
+    "Annual",
+    "Irregular",
+]
+
 
 PENDING_KEYS = (
     "eda_pending_plan",
@@ -89,6 +114,252 @@ def _context_signature(
     )
 
 
+_DATASET_CONTEXT_KEYS = ("eda_data_source", "eda_frequency", "eda_column_units")
+
+
+def _remember_dataset_context() -> None:
+    """Copy typed dataset notes out of widget state before a selection change."""
+    for key in _DATASET_CONTEXT_KEYS:
+        if key in st.session_state:
+            st.session_state[f"kept_{key}"] = st.session_state[key]
+
+
+def _restore_dataset_context() -> None:
+    """Put saved notes back when the single-file fields are created again."""
+    for key in _DATASET_CONTEXT_KEYS:
+        kept = f"kept_{key}"
+        if key not in st.session_state and kept in st.session_state:
+            st.session_state[key] = st.session_state[kept]
+
+
+def _clear_saved_report() -> None:
+    st.session_state.pop("eda_report", None)
+    st.session_state.pop("eda_artifacts", None)
+    st.session_state.pop("eda_report_dataset_sha", None)
+    st.session_state.pop("eda_report_project_id", None)
+
+
+def _saved_report_matches_current(file_identity: str | None, project_id: str) -> bool:
+    """Show an approved report only for the file and project that produced it."""
+    return pending_plan_matches(
+        st.session_state.get("eda_report_dataset_sha"),
+        file_identity,
+    ) and st.session_state.get("eda_report_project_id") == project_id
+
+
+def _drop_stale_approval(current_identity: str | None) -> None:
+    """Drop plan and report state that does not belong to the current dataset.
+
+    ``current_identity`` is the single-file SHA-256, or None when the selection
+    is empty, rejected, too large, or more than one file. A project-ID change
+    keeps the saved report in session and hides it until that project returns.
+    Widget values the user typed (source, units, frequency, problem text) stay.
+    """
+    plan_identity = st.session_state.get("eda_pending_dataset_sha")
+    plan_is_stale = bool(plan_identity) and not pending_plan_matches(
+        plan_identity, current_identity
+    )
+    report_identity = st.session_state.get("eda_report_dataset_sha")
+    report_is_stale = bool(report_identity) and not pending_plan_matches(
+        report_identity, current_identity
+    )
+    if plan_is_stale:
+        _clear_pending_plan()
+        st.info("The uploaded dataset changed. The previous unapproved chart plan was cleared.")
+    if report_is_stale:
+        _clear_saved_report()
+        if not plan_is_stale:
+            st.info("The uploaded dataset changed. The previous saved report was cleared.")
+
+
+def _numeric_stat(column: dict, key: str):
+    summary = column["numeric_summary"] or {}
+    return summary.get(key)
+
+
+def _render_independent_profile(view: dict, preview) -> None:
+    st.caption(
+        f"Analytical scope: independent · not joined · Dataset ID `{view['dataset_id']}`"
+    )
+    summary = view["summary"]
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Rows", f"{summary['row_count']:,}")
+    c2.metric("Columns", summary["column_count"])
+    c3.metric("Numeric columns", summary["numeric_column_count"])
+    c4.metric("Columns with missing values", summary["columns_with_missing_values"])
+    st.caption(f"SHA-256: {view['sha256']}")
+    st.caption(f"File: {view['file_name']} · Display name: {view['display_name']}")
+    st.dataframe(preview, use_container_width=True)
+    st.subheader("Column profiles")
+    st.dataframe(
+        [
+            {
+                "Qualified column": column["qualified_name"],
+                "Column": column["name"],
+                "Type": column["dtype"],
+                "Missing": column["missing_count"],
+                "Missing rate": f"{column['missing_rate']:.1%}",
+                "Unique": column["unique_count"],
+                "Unit": column["unit"] or "Not provided",
+                "Mean": _numeric_stat(column, "mean"),
+                "Median": _numeric_stat(column, "median"),
+                "Min": _numeric_stat(column, "min"),
+                "Max": _numeric_stat(column, "max"),
+            }
+            for column in view["columns"]
+        ],
+        use_container_width=True,
+    )
+    if view["warnings"]:
+        st.subheader("Data quality warnings")
+        for warning in view["warnings"]:
+            st.warning(warning)
+    context_cols = st.columns(4)
+    context_cols[0].metric("Period start", (view["period_start"] or "N/A")[:10])
+    context_cols[1].metric("Period end", (view["period_end"] or "N/A")[:10])
+    context_cols[2].metric("Declared frequency", view["temporal_frequency"] or "Not specified")
+    inferred = (view["inferred_frequency"] or "N/A").split(" (")[0]
+    context_cols[3].metric("Estimated frequency", inferred)
+    if view["data_source"]:
+        st.caption(f"Source: {view['data_source']}")
+    correlations = view["correlations_within_dataset"]
+    if correlations:
+        with st.expander("Correlations within this dataset"):
+            st.dataframe(
+                [
+                    {"Row": row, "Column": column, "Correlation": value}
+                    for row, values in correlations.items()
+                    for column, value in values.items()
+                ],
+                use_container_width=True,
+            )
+
+
+def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
+    st.info(
+        "Each file is profiled on its own. This step does not join files, "
+        "align dates, draw a cross-dataset chart, or call a model."
+    )
+    for note in bundle.manifest.limitations:
+        st.caption(note)
+    st.caption(f"Bundle fingerprint: {bundle.fingerprint}")
+    st.dataframe(
+        [
+            {
+                "Dataset ID": ref.dataset_id,
+                "Display name": ref.display_name,
+                "File": ref.file_name,
+                "Rows": len(bundle.loaded_dataset(ref.dataset_id).frame),
+                "SHA-256": ref.sha256,
+                "Qualified columns": ", ".join(ref.qualified_column_names),
+            }
+            for ref in bundle.datasets
+        ],
+        use_container_width=True,
+    )
+    sources: dict[str, str] = {}
+    frequencies: dict[str, str | None] = {}
+    units: dict[str, dict[str, str]] = {}
+    for ref in bundle.datasets:
+        with st.expander(f"Dataset context · {ref.display_name}", expanded=False):
+            st.caption(f"Dataset ID: {ref.dataset_id}")
+            sources[ref.dataset_id] = st.text_input(
+                "Data source",
+                placeholder="Optional source name or URL",
+                key=f"eda_source_{ref.dataset_id}",
+            )
+            frequency_choice = st.selectbox(
+                "Data frequency",
+                FREQUENCY_OPTIONS,
+                key=f"eda_frequency_{ref.dataset_id}",
+            )
+            frequencies[ref.dataset_id] = (
+                None if frequency_choice.startswith("Not specified") else frequency_choice
+            )
+            units_text = st.text_area(
+                "Column units (one per line: column_name = unit)",
+                key=f"eda_units_{ref.dataset_id}",
+                height=80,
+            )
+            try:
+                units[ref.dataset_id] = _parse_units(units_text, ref.column_names)
+            except ValueError as exc:
+                units[ref.dataset_id] = {}
+                st.error(str(exc))
+    profiles = build_bundle_profiles(
+        bundle,
+        column_units_by_dataset=units,
+        data_source_by_dataset=sources,
+        temporal_frequency_by_dataset=frequencies,
+    )
+    tabs = st.tabs([f"{ref.display_name} · {ref.dataset_id}" for ref in bundle.datasets])
+    for tab, ref in zip(tabs, bundle.datasets, strict=True):
+        with tab:
+            view = describe_independent_eda(ref, profiles[ref.dataset_id])
+            preview = bundle.loaded_dataset(ref.dataset_id).frame.head(20)
+            _render_independent_profile(view, preview)
+
+    st.divider()
+    st.subheader("Dataset relationships & safe join preview")
+    st.caption(
+        "Candidate keys are suggestions based on exact column names and observed values. "
+        "No automatic join, coercion, resampling, upload to a model, or persistent merge."
+    )
+    candidates = discover_relationships(bundle)
+    if candidates:
+        st.dataframe(
+            [
+                {
+                    "Left": item.left_id,
+                    "Right": item.right_id,
+                    "Key": item.left_key,
+                    "Overlap": item.overlap,
+                    "Cardinality": item.relationship,
+                    "Left missing": item.left_missing,
+                    "Right missing": item.right_missing,
+                    "Left duplicate keys": item.left_duplicates,
+                    "Right duplicate keys": item.right_duplicates,
+                    "Eligible for preview": item.safe_to_preview,
+                    "Caveat": item.reason,
+                }
+                for item in candidates
+            ],
+            use_container_width=True,
+        )
+    else:
+        st.warning("No defensible shared key found; cannot safely join automatically.")
+    id_options = [ref.dataset_id for ref in bundle.datasets]
+    left_id = st.selectbox("Left dataset", id_options, key="join_left_dataset")
+    right_options = [item for item in id_options if item != left_id]
+    right_id = st.selectbox("Right dataset", right_options, key="join_right_dataset")
+    left_frame = bundle.loaded_dataset(left_id).frame
+    right_frame = bundle.loaded_dataset(right_id).frame
+    left_key = st.selectbox("Left join key", list(left_frame.columns), key="join_left_key")
+    right_key = st.selectbox("Right join key", list(right_frame.columns), key="join_right_key")
+    join_type = st.selectbox("Preview join type", ["inner", "left"], key="join_type")
+    if st.button("Preview join (no data saved)", key="preview_join"):
+        try:
+            report, sample = preview_join(
+                bundle, left_id, right_id, left_key, right_key, how=join_type
+            )
+        except (ValueError, KeyError, TypeError) as exc:
+            st.error(f"Cannot safely join: {exc}")
+        else:
+            st.success(
+                f"Preview only · {report.relationship} · "
+                f"{len(sample)} displayed rows (at most 50)"
+            )
+            st.caption(
+                f"Sources: {left_id} ({bundle.loaded_dataset(left_id).sha256}) / "
+                f"{right_id} ({bundle.loaded_dataset(right_id).sha256})"
+            )
+            st.warning(
+                "This is a structural preview, not an approved scientific data integration. "
+                "Check semantic meaning, units and timezones before interpreting results."
+            )
+            st.dataframe(sample, use_container_width=True)
+
+
 def _render_chart_plan(plan: ChartPlan) -> None:
     st.subheader("Proposed chart plan")
     if plan.strategy == "agent":
@@ -149,7 +420,10 @@ with left:
     problem_text = st.text_area(
         "MCM problem statement / research question",
         height=180,
-        help="The Visual EDA Planner uses this context to select charts relevant to the research task.",
+        help=(
+            "The Visual EDA Planner uses this context to select charts relevant "
+            "to the research task."
+        ),
     )
     if st.button("Initialize project", type="primary"):
         if len(project_name.strip()) < 3:
@@ -171,215 +445,251 @@ with right:
 
 st.divider()
 st.header("Dataset Explorer")
-st.write("Upload one CSV or XLSX dataset to profile it and prepare a problem-aware chart plan.")
-project_id = st.text_input("Project ID for saved artifacts", value="mcm-c-demo")
-uploaded_file = st.file_uploader(
-    "Choose a dataset",
-    type=["csv", "xlsx"],
-    help="Maximum file size: 20 MB.",
+st.write(
+    "Upload 1 to 5 CSV or XLSX files. Each file is profiled on its own with a stable dataset ID. "
+    "A single file can still prepare a chart plan. Multiple files are not joined."
 )
+project_id = st.text_input("Project ID for saved artifacts", value="mcm-c-demo")
+uploaded_files = st.file_uploader(
+    "Choose 1 to 5 datasets",
+    type=["csv", "xlsx"],
+    accept_multiple_files=True,
+    help="CSV or XLSX. Up to 5 files, 20 MB each, 50 MB combined. Files are not joined.",
+    key="dataset_uploader",
+)
+uploaded_files = list(uploaded_files or [])
+accepted_identity: str | None = None
+_remember_dataset_context()
 
-if uploaded_file is not None:
+if len(uploaded_files) > ABSOLUTE_MAX_DATASETS:
+    st.error(
+        f"Dataset bundle accepts at most {ABSOLUTE_MAX_DATASETS} files; "
+        f"received {len(uploaded_files)}."
+    )
+    _drop_stale_approval(None)
+elif not uploaded_files:
+    _drop_stale_approval(None)
+else:
     try:
-        dataset = load_dataset(uploaded_file.getvalue(), uploaded_file.name)
-        st.success(
-            f"Loaded {dataset.file_name}: {len(dataset.frame):,} rows × "
-            f"{len(dataset.frame.columns)} columns"
+        bundle = build_dataset_bundle(
+            [(uploaded.name, uploaded.getvalue()) for uploaded in uploaded_files],
+            project_id=project_id,
         )
-        st.dataframe(dataset.frame.head(20), use_container_width=True)
-        st.caption(f"SHA-256: {dataset.sha256}")
-
-        if (
-            st.session_state.get("eda_pending_dataset_sha")
-            and st.session_state["eda_pending_dataset_sha"] != dataset.sha256
-        ):
-            _clear_pending_plan()
-            st.info("The uploaded dataset changed. The previous unapproved chart plan was cleared.")
-
-        if (
-            st.session_state.get("eda_report_dataset_sha")
-            and st.session_state["eda_report_dataset_sha"] != dataset.sha256
-        ):
-            st.session_state.pop("eda_report", None)
-            st.session_state.pop("eda_artifacts", None)
-            st.session_state.pop("eda_report_dataset_sha", None)
-
-        with st.expander("Dataset context (optional)", expanded=False):
-            data_source = st.text_input(
-                "Data source",
-                placeholder="e.g., LBMA Gold Price PM / official source URL",
-                key="eda_data_source",
-            )
-            frequency_choice = st.selectbox(
-                "Data frequency",
-                [
-                    "Not specified — estimate from dates",
-                    "Business-day daily",
-                    "Daily",
-                    "Weekly",
-                    "Monthly",
-                    "Quarterly",
-                    "Annual",
-                    "Irregular",
-                ],
-                key="eda_frequency",
-            )
-            units_text = st.text_area(
-                "Column units (one per line: column_name = unit)",
-                placeholder="price = USD per troy ounce",
-                key="eda_column_units",
-                height=80,
-            )
-
-        use_ai_planner = st.checkbox(
-            "Use AI Visual EDA Planner",
-            value=False,
-            help="When enabled, the problem statement and compact dataset profile are sent to the configured LLM provider.",
-        )
-        if use_ai_planner:
-            st.warning(
-                "External model processing is enabled. The planner sends the problem statement "
-                "and compact column/statistical profile, not the full raw CSV/XLSX rows."
-            )
-        else:
-            st.caption(
-                "AI planning is off. A deterministic generic chart plan will be prepared locally."
-            )
-
-        if st.button("Generate chart plan", type="primary", key="generate_chart_plan"):
-            _clear_pending_plan()
-            st.session_state.pop("eda_report", None)
-            st.session_state.pop("eda_artifacts", None)
-            st.session_state.pop("eda_report_dataset_sha", None)
-            try:
-                column_units = _parse_units(
-                    units_text,
-                    dataset.frame.columns.astype(str).tolist(),
-                )
-                frequency_value = (
-                    None if frequency_choice.startswith("Not specified") else frequency_choice
-                )
-                report = build_eda_report(
-                    dataset,
-                    project_id,
-                    data_source=data_source,
-                    temporal_frequency=frequency_value,
-                    column_units=column_units,
-                )
-                if use_ai_planner:
-                    plan = plan_visual_eda(
-                        problem_text,
-                        report,
-                        dataset.frame,
-                        settings=settings,
-                    )
-                else:
-                    plan = fallback_chart_plan(report).model_copy(
-                        update={
-                            "fallback_reason": (
-                                "AI planner was not enabled; generated generic deterministic EDA."
-                            )
-                        }
-                    )
-                validate_chart_plan(plan, dataset.frame, report)
-                st.session_state["eda_pending_plan"] = plan.model_dump(mode="json")
-                st.session_state["eda_pending_report"] = report.model_dump(mode="json")
-                st.session_state["eda_pending_dataset_sha"] = dataset.sha256
-                st.session_state["eda_pending_problem_statement"] = problem_text
-                st.session_state["eda_pending_context_signature"] = _context_signature(
-                    project_id,
-                    data_source,
-                    frequency_value,
-                    column_units,
-                    use_ai_planner,
-                    settings.llm_provider,
-                    settings.llm_model,
-                    st.session_state.get(SESSION_REVISION_KEY, 0),
-                )
-                st.success("Chart plan generated. Review it below before approving execution.")
-            except ValueError as exc:
-                st.error(str(exc))
-            except Exception as exc:
-                st.error(f"Chart planning failed: {type(exc).__name__}: {exc}")
-
-        if (
-            "eda_pending_plan" in st.session_state
-            and st.session_state.get("eda_pending_dataset_sha") == dataset.sha256
-        ):
-            pending_plan = ChartPlan.model_validate(st.session_state["eda_pending_plan"])
-            pending_report = EDAReport.model_validate(st.session_state["eda_pending_report"])
-            current_frequency = (
-                None if frequency_choice.startswith("Not specified") else frequency_choice
-            )
-            try:
-                current_units = _parse_units(
-                    units_text,
-                    dataset.frame.columns.astype(str).tolist(),
-                )
-                current_signature = _context_signature(
-                    project_id,
-                    data_source,
-                    current_frequency,
-                    current_units,
-                    use_ai_planner,
-                    settings.llm_provider,
-                    settings.llm_model,
-                    st.session_state.get(SESSION_REVISION_KEY, 0),
-                )
-                context_changed = (
-                    problem_text != st.session_state.get("eda_pending_problem_statement")
-                    or current_signature != st.session_state.get("eda_pending_context_signature")
-                )
-            except ValueError as exc:
-                context_changed = True
-                st.warning(str(exc))
-            _render_chart_plan(pending_plan)
-
-            if context_changed:
-                st.warning(
-                    "The problem statement or dataset metadata changed after this plan was created. "
-                    "Generate a new plan before approving it."
-                )
-
-            approve_col, discard_col = st.columns(2)
-            with approve_col:
-                approve_clicked = st.button(
-                    "Approve plan & generate charts",
-                    type="primary",
-                    disabled=context_changed,
-                    key="approve_chart_plan",
-                )
-            with discard_col:
-                discard_clicked = st.button("Discard plan", key="discard_chart_plan")
-
-            if discard_clicked:
-                _clear_pending_plan()
-                st.rerun()
-
-            if approve_clicked:
-                try:
-                    artifacts = save_eda_artifacts(
-                        dataset,
-                        pending_report,
-                        settings.output_dir,
-                        chart_plan=pending_plan,
-                        human_approved=True,
-                    )
-                    st.session_state["eda_report"] = pending_report.model_dump(mode="json")
-                    st.session_state["eda_artifacts"] = artifacts
-                    st.session_state["eda_report_dataset_sha"] = dataset.sha256
-                    _clear_pending_plan()
-                    st.success("Approved chart plan executed. Reports and charts have been saved.")
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Chart execution failed: {type(exc).__name__}: {exc}")
-
     except ValueError as exc:
         st.error(str(exc))
+        _drop_stale_approval(None)
     except Exception as exc:
         st.error(f"Dataset processing failed: {type(exc).__name__}: {exc}")
+        _drop_stale_approval(None)
+    else:
+        dataset_count = len(bundle.datasets)
+        single_sha = bundle.datasets[0].sha256 if dataset_count == 1 else None
+        accepted_identity = approval_identity(dataset_count, single_sha)
+        _drop_stale_approval(accepted_identity)
+        if chart_planning_allowed(dataset_count):
+            dataset_ref = bundle.datasets[0]
+            dataset = bundle.loaded_dataset(dataset_ref.dataset_id)
+            st.success(
+                f"Loaded {dataset.file_name}: {len(dataset.frame):,} rows × "
+                f"{len(dataset.frame.columns)} columns"
+            )
+            st.dataframe(dataset.frame.head(20), use_container_width=True)
+            st.caption(f"Dataset ID: {dataset_ref.dataset_id}")
+            st.caption(f"SHA-256: {dataset.sha256}")
+            st.caption(
+                "Qualified columns: "
+                + ", ".join(dataset_ref.qualified_column_names)
+            )
 
-if "eda_report" in st.session_state:
+            with st.expander("Dataset context (optional)", expanded=False):
+                _restore_dataset_context()
+                data_source = st.text_input(
+                    "Data source",
+                    placeholder="e.g., LBMA Gold Price PM / official source URL",
+                    key="eda_data_source",
+                )
+                frequency_choice = st.selectbox(
+                    "Data frequency",
+                    FREQUENCY_OPTIONS,
+                    key="eda_frequency",
+                )
+                units_text = st.text_area(
+                    "Column units (one per line: column_name = unit)",
+                    placeholder="price = USD per troy ounce",
+                    key="eda_column_units",
+                    height=80,
+                )
+
+            use_ai_planner = st.checkbox(
+                "Use AI Visual EDA Planner",
+                value=False,
+                help=(
+                    "When enabled, the problem statement and compact dataset profile "
+                    "are sent to the configured LLM provider."
+                ),
+            )
+            if use_ai_planner:
+                st.warning(
+                    "External model processing is enabled. The planner sends the problem statement "
+                    "and compact column/statistical profile, not the full raw CSV/XLSX rows."
+                )
+            else:
+                st.caption(
+                    "AI planning is off. A deterministic generic chart plan "
+                    "will be prepared locally."
+                )
+
+            if st.button("Generate chart plan", type="primary", key="generate_chart_plan"):
+                _clear_pending_plan()
+                _clear_saved_report()
+                try:
+                    column_units = _parse_units(
+                        units_text,
+                        dataset.frame.columns.astype(str).tolist(),
+                    )
+                    frequency_value = (
+                        None if frequency_choice.startswith("Not specified") else frequency_choice
+                    )
+                    report = build_eda_report(
+                        dataset,
+                        project_id,
+                        data_source=data_source,
+                        temporal_frequency=frequency_value,
+                        column_units=column_units,
+                    )
+                    if use_ai_planner:
+                        plan = plan_visual_eda(
+                            problem_text,
+                            report,
+                            dataset.frame,
+                            settings=settings,
+                        )
+                    else:
+                        plan = fallback_chart_plan(report).model_copy(
+                            update={
+                                "fallback_reason": (
+                                    "AI planner was not enabled; "
+                            "generated generic deterministic EDA."
+                                )
+                            }
+                        )
+                    validate_chart_plan(plan, dataset.frame, report)
+                    st.session_state["eda_pending_plan"] = plan.model_dump(mode="json")
+                    st.session_state["eda_pending_report"] = report.model_dump(mode="json")
+                    st.session_state["eda_pending_dataset_sha"] = dataset.sha256
+                    st.session_state["eda_pending_problem_statement"] = problem_text
+                    st.session_state["eda_pending_context_signature"] = _context_signature(
+                        project_id,
+                        data_source,
+                        frequency_value,
+                        column_units,
+                        use_ai_planner,
+                        settings.llm_provider,
+                        settings.llm_model,
+                        st.session_state.get(SESSION_REVISION_KEY, 0),
+                    )
+                    st.success("Chart plan generated. Review it below before approving execution.")
+                except ValueError as exc:
+                    st.error(str(exc))
+                except Exception as exc:
+                    st.error(f"Chart planning failed: {type(exc).__name__}: {exc}")
+
+            if "eda_pending_plan" in st.session_state and pending_plan_matches(
+                st.session_state.get("eda_pending_dataset_sha"),
+                dataset.sha256,
+            ):
+                pending_plan = ChartPlan.model_validate(st.session_state["eda_pending_plan"])
+                pending_report = EDAReport.model_validate(st.session_state["eda_pending_report"])
+                current_frequency = (
+                    None if frequency_choice.startswith("Not specified") else frequency_choice
+                )
+                try:
+                    current_units = _parse_units(
+                        units_text,
+                        dataset.frame.columns.astype(str).tolist(),
+                    )
+                    current_signature = _context_signature(
+                        project_id,
+                        data_source,
+                        current_frequency,
+                        current_units,
+                        use_ai_planner,
+                        settings.llm_provider,
+                        settings.llm_model,
+                        st.session_state.get(SESSION_REVISION_KEY, 0),
+                    )
+                    stored_problem = st.session_state.get("eda_pending_problem_statement")
+                    stored_signature = st.session_state.get("eda_pending_context_signature")
+                    context_changed = (
+                        problem_text != stored_problem
+                        or current_signature != stored_signature
+                    )
+                except ValueError as exc:
+                    context_changed = True
+                    st.warning(str(exc))
+                _render_chart_plan(pending_plan)
+
+                if context_changed:
+                    st.warning(
+                        "The problem statement or dataset metadata changed after "
+                        "this plan was created. Generate a new plan before approving it."
+                    )
+
+                approve_col, discard_col = st.columns(2)
+                with approve_col:
+                    approve_clicked = st.button(
+                        "Approve plan & generate charts",
+                        type="primary",
+                        disabled=context_changed,
+                        key="approve_chart_plan",
+                    )
+                with discard_col:
+                    discard_clicked = st.button("Discard plan", key="discard_chart_plan")
+
+                if discard_clicked:
+                    _clear_pending_plan()
+                    st.rerun()
+
+                if approve_clicked:
+                    try:
+                        artifacts = save_eda_artifacts(
+                            dataset,
+                            pending_report,
+                            settings.output_dir,
+                            chart_plan=pending_plan,
+                            human_approved=True,
+                        )
+                        st.session_state["eda_report"] = pending_report.model_dump(mode="json")
+                        st.session_state["eda_artifacts"] = artifacts
+                        st.session_state["eda_report_dataset_sha"] = dataset.sha256
+                        st.session_state["eda_report_project_id"] = pending_report.project_id
+                        _clear_pending_plan()
+                        st.success(
+                            "Approved chart plan executed. Reports and charts have been saved."
+                        )
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Chart execution failed: {type(exc).__name__}: {exc}")
+        else:
+            _render_multi_dataset_eda(bundle)
+
+report_matches_selection = _saved_report_matches_current(accepted_identity, project_id)
+saved_project_id = st.session_state.get("eda_report_project_id")
+file_still_loaded = pending_plan_matches(
+    st.session_state.get("eda_report_dataset_sha"),
+    accepted_identity,
+)
+if (
+    "eda_report" in st.session_state
+    and file_still_loaded
+    and saved_project_id
+    and saved_project_id != project_id
+):
+    st.info(
+        f"This saved report was approved for project {saved_project_id}. "
+        "It is not shown as output for the current project ID."
+    )
+if "eda_report" in st.session_state and report_matches_selection:
     report_data = st.session_state["eda_report"]
     artifacts = st.session_state["eda_artifacts"]
     st.subheader("EDA Summary")
