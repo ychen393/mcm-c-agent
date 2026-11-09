@@ -7,7 +7,7 @@
 - Repository: `ychen393/mcm-c-agent`. Source of truth: actual issue/PR/commit/CI and current GitHub state.
 - Existing Cursor Project: **Cursor Subagent Workflow**. Verified Coordinator session: https://cursor.com/agents/bc-a1f8594c-95fc-4e50-a705-2774b4984644 (2026-11-06 pilot). This repository still **cannot** reparent historical sessions or hard-enforce billing caps.
 - Scope: development organization only. Product LangGraph Agents are a separate layer.
-- Main Coordinator: this Project session scopes work, selects a role, tracks outstanding gates, and returns a decision package to owner. Under the $0 gate it must not launch child Cloud Agents without fresh owner authorization.
+- Main Coordinator: this Project session scopes work, selects a role, tracks outstanding gates, and returns a decision package to owner. The owner now permits up to USD $50 cumulative additional billed usage for MCM. A new Cloud run is permitted only when actual available budget, charging route, and effective account spending cap are verifiable; never confuse disabled Auto Top-up with a hard cap.
 - Registry links: `docs/agents/agent-registry.json` / `docs/agents/task-registry.json`.
 
 ## One task = one traceable identity
@@ -55,7 +55,7 @@ Include: role and actual runtime, scope, exact PR and HEAD, real tests/check IDs
 
 1. Adopt this documentation via owner-reviewed Draft PR; maintain registry.
 2. If Project UI supports it, select existing `Cursor Subagent Workflow` as the single home and reference the registry.
-3. Verify actual supported Cloud Project task dispatch and task IDs in a separately owner-authorized zero-extra-cost pilot.
+3. Verify actual supported Cloud Project task dispatch and task IDs in a budget-gated pilot within the owner-approved USD $50 project cap.
 4. Only then consider an event-based, owner-gated orchestration. Until then, the record is a traceability layer, not a functioning autonomous dispatcher.
 
 ## Cost and research safeguards
