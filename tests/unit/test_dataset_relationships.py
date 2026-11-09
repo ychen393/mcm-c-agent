@@ -100,3 +100,28 @@ def test_ui_includes_explicit_preview_without_model_call():
     assert "discover_relationships(bundle)" in source
     assert "preview_join(" in source
     assert "No defensible shared key found" in source
+
+
+def test_streamlit_join_preview_end_to_end(monkeypatch):
+    from pathlib import Path
+    from streamlit.testing.v1 import AppTest
+    def forbid(*_args, **_kwargs):
+        raise AssertionError("AI model must not be used for local join preview")
+    monkeypatch.setattr("agents.visual_eda_agent.plan_visual_eda", forbid)
+    app = AppTest.from_file(
+        Path(__file__).resolve().parents[2] / "app" / "main.py",
+        default_timeout=60,
+    ).run()
+    app.file_uploader[0].set_value([
+        ("sales.csv", b"date,value\\n2026-01-01,10\\n2026-01-02,20\\n2026-01-03,30\\n", "text/csv"),
+        ("weather.csv", b"date,value\\n2026-01-01,1\\n2026-01-02,2\\n2026-01-03,3\\n", "text/csv"),
+    ]).run()
+    assert not app.exception
+    button = next(b for b in app.button if b.label == "Preview join (no data saved)")
+    app = button.click().run()
+    assert not app.exception
+    assert any("Preview only" in item.value for item in app.success)
+    joined = app.dataframe[-1].value
+    assert len(joined) == 3
+    assert "value_left" in joined.columns
+    assert "value_right" in joined.columns
