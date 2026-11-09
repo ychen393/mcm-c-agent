@@ -1,6 +1,6 @@
 # M1-B.2 Slice 1 — Offline multi-dataset registry
 
-Status: data-layer only. The Streamlit app still uploads one file.
+Status: data-layer registry. Slice 2 adds the Streamlit uploader that calls this registry; see `docs/M1B2_SLICE2_MULTI_UPLOAD.md`. The contracts below still do not join files.
 
 ## What this slice does
 
@@ -21,7 +21,7 @@ Status: data-layer only. The Streamlit app still uploads one file.
 - No chart that reads more than one dataset.
 - No extra LLM call and no joint prompt.
 - No multi-sheet workbook selection. One XLSX file is one dataset, and only the first worksheet is read.
-- No Streamlit multi-file uploader.
+- Streamlit multi-file upload is Slice 2. This module still does not join files.
 
 Those behaviors are later slices of #11 and #12. This registry never silently joins files.
 
