@@ -42,7 +42,7 @@ The registry is a **manual bootstrap inventory**, NOT a live synchronized dashbo
 
 ## Cost and permission boundary
 
-Owner allows **$0 additional billed spend**. Any new Cursor Cloud call, Automation or externally billed review requires separate explicit approval. No unattended paid dispatch, no secret/billing changes, no main branch changes and no merge. The two-fix controller only limits actions routed through that controller. A GitHub read-only job cannot enforce write restrictions on a different Cursor session.
+Owner updated the additional MCM project billed-usage budget to **USD $50 total cumulative** (2026-11-09), including Cursor Cloud and Bugbot. Additional calls may use the approved budget only after verifiable current spend and effective spending limits; disabled Auto Top-up is not itself a hard spending cap. No unattended paid dispatch, no secret/billing changes, no main branch changes and no merge. The two-fix controller only limits actions routed through that controller. A GitHub read-only job cannot enforce write restrictions on a different Cursor session.
 
 ## Development agents vs product agents
 
