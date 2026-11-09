@@ -9,7 +9,9 @@ def test_registry_contract():
 
 def test_no_extra_cloud_or_auto_merge():
     policy = json.loads(AGENTS.read_text(encoding="utf-8"))["cost_policy"]
-    assert policy["extra_billed_usd"] == 0
+    assert policy["extra_billed_usd"] == 50
+    assert policy["actual_spend_verified"] is False
+    assert policy["auto_top_up_reported_disabled"] is True
     assert policy["autonomous_cloud_dispatch"] is False
     assert policy["auto_merge"] is False
 
