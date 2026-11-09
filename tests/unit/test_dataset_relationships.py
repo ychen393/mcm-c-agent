@@ -113,8 +113,8 @@ def test_streamlit_join_preview_end_to_end(monkeypatch):
         default_timeout=60,
     ).run()
     app.file_uploader[0].set_value([
-        ("sales.csv", b"date,value\\n2026-01-01,10\\n2026-01-02,20\\n2026-01-03,30\\n", "text/csv"),
-        ("weather.csv", b"date,value\\n2026-01-01,1\\n2026-01-02,2\\n2026-01-03,3\\n", "text/csv"),
+        ("sales.csv", b"date,value\n2026-01-01,10\n2026-01-02,20\n2026-01-03,30\n", "text/csv"),
+        ("weather.csv", b"date,value\n2026-01-01,1\n2026-01-02,2\n2026-01-03,3\n", "text/csv"),
     ]).run()
     assert not app.exception
     button = next(b for b in app.button if b.label == "Preview join (no data saved)")
