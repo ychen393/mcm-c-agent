@@ -18,8 +18,8 @@ def validate(agent_path=AGENTS, task_path=TASKS):
     ids = [r.get("id") for r in roles]
     if len(ids) != len(set(ids)) or not ids:
         errors.append("Role ids must be unique and non-empty")
-    if agents.get("cost_policy", {}).get("extra_billed_usd") != 0:
-        errors.append("Extra billed spending must remain zero")
+    if agents.get("cost_policy", {}).get("extra_billed_usd") != 50:
+        errors.append("Project additional billed spending must remain capped at USD 50")
     if agents.get("cost_policy", {}).get("autonomous_cloud_dispatch") is not False:
         errors.append("Cloud dispatch must remain disabled")
     if agents.get("cost_policy", {}).get("auto_merge") is not False:

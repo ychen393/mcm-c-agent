@@ -2,6 +2,8 @@
 
 > **This describes the DEVELOPMENT orchestration, not the LangGraph research agents inside the product.** A role prompt is **not** a running Cloud Agent; a Cursor Cloud conversation is a run, not a permanent role; a GitHub Action is not an independent AI reviewer.
 
+**Live GitHub task snapshot:** [Coordinator V2](COORDINATOR_LIVE_VIEW_V2.md). This is an event-driven Actions artifact, **not** a Cursor-native live dashboard.
+
 Machine-readable role definitions: [agent-registry.json](agent-registry.json). Task inventory: [task-registry.json](task-registry.json). Operating procedure: [COORDINATOR_RUNBOOK.md](COORDINATOR_RUNBOOK.md).
 
 ## One project, explicit hierarchy
@@ -40,7 +42,7 @@ The registry is a **manual bootstrap inventory**, NOT a live synchronized dashbo
 
 ## Cost and permission boundary
 
-Owner allows **$0 additional billed spend**. Any new Cursor Cloud call, Automation or externally billed review requires separate explicit approval. No unattended paid dispatch, no secret/billing changes, no main branch changes and no merge. The two-fix controller only limits actions routed through that controller. A GitHub read-only job cannot enforce write restrictions on a different Cursor session.
+Owner updated the additional MCM project billed-usage budget to **USD $50 total cumulative** (2026-11-09), including Cursor Cloud and Bugbot. Additional calls may use the approved budget only after verifiable current spend and effective spending limits; disabled Auto Top-up is not itself a hard spending cap. No unattended paid dispatch, no secret/billing changes, no main branch changes and no merge. The two-fix controller only limits actions routed through that controller. A GitHub read-only job cannot enforce write restrictions on a different Cursor session.
 
 ## Development agents vs product agents
 

@@ -6,7 +6,10 @@
   "project_name": "Cursor Subagent Workflow",
   "source_of_truth": "GitHub issues, PRs, exact commit and checks; Cursor session IDs only where evidenced",
   "cost_policy": {
-    "extra_billed_usd": 0,
+    "extra_billed_usd": 50,
+    "budget_scope": "MCM project cumulative additional billed usage, not a monthly renewal",
+    "actual_spend_verified": false,
+    "auto_top_up_reported_disabled": true,
     "cloud_invocation": "requires fresh specific owner authorization",
     "auto_merge": false,
     "autonomous_cloud_dispatch": false,
