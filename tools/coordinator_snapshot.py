@@ -100,7 +100,7 @@ def collect(registry: dict, repo: str, fetch):
         "project_session": registry.get("project_session"),
         "mode": "on-demand-github-snapshot-not-cursor-live-sync",
         "entries": [refresh_entry(x, repo, fetch) for x in registry["entries"]],
-        "security": {"extra_billed_usd": 0, "auto_cloud_dispatch": False, "auto_merge": False},
+        "security": {"extra_billed_usd": 50, "actual_spend_verified": False, "auto_cloud_dispatch": False, "auto_merge": False},
     }
 
 
