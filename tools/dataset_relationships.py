@@ -73,14 +73,18 @@ def inspect_pair(bundle: DatasetBundle, left_id: str, right_id: str,
         return Candidate(left_id, right_id, left_key, right_key, len(a), len(b),
                          left_missing, right_missing, left_dupes, right_dupes,
                          0, "UNKNOWN", False, "No non-null join keys.")
-    compatible = (pd.api.types.is_numeric_dtype(a) == pd.api.types.is_numeric_dtype(b))
+    compatible = (
+        pd.api.types.is_numeric_dtype(a) == pd.api.types.is_numeric_dtype(b)
+        and pd.api.types.is_datetime64_any_dtype(a)
+        == pd.api.types.is_datetime64_any_dtype(b)
+    )
     if not compatible:
         return Candidate(left_id, right_id, left_key, right_key, len(a), len(b),
                          left_missing, right_missing, left_dupes, right_dupes,
                          0, "INCOMPATIBLE", False, "Key types differ; coercion is not automatic.")
-    # Hashed comparison avoids mixed-type ordering assumptions.
-    left_values = set(a.dropna().astype(str))
-    right_values = set(b.dropna().astype(str))
+    # Native scalar equality keeps numeric 1 and 1.0 equivalent, as pandas merge does.
+    left_values = set(a.dropna().tolist())
+    right_values = set(b.dropna().tolist())
     overlap = len(left_values & right_values)
     relationship = ("1:1" if not left_dupes and not right_dupes else
                     "1:N" if not left_dupes else
@@ -119,8 +123,8 @@ def preview_join(bundle: DatasetBundle, left_id: str, right_id: str,
     a = bundle.loaded_dataset(left_id).frame
     b = bundle.loaded_dataset(right_id).frame
     # Bound the output *before* allocating a potentially explosive pandas merge.
-    left_counts = a[left_key].dropna().astype(str).value_counts()
-    right_counts = b[right_key].dropna().astype(str).value_counts()
+    left_counts = a[left_key].dropna().value_counts()
+    right_counts = b[right_key].dropna().value_counts()
     predicted_inner = sum(int(n) * int(right_counts.get(key, 0))
                           for key, n in left_counts.items())
     predicted = predicted_inner + (len(a) - sum(int(n) for key, n in left_counts.items()
