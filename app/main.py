@@ -18,6 +18,7 @@ from app.foundation_panel import (
     sync_foundation_state,
 )
 from app.persistence_panel import get_or_create_store, render_persistence_panel
+from app.problem_analyst_panel import render_problem_analyst_panel
 from app.relationship_panel import render_relationship_panel
 from core.config import get_settings
 from database.repositories import build_project_store
@@ -361,10 +362,11 @@ def _render_chart_plan(plan: ChartPlan) -> None:
 
 with st.sidebar:
     st.subheader("Workspace")
-    st.info("M1-B · Visual EDA Agent")
+    st.info("Phase 2 · Problem Analyst + M1-B Visual EDA")
     st.caption(f"Environment: {settings.app_env}")
     st.caption(f"LLM provider: {settings.llm_provider}")
     st.caption(f"LLM model: {settings.llm_model}")
+    st.caption(f"Problem Analyst LLM: {settings.problem_analyst_use_llm}")
 
 left, right = st.columns([1.3, 1])
 with left:
@@ -379,13 +381,13 @@ with left:
         "MCM problem statement / research question",
         height=180,
         help=(
-            "The Visual EDA Planner uses this context to select charts relevant "
-            "to the research task."
+            "Problem Analyst turns this into a validated ProblemSpecification. "
+            "The Visual EDA Planner also uses it for chart relevance."
         ),
     )
     st.caption(
         "Initialize records this project and any validated datasets already loaded below. "
-        "Analysis does not start, and file bytes are not sent to a model."
+        "Problem Analyst can structure the statement without starting joint modeling."
     )
     if st.button("Initialize project", type="primary"):
         if len(project_name.strip()) < 3:
@@ -401,12 +403,12 @@ with left:
 
 with right:
     st.subheader("System status")
-    st.metric("Milestone", "M1-B")
+    st.metric("Milestone", "Phase 2")
     st.metric("Workflow nodes", "2")
     st.metric("Configured provider", settings.llm_provider)
     st.caption(
-        "The two nodes only initialize the project. They do not analyze the problem, "
-        "join files, call a model, or model a trading strategy."
+        "Foundation nodes initialize the project. Problem Analyst emits ProblemSpecification. "
+        "Joint strategy modeling is still out of scope."
     )
     st.info(
         "The planner proposes charts; Python validates and renders them only after your approval."
@@ -847,6 +849,11 @@ if computed is not None:
     form_signature = computed[0]
 
 render_project_phases(recorded_state, inputs_current=inputs_current)
+render_problem_analyst_panel(
+    problem_text,
+    settings=settings,
+    recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
+)
 render_persistence_panel(
     project_store,
     project_id=project_id,

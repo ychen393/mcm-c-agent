@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     checkpoint_database_url: str | None = None
     # ``auto`` prefers Postgres and falls back to local; ``local`` / ``postgres`` force a backend.
     project_store_backend: Literal['auto', 'local', 'postgres'] = 'auto'
+    # Phase 2 Problem Analyst: keep LLM extraction off by default for CI.
+    problem_analyst_use_llm: bool = False
     upload_dir: Path = Path('./data/uploads')
     output_dir: Path = Path('./outputs')
     @model_validator(mode='after')

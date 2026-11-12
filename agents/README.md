@@ -13,9 +13,16 @@ Agent implementations are introduced incrementally as vertical slices with typed
 
 The planner service is connected to the Streamlit Dataset Explorer through an explicit opt-in, ranked plan preview and mandatory approval gate. Mocked-LLM tests cover provider and validation failure paths.
 
+## Phase 2 — Problem Analyst
+
+- **Implementation:** `agents/problem_analyst.py` exposes `analyze_problem()`.
+- **Contract:** `schemas/problem_specification.py` (`ProblemSpecification`) with official / inferred / unknown provenance.
+- **Default path:** deterministic 2022 MCM C extractor (`tools/problem_spec_2022_c.py`) + fixture under `data/problem_fixtures/`.
+- **Optional LLM:** `PROBLEM_ANALYST_USE_LLM` / `use_llm=True`; one structured repair; 2022 C falls back to deterministic on persistent invalid output.
+- **UI:** Research Lab Problem Analyst panel shows validated JSON; does not start joint modeling.
+
 ## Planned later agents
 
-- Problem Analyst
 - Literature / Evidence Researcher (after source and competition-compliance gates)
 - Research Strategy / Debate Critic
 - Insight Analyst and EDA Reviewer (Phase C)
