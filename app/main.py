@@ -10,14 +10,19 @@ from app.dataset_workspace import (
     describe_independent_eda,
     pending_plan_matches,
 )
+from app.foundation_panel import (
+    INIT_MESSAGE,
+    mark_project_initialized,
+    render_project_phases,
+    sync_foundation_state,
+)
 from app.relationship_panel import render_relationship_panel
 from core.config import get_settings
-from core.graph import build_foundation_graph
-from core.state import new_research_state
 from schemas.chart_plan import ChartPlan
 from schemas.eda import EDAReport
 from tools.chart_catalog import fallback_chart_plan
 from tools.chart_plan_validator import validate_chart_plan
+from tools.data_loader import safe_project_id
 from tools.dataset_bundle import (
     ABSOLUTE_MAX_DATASETS,
     DatasetBundle,
@@ -362,6 +367,11 @@ left, right = st.columns([1.3, 1])
 with left:
     st.subheader("Create a research project")
     project_name = st.text_input("Project name", value="MCM C Demo Project")
+    project_id = st.text_input(
+        "Project ID for saved artifacts",
+        value="mcm-c-demo",
+        help="Dataset Explorer and the foundation state both use this project ID.",
+    )
     problem_text = st.text_area(
         "MCM problem statement / research question",
         height=180,
@@ -370,20 +380,31 @@ with left:
             "to the research task."
         ),
     )
+    st.caption(
+        "Initialize records this project and any validated datasets already loaded below. "
+        "Analysis does not start, and file bytes are not sent to a model."
+    )
     if st.button("Initialize project", type="primary"):
         if len(project_name.strip()) < 3:
             st.error("Project name must contain at least 3 characters.")
         else:
-            state = new_research_state("demo-project", project_name.strip())
-            state["problem_text"] = problem_text
-            st.session_state["last_run"] = build_foundation_graph().invoke(state)
-            st.success("Foundation workflow completed.")
+            try:
+                safe_project_id(project_id)
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                mark_project_initialized()
+                st.success(INIT_MESSAGE)
 
 with right:
     st.subheader("System status")
     st.metric("Milestone", "M1-B")
     st.metric("Workflow nodes", "2")
     st.metric("Configured provider", settings.llm_provider)
+    st.caption(
+        "The two nodes only initialize the project. They do not analyze the problem, "
+        "join files, call a model, or model a trading strategy."
+    )
     st.info(
         "The planner proposes charts; Python validates and renders them only after your approval."
     )
@@ -392,9 +413,9 @@ st.divider()
 st.header("Dataset Explorer")
 st.write(
     "Upload 1 to 5 CSV or XLSX files. Each file is profiled on its own with a stable dataset ID. "
-    "A single file can still prepare a chart plan. Multiple files are not joined."
+    "A single file can still prepare a chart plan. Multiple files are not joined. "
+    "Saved artifacts use the project ID from the form above."
 )
-project_id = st.text_input("Project ID for saved artifacts", value="mcm-c-demo")
 uploaded_files = st.file_uploader(
     "Choose 1 to 5 datasets",
     type=["csv", "xlsx"],
@@ -403,10 +424,14 @@ uploaded_files = st.file_uploader(
     key="dataset_uploader",
 )
 uploaded_files = list(uploaded_files or [])
+upload_payloads = [(uploaded.name, uploaded.getvalue()) for uploaded in uploaded_files]
 accepted_identity: str | None = None
+bundle: DatasetBundle | None = None
+bundle_rejected = False
 _remember_dataset_context()
 
 if len(uploaded_files) > ABSOLUTE_MAX_DATASETS:
+    bundle_rejected = True
     st.error(
         f"Dataset bundle accepts at most {ABSOLUTE_MAX_DATASETS} files; "
         f"received {len(uploaded_files)}."
@@ -416,14 +441,13 @@ elif not uploaded_files:
     _drop_stale_approval(None)
 else:
     try:
-        bundle = build_dataset_bundle(
-            [(uploaded.name, uploaded.getvalue()) for uploaded in uploaded_files],
-            project_id=project_id,
-        )
+        bundle = build_dataset_bundle(upload_payloads, project_id=project_id)
     except ValueError as exc:
+        bundle_rejected = True
         st.error(str(exc))
         _drop_stale_approval(None)
     except Exception as exc:
+        bundle_rejected = True
         st.error(f"Dataset processing failed: {type(exc).__name__}: {exc}")
         _drop_stale_approval(None)
     else:
@@ -787,6 +811,28 @@ if "eda_report" in st.session_state and report_matches_selection:
         )
     st.caption(f"Artifacts saved under: {settings.output_dir / project_id / 'eda'}")
 
-if "last_run" in st.session_state:
-    st.subheader("Latest foundation workflow state")
-    st.json(st.session_state["last_run"])
+inputs_current = sync_foundation_state(
+    project_id=project_id,
+    project_name=project_name,
+    problem_text=problem_text,
+    upload_payloads=upload_payloads,
+    bundle=bundle,
+    bundle_rejected=bundle_rejected,
+    llm_provider=settings.llm_provider,
+    llm_model=settings.llm_model,
+    llm_config_revision=int(st.session_state.get(SESSION_REVISION_KEY, 0)),
+)
+recorded_state = (
+    st.session_state.get("last_run") if st.session_state.get("foundation_initialized") else None
+)
+render_project_phases(recorded_state, inputs_current=inputs_current)
+
+if recorded_state is not None:
+    st.subheader("Latest foundation state")
+    st.caption(
+        "Recorded when you initialize the project or change its inputs. "
+        "Analysis has not started. uploaded_files holds dataset provenance only: "
+        "IDs, file names, SHA-256, row and column counts, and profile warnings. "
+        "File bytes are not stored here, and no trading strategy is modeled."
+    )
+    st.json(recorded_state)
