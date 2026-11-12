@@ -184,6 +184,40 @@ def test_foundation_graph_clears_phase6_model_artifacts_keeps_experiment_logs():
     assert result["approval_status"] == {}
 
 
+def test_foundation_graph_clears_phase7_validation_and_h2():
+    """Phase 7: validation_report + H2 clear on foundation rebuild."""
+    from core.foundation import cleared_derived_products
+
+    cleared = cleared_derived_products()
+    assert cleared["validation_report"] == {}
+    assert cleared["approval_status"] == {}
+
+    state = new_research_state("p-phase7-clear", "Phase7 Clear Test")
+    state["uploaded_files"] = [
+        {
+            "dataset_id": "ds_lbma-gold_abc123abc123",
+            "file_name": "LBMA-GOLD.csv",
+            "sha256": "a" * 64,
+            "row_count": 4,
+        }
+    ]
+    state["dataset_metadata"] = {"selection_status": "ready"}
+    state["validation_report"] = {"report_id": "vrep_stale", "scenarios": []}
+    state["decision_report"] = {"h2": {"status": "approved", "auto_approved": False}}
+    state["approval_status"] = {"h1": "approved", "h2": "approved"}
+    state["experiment_logs"] = [{"run_id": "erun_keep", "status": "completed"}]
+    result = build_foundation_graph().invoke(state)
+    assert result["validation_report"] == {}
+    assert result["decision_report"] == {}
+    assert result["approval_status"] == {}
+    assert result["experiment_logs"] == [{"run_id": "erun_keep", "status": "completed"}]
+    # Stale H2 cannot keep paper unlocked after rebuild.
+    from validation.gate import paper_allowed, validation_allowed
+
+    assert paper_allowed(result) is False
+    assert validation_allowed(result) is False
+
+
 def test_foundation_graph_rejects_secret_bearing_uploaded_files():
     state = new_research_state("p-002", "Graph Test")
     state["uploaded_files"] = [

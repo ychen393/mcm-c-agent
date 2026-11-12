@@ -135,7 +135,7 @@ def run_modeling_experiment(
     notes = [
         "Phase 6 deterministic fixture runner completed.",
         f"modeling_gate.reason={gate.reason}",
-        "Validation / H2 (Phase 7) is out of scope for this slice.",
+        "Attach results, then run Validation / H2 (Phase 7) separately.",
     ]
     if run.sandboxed_python_note:
         notes.append(run.sandboxed_python_note)

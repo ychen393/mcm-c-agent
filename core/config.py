@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # Phase 6 Modeling: optional sandboxed Python off by default; Phase 6 stub does not
     # execute arbitrary user code even when enabled (deterministic fixture remains authoritative).
     modeling_allow_sandboxed_python: bool = False
+    # Phase 7 Validation / Sensitivity: optional LLM critique off by default for CI.
+    validation_use_llm: bool = False
     upload_dir: Path = Path('./data/uploads')
     output_dir: Path = Path('./outputs')
     @model_validator(mode='after')

@@ -161,7 +161,7 @@ def persist_experiment_into_state(
     phases["modeling_experiment"] = "recorded"
     updated["workspace_phases"] = phases
 
-    # Do not mark research_task_complete or start Phase 7 validation / H2.
+    # Do not mark research_task_complete, approve H2, or start Phase 8 paper.
     assert_safe_for_persistence(updated, "state")
 
     _project, run, saved = store.save_project_state(

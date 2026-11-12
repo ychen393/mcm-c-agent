@@ -92,7 +92,7 @@ def render_modeling_experiment_panel(
         "Runs a CI-safe deterministic trading experiment on a synthetic 2022 MCM C "
         "price fixture (not live market data). Requires human H1 approval in project "
         "state. Optional sandboxed Python does not execute arbitrary code in this slice. "
-        "Validation / H2 is Phase 7."
+        "After attach, Validation / H2 is available in Phase 7."
     )
 
     gate = modeling_gate_status(recorded_state if isinstance(recorded_state, dict) else None)
@@ -272,7 +272,8 @@ def render_modeling_experiment_panel(
             disabled=not gate.modeling_allowed,
             help=(
                 "Stores sanitized experiment_logs + model_artifacts via Phase 1 "
-                "persistence. Refused unless H1 is approved. Does not start Phase 7 / H2."
+                "persistence. Refused unless H1 is approved. Does not approve H2 "
+                "or start Paper / LaTeX."
             ),
         )
         if attach:
