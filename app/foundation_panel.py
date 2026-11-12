@@ -163,6 +163,11 @@ def sync_foundation_state(
                 input_signature=signature,
             )
         st.session_state["last_run"] = result
+        # Derived products (including ProblemSpecification) were cleared on rebuild;
+        # drop the orphan UI cache so it cannot outrank the new recorded state.
+        from app.problem_analyst_panel import clear_problem_specification_cache
+
+        clear_problem_specification_cache()
     except (TypeError, ValueError) as exc:
         st.error(str(exc))
         return False
