@@ -54,8 +54,9 @@ def modeling_gate_status(state: dict[str, Any] | None) -> ModelingGateStatus:
             h1_status="approved",
             reason="h1_approved",
             message=(
-                "H1 approved by a human. Modeling & Experiment (Phase 6) may proceed "
-                "when that phase is implemented — Phase 5 does not start modeling."
+                "H1 approved by a human. Modeling & Experiment (Phase 6) may run the "
+                "deterministic fixture path. H1 is never auto-approved; Validation/H2 "
+                "remains Phase 7."
             ),
         )
     if status == "pending":

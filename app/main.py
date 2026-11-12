@@ -19,6 +19,7 @@ from app.foundation_panel import (
     sync_foundation_state,
 )
 from app.literature_panel import render_literature_evidence_panel
+from app.modeling_panel import render_modeling_experiment_panel
 from app.persistence_panel import get_or_create_store, render_persistence_panel
 from app.problem_analyst_panel import render_problem_analyst_panel
 from app.relationship_panel import render_relationship_panel
@@ -1013,6 +1014,14 @@ render_research_h1_panel(
     eda_plan=eda_plan_for_lit if isinstance(eda_plan_for_lit, dict) else None,
     eda_report=eda_report_for_lit,
     evidence_report=evidence_for_h1,
+    recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
+    project_id=project_id,
+    project_name=project_name,
+    input_signature=form_signature,
+)
+render_modeling_experiment_panel(
+    settings=settings,
+    problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
     recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
     project_id=project_id,
     project_name=project_name,

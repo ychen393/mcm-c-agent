@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     literature_live_retrieval: bool = False
     # Phase 5 Research Strategy / Debate: optional LLM off by default for CI.
     research_strategy_use_llm: bool = False
+    # Phase 6 Modeling: optional sandboxed Python off by default; Phase 6 stub does not
+    # execute arbitrary user code even when enabled (deterministic fixture remains authoritative).
+    modeling_allow_sandboxed_python: bool = False
     upload_dir: Path = Path('./data/uploads')
     output_dir: Path = Path('./outputs')
     @model_validator(mode='after')

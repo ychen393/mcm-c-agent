@@ -152,6 +152,38 @@ def test_foundation_graph_clears_stale_phase5_research_h1_products():
     assert result["experiment_logs"] == [{"run": "keep"}]
 
 
+def test_foundation_graph_clears_phase6_model_artifacts_keeps_experiment_logs():
+    """Phase 6: model_artifacts clear; experiment_logs stay (Phase 1 durable logs)."""
+    from core.foundation import cleared_derived_products
+
+    cleared = cleared_derived_products()
+    assert cleared["model_artifacts"] == []
+    assert "experiment_logs" not in cleared
+
+    state = new_research_state("p-phase6-clear", "Phase6 Clear Test")
+    state["uploaded_files"] = [
+        {
+            "dataset_id": "ds_lbma-gold_abc123abc123",
+            "file_name": "LBMA-GOLD.csv",
+            "sha256": "a" * 64,
+            "row_count": 4,
+        }
+    ]
+    state["dataset_metadata"] = {"selection_status": "ready"}
+    state["model_artifacts"] = [
+        {"artifact_id": "art_stale", "kind": "equity_curve_summary", "summary": "stale"}
+    ]
+    state["experiment_logs"] = [{"run_id": "erun_keep", "status": "completed"}]
+    state["decision_report"] = {"experiment": {"report_id": "erep_stale"}}
+    state["approval_status"] = {"h1": "approved"}
+    result = build_foundation_graph().invoke(state)
+    assert result["model_artifacts"] == []
+    assert result["experiment_logs"] == [{"run_id": "erun_keep", "status": "completed"}]
+    # decision_report / approval clear with derived products (stale H1 cannot survive).
+    assert result["decision_report"] == {}
+    assert result["approval_status"] == {}
+
+
 def test_foundation_graph_rejects_secret_bearing_uploaded_files():
     state = new_research_state("p-002", "Graph Test")
     state["uploaded_files"] = [

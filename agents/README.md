@@ -28,13 +28,28 @@ The planner service is connected to the Streamlit Dataset Explorer through an ex
 - **Default path:** offline fixture corpus under `knowledge/fixture_corpus/` (synthetic CI stubs only).
 - **Optional live retrieval:** `LITERATURE_LIVE_RETRIEVAL` / `use_live=True` — Phase 4 stub records unavailability and never invents sources.
 - **UI:** Research Lab Literature & Evidence panel reviews cards/gaps and attaches sanitized `evidence_report` + `citations`.
-- **Phase 5 stub:** `agents/research_strategy_stub.py` explicitly marks Research Strategy / H1 as not implemented.
+- **Phase 5 stub:** `agents/research_strategy_stub.py` re-exports live `research_strategy_status` (`h1_auto_approve=false`).
+
+## Phase 5 — Research Strategy / Debate → H1
+
+- **Implementation:** `agents/research_strategy.py`, `agents/debate_critic.py`.
+- **Contract:** `schemas/research.py` (`ResearchProposal`, `DebateCritique`, `H1Decision`, `ModelingGateStatus`).
+- **Gate:** `modeling/gate.py` — modeling allowed only when human H1 is `approved` (never auto-approve).
+- **UI:** Research Lab H1 panel synthesizes → critiques → human Approve / Request-revision.
+
+## Phase 6 — Mathematical Modeling & Experiment
+
+- **Implementation:** `agents/modeling_experiment.py` exposes `run_modeling_experiment()`.
+- **Contract:** `schemas/experiment.py` (`ExperimentParams`, `ExperimentRun`, `ExperimentReport`, metrics/artifacts).
+- **Default path:** `modeling/runner.py` deterministic backtest on synthetic fixture prices (`modeling/fixture_data.py`).
+- **H1 enforcement:** refuses to run/persist unless `assert_modeling_allowed(state)` passes.
+- **Optional sandbox:** `MODELING_ALLOW_SANDBOXED_PYTHON` / UI checkbox — Phase 6 stub does **not** execute arbitrary code.
+- **UI:** Modeling & Experiment panel configures/runs deterministic path, shows metrics/artifacts, attaches via `tools/experiment_persistence.py`.
 
 ## Planned later agents
 
-- Research Strategy / Debate Critic (Phase 5 / H1)
+- Validation / sensitivity → H2 (Phase 7)
 - Insight Analyst and EDA Reviewer (legacy Phase C naming)
-- Model Builder and Validator
-- Paper Writer and Reviewer
+- Paper Writer and Reviewer → H3
 
 All agents must use versioned Pydantic contracts, record provider/model and prompt version where applicable, and preserve evidence provenance.
