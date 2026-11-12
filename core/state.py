@@ -1,13 +1,16 @@
 from typing import Any, TypedDict
 
+
 class ResearchState(TypedDict, total=False):
     project_id: str
     project_name: str
     project_status: str
     current_stage: str
     problem_text: str
-    uploaded_files: list[str]
+    uploaded_files: list[dict[str, Any]]
     dataset_metadata: dict[str, Any]
+    analysis_status: str
+    workspace_phases: dict[str, str]
     problem_specification: dict[str, Any]
     eda_report: dict[str, Any]
     research_proposal: dict[str, Any]
@@ -25,4 +28,18 @@ class ResearchState(TypedDict, total=False):
     errors: list[dict[str, Any]]
 
 def new_research_state(project_id: str, project_name: str) -> ResearchState:
-    return {'project_id': project_id, 'project_name': project_name, 'project_status': 'created', 'current_stage': 'intake', 'uploaded_files': [], 'disagreement_log': [], 'model_artifacts': [], 'approval_status': {}, 'citations': [], 'experiment_logs': [], 'ai_usage_logs': [], 'errors': []}
+    return {
+        "project_id": project_id,
+        "project_name": project_name,
+        "project_status": "created",
+        "current_stage": "intake",
+        "analysis_status": "not_started",
+        "uploaded_files": [],
+        "disagreement_log": [],
+        "model_artifacts": [],
+        "approval_status": {},
+        "citations": [],
+        "experiment_logs": [],
+        "ai_usage_logs": [],
+        "errors": [],
+    }
