@@ -97,8 +97,19 @@ def _datasets_from_state(state: dict[str, Any], *, project_id: str, run_id: str)
 
 
 def _sanitize_state(state: dict[str, Any]) -> dict[str, Any]:
-    """Fail closed: nested secrets / bytes raise; never reach disk or DB."""
+    """Fail closed on write: nested secrets / bytes raise; never reach disk or DB."""
     return sanitize_state_for_persistence(state)
+
+
+def _safe_load_state(data: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Read-path sanitize: poisoned/tampered payloads soft-fail as unreadable."""
+    if not data:
+        return None
+    try:
+        return sanitize_state_for_persistence(data)
+    except (TypeError, ValueError) as exc:
+        logger.warning("Stored research state is unreadable (%s).", type(exc).__name__)
+        return None
 
 
 def _backend_marker_path(projects_root: Path) -> Path:
@@ -418,7 +429,7 @@ class LocalProjectStore(ProjectStore):
         except ValueError:
             return None
         data = self._read_json(path)
-        return _sanitize_state(data) if data else None
+        return _safe_load_state(data)
 
     def history(self, project_id: str) -> list[ProjectHistoryEntry]:
         project_id = validate_project_id(project_id)
@@ -760,7 +771,7 @@ class PostgresProjectStore(ProjectStore):
             row = session.get(ResearchRunRow, safe_run)
             if row is None or row.project_id != validate_project_id(project_id):
                 return None
-            return _sanitize_state(dict(row.state_json or {}))
+            return _safe_load_state(dict(row.state_json or {}))
 
     def history(self, project_id: str) -> list[ProjectHistoryEntry]:
         project_id = validate_project_id(project_id)
@@ -803,7 +814,9 @@ class PostgresProjectStore(ProjectStore):
             row = session.get(ResearchRunRow, safe_run)
             if row is None or row.project_id != validate_project_id(project_id):
                 return None
-            state = _sanitize_state(dict(row.state_json or {}))
+            state = _safe_load_state(dict(row.state_json or {}))
+            if state is None:
+                return None
             state["data_resume"] = "reupload_required"
             state.setdefault("errors", [])
             if not any(err.get("code") == "reupload_required" for err in state["errors"]):

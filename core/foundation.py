@@ -17,6 +17,12 @@ from core.lifecycle import (
     LIFECYCLE_PROJECT_INITIALIZED,
 )
 from core.state import ResearchState, new_research_state
+from schemas.persistence import (
+    FORBIDDEN_STATE_KEYS,
+    assert_safe_for_persistence,
+    is_forbidden_key,
+    sanitize_uploaded_file_record,
+)
 from tools.dataset_bundle import DatasetBundle, build_bundle_profiles
 
 ANALYSIS_NOT_STARTED = "not_started"
@@ -25,23 +31,8 @@ STAGE_DATASETS_LOADED = "datasets_loaded"
 PROJECT_STATUS_INITIALIZED = "initialized"
 NOT_IMPLEMENTED = "NOT IMPLEMENTED"
 
-FORBIDDEN_PROVENANCE_KEYS = frozenset(
-    {
-        "api_key",
-        "anthropic_api_key",
-        "content",
-        "deepseek_api_key",
-        "frame",
-        "llm_api_key",
-        "numeric_correlations",
-        "numeric_summary",
-        "openai_api_key",
-        "preview_rows",
-        "raw_bytes",
-        "sample_values",
-        "top_values",
-    }
-)
+# Kept as an alias of the persistence denylist for older call sites / tests.
+FORBIDDEN_PROVENANCE_KEYS = FORBIDDEN_STATE_KEYS
 
 _SELECTION_STATUSES = frozenset({"empty", "ready", "rejected"})
 
@@ -160,34 +151,36 @@ def dataset_provenance(bundle: DatasetBundle) -> list[dict[str, Any]]:
 
 
 def sanitize_uploaded_files(files: Any) -> list[dict[str, Any]]:
-    """Keep provenance records and drop raw payloads or unexpected values."""
+    """Keep allowlisted provenance only; fail closed on secret-shaped keys/bytes.
+
+    Aligned with ``schemas.persistence`` so Issue #26 secrets cannot sit in
+    in-memory ResearchState even before a store write.
+    """
     if not files:
         return []
     if not isinstance(files, list):
         return []
     cleaned: list[dict[str, Any]] = []
-    for item in files:
+    for index, item in enumerate(files):
         if not isinstance(item, dict):
             continue
-        record: dict[str, Any] = {}
-        for key, value in item.items():
-            if key in FORBIDDEN_PROVENANCE_KEYS or isinstance(value, (bytes, bytearray, dict)):
-                continue
-            record[key] = value
-        if record.get("dataset_id") and record.get("file_name") and record.get("sha256"):
-            record["joined"] = False
-            cleaned.append(record)
+        # Reject secrets/bytes before allowlisting; do not silently keep them.
+        assert_safe_for_persistence(item, f"uploaded_files[{index}]")
+        cleaned.append(
+            sanitize_uploaded_file_record(item, path=f"uploaded_files[{index}]")
+        )
     return cleaned
 
 
 def sanitize_metadata(metadata: Any) -> dict[str, Any]:
-    """Drop secret-shaped or raw-payload keys from bundle metadata."""
+    """Fail closed on secret-shaped or raw-payload keys in bundle metadata."""
     if not isinstance(metadata, dict):
         return {}
+    assert_safe_for_persistence(metadata, "dataset_metadata")
     cleaned: dict[str, Any] = {}
     for key, value in metadata.items():
-        if key in FORBIDDEN_PROVENANCE_KEYS or isinstance(value, (bytes, bytearray)):
-            continue
+        if is_forbidden_key(key) or isinstance(value, (bytes, bytearray)):
+            raise ValueError(f"Foundation state cannot contain forbidden key '{key}'.")
         cleaned[key] = value
     cleaned["raw_rows_included"] = False
     cleaned["file_bytes_included"] = False
@@ -196,16 +189,11 @@ def sanitize_metadata(metadata: Any) -> dict[str, Any]:
 
 
 def _reject_unsafe_values(value: Any, path: str = "state") -> None:
-    if isinstance(value, (bytes, bytearray)):
-        raise TypeError(f"Foundation state cannot contain file bytes at {path}.")
-    if isinstance(value, dict):
-        for key, item in value.items():
-            if key in FORBIDDEN_PROVENANCE_KEYS:
-                raise TypeError(f"Foundation state cannot contain {key} at {path}.")
-            _reject_unsafe_values(item, f"{path}.{key}")
-    elif isinstance(value, list):
-        for index, item in enumerate(value):
-            _reject_unsafe_values(item, f"{path}[{index}]")
+    """Fail closed using the same heuristics as persistence sanitization."""
+    try:
+        assert_safe_for_persistence(value, path)
+    except ValueError as exc:
+        raise TypeError(str(exc).replace("Refusing to persist", "Foundation state cannot contain")) from exc
 
 
 def build_initialized_state(

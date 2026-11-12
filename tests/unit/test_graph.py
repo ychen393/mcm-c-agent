@@ -1,3 +1,5 @@
+import pytest
+
 from core.checkpoint import checkpoint_backend_name
 from core.foundation import NOT_IMPLEMENTED
 from core.graph import build_foundation_graph
@@ -34,8 +36,6 @@ def test_foundation_graph_keeps_provenance_and_clears_stale_products():
             "sha256": "a" * 64,
             "row_count": 4,
             "warnings": ["Column 'USD (PM)' has 1 missing values (25.0%)."],
-            "raw_bytes": b"Date,USD (PM)\n",
-            "sample_values": ["1324.60"],
         },
         {
             "dataset_id": "ds_bchain-mkpru_def456def456",
@@ -44,7 +44,7 @@ def test_foundation_graph_keeps_provenance_and_clears_stale_products():
             "row_count": 5,
         },
     ]
-    state["dataset_metadata"] = {"selection_status": "ready", "api_key": "sk-secret"}
+    state["dataset_metadata"] = {"selection_status": "ready"}
     state["eda_report"] = {"stale": True}
     state["approval_status"] = {"h1": "approved"}
     state["research_proposal"] = {"strategy": "trade gold"}
@@ -58,10 +58,6 @@ def test_foundation_graph_keeps_provenance_and_clears_stale_products():
         "LBMA-GOLD.csv",
         "BCHAIN-MKPRU.csv",
     ]
-    blob = repr(result["uploaded_files"])
-    assert "1324.60" not in blob
-    assert "raw_bytes" not in result["uploaded_files"][0]
-    assert "sample_values" not in result["uploaded_files"][0]
     assert result["uploaded_files"][0]["joined"] is False
     assert result["dataset_metadata"]["selection_status"] == "ready"
     assert "api_key" not in result["dataset_metadata"]
@@ -77,3 +73,17 @@ def test_foundation_graph_keeps_provenance_and_clears_stale_products():
     assert result["workspace_phases"]["relationship_preview"] == "ready"
     assert result["workspace_phases"]["joint_analysis"] == NOT_IMPLEMENTED
     assert result["workspace_phases"]["strategy_modeling"] == NOT_IMPLEMENTED
+
+
+def test_foundation_graph_rejects_secret_bearing_uploaded_files():
+    state = new_research_state("p-002", "Graph Test")
+    state["uploaded_files"] = [
+        {
+            "dataset_id": "ds_lbma-gold_abc123abc123",
+            "file_name": "LBMA-GOLD.csv",
+            "sha256": "a" * 64,
+            "authorization": "Bearer secret",
+        }
+    ]
+    with pytest.raises(ValueError, match="forbidden key"):
+        build_foundation_graph().invoke(state)

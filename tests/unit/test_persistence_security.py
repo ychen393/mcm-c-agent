@@ -258,3 +258,96 @@ def test_unknown_upload_extra_fields_are_dropped_not_stored(tmp_path):
     text = disk.read_text(encoding="utf-8")
     assert "harmless_extra" not in text
     assert SECRET not in text
+
+
+def test_foundation_rejects_authorization_and_token_like_persistence():
+    """P1-1: in-memory ResearchState uses the same heuristics as persistence."""
+    from core.foundation import (
+        build_initialized_state,
+        sanitize_uploaded_files,
+        _reject_unsafe_values,
+    )
+    from core.graph import build_foundation_graph
+    from schemas.persistence import assert_safe_for_persistence
+
+    state, _ = _clean_state()
+    poisoned = [dict(item) for item in state["uploaded_files"]]
+    poisoned[0]["authorization"] = "Bearer secret"
+    with pytest.raises(ValueError, match="forbidden key"):
+        assert_safe_for_persistence({"uploaded_files": poisoned})
+    with pytest.raises(ValueError, match="forbidden key"):
+        sanitize_uploaded_files(poisoned)
+
+    nested = dict(state)
+    nested["dataset_metadata"] = dict(nested["dataset_metadata"])
+    nested["dataset_metadata"]["provider_token"] = SECRET
+    with pytest.raises(TypeError, match="cannot contain|forbidden"):
+        _reject_unsafe_values(nested)
+
+    # Clean build + graph output never carries authorization / token keys.
+    clean = build_initialized_state(
+        project_id="sec-demo",
+        project_name="Security Demo",
+        problem_text="problem",
+        bundle=build_dataset_bundle([("LBMA-GOLD.csv", GOLD)], project_id="sec-demo"),
+        selection_status="ready",
+        llm_config_revision=0,
+        llm_provider="deepseek",
+        llm_model="deepseek-chat",
+    )
+    result = build_foundation_graph().invoke(clean)
+    dump = str(result)
+    assert "authorization" not in dump.lower()
+    assert "Bearer" not in dump
+    assert SECRET not in dump
+    for item in result["uploaded_files"]:
+        assert "authorization" not in item
+        assert "token" not in item
+        assert "api_key" not in item
+
+
+def test_poisoned_stored_state_soft_fails_on_load_and_continue(tmp_path):
+    """P1-2: tampered state.json must not raise 'Refusing to persist' on read."""
+    store = LocalProjectStore(tmp_path / "projects")
+    state, signature = _clean_state(project_id="poison")
+    _p, run, saved = store.save_project_state(
+        project_id="poison",
+        project_name="Security Demo",
+        state=state,
+        input_signature=signature,
+    )
+    path = tmp_path / "projects" / "poison" / "runs" / run.run_id / "state.json"
+    planted = dict(saved)
+    planted["dataset_metadata"] = dict(planted.get("dataset_metadata") or {})
+    planted["dataset_metadata"]["api_key"] = SECRET
+    path.write_text(__import__("json").dumps(planted), encoding="utf-8")
+
+    assert store.load_run_state("poison", run.run_id) is None
+    assert store.continue_run("poison", run.run_id) is None
+    assert store.load_active_state("poison") is None
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'poison.db'}")
+    pg = PostgresProjectStore(engine)
+    _p2, run2, saved2 = pg.save_project_state(
+        project_id="poison-pg",
+        project_name="Security Demo",
+        state=state,
+        input_signature=signature,
+    )
+    # Plant nested secret directly into ORM JSON.
+    from database.models import ResearchRunRow
+    from sqlalchemy.orm import sessionmaker
+
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    with Session() as session:
+        row = session.get(ResearchRunRow, run2.run_id)
+        assert row is not None
+        poisoned_json = dict(row.state_json or {})
+        poisoned_json["dataset_metadata"] = dict(poisoned_json.get("dataset_metadata") or {})
+        poisoned_json["dataset_metadata"]["api_key"] = SECRET
+        row.state_json = poisoned_json
+        session.commit()
+
+    assert pg.load_run_state("poison-pg", run2.run_id) is None
+    assert pg.continue_run("poison-pg", run2.run_id) is None
+    assert pg.load_active_state("poison-pg") is None
