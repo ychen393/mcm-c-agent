@@ -18,6 +18,7 @@ from app.foundation_panel import (
     sync_foundation_state,
 )
 from app.persistence_panel import get_or_create_store, render_persistence_panel
+from app.problem_analysis_panel import render_problem_analysis_panel
 from app.relationship_panel import render_relationship_panel
 from core.config import get_settings
 from database.repositories import build_project_store
@@ -408,6 +409,7 @@ with right:
         "The two nodes only initialize the project. They do not analyze the problem, "
         "join files, call a model, or model a trading strategy."
     )
+    st.caption("Problem Analyst is the separate Analyze Problem action, not these two nodes.")
     st.info(
         "The planner proposes charts; Python validates and renders them only after your approval."
     )
@@ -847,6 +849,16 @@ if computed is not None:
     form_signature = computed[0]
 
 render_project_phases(recorded_state, inputs_current=inputs_current)
+render_problem_analysis_panel(
+    recorded_state,
+    settings=settings,
+    store=project_store,
+    project_id=project_id,
+    project_name=project_name,
+    problem_text=problem_text,
+    foundation_signature=form_signature,
+    inputs_current=inputs_current,
+)
 render_persistence_panel(
     project_store,
     project_id=project_id,
@@ -857,9 +869,19 @@ render_persistence_panel(
 
 if recorded_state is not None:
     st.subheader("Latest foundation state")
+    if recorded_state.get("lifecycle") == "problem_analysis_ready":
+        state_caption = (
+            "Problem specification is stored on this run. "
+            "Trading strategy modeling has not started. "
+        )
+    else:
+        state_caption = (
+            "Recorded when you initialize the project or change its inputs. "
+            "Problem analysis has not produced a specification. "
+        )
     st.caption(
-        "Recorded when you initialize the project or change its inputs. "
-        "Analysis has not started. uploaded_files holds dataset provenance only: "
+        state_caption
+        + "uploaded_files holds dataset provenance only: "
         "IDs, file names, SHA-256, row and column counts, and profile warnings. "
         "File bytes are not stored here, and no trading strategy is modeled. "
         f"run_id={recorded_state.get('run_id')} · lifecycle={recorded_state.get('lifecycle')}"

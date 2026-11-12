@@ -1,0 +1,16 @@
+2022 MCM Problem C — Trading Strategies.
+
+A trader starts with $1,000 on 2016-09-11.
+The trading period runs from 2016-09-11 to 2021-09-10.
+Gold may be traded only on days the market is open.
+Bitcoin may be traded every day.
+The commission for gold is 1% of the amount traded.
+The commission for bitcoin is 2% of the amount traded.
+The strategy may use only the past stream of daily prices.
+It cannot see the future.
+No look-ahead is allowed.
+On 2021-09-10 the model must report the final portfolio value and justify that value.
+Determine how sensitive the strategy is to transaction costs.
+Communicate the result in a memorandum of at most two pages.
+Price files are the supplied LBMA gold and Bitcoin series.
+Do not execute trades while reading the problem.

@@ -8,6 +8,10 @@ class ResearchState(TypedDict, total=False):
     current_stage: str
     run_id: str
     lifecycle: str
+    analyst_entry_lifecycle: str
+    foundation_input_signature: str
+    problem_revision_notes: str
+    data_resume: str
     problem_text: str
     uploaded_files: list[dict[str, Any]]
     dataset_metadata: dict[str, Any]

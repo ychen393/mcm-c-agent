@@ -14,8 +14,17 @@ from schemas.persistence import ProjectLifecycle
 LIFECYCLE_CREATED: ProjectLifecycle = "created"
 LIFECYCLE_PROJECT_INITIALIZED: ProjectLifecycle = "project_initialized"
 LIFECYCLE_DATASETS_RECORDED: ProjectLifecycle = "datasets_recorded"
+LIFECYCLE_PROBLEM_ANALYSIS_RUNNING: ProjectLifecycle = "problem_analysis_running"
+LIFECYCLE_PROBLEM_ANALYSIS_READY: ProjectLifecycle = "problem_analysis_ready"
+LIFECYCLE_PROBLEM_ANALYSIS_FAILED: ProjectLifecycle = "problem_analysis_failed"
 LIFECYCLE_DATA_ANALYSIS_DONE: ProjectLifecycle = "data_analysis_done"
 LIFECYCLE_RESEARCH_TASK_COMPLETE: ProjectLifecycle = "research_task_complete"
+
+_PROBLEM_ANALYSIS_LIFECYCLES = {
+    LIFECYCLE_PROBLEM_ANALYSIS_RUNNING,
+    LIFECYCLE_PROBLEM_ANALYSIS_READY,
+    LIFECYCLE_PROBLEM_ANALYSIS_FAILED,
+}
 
 ANALYSIS_NOT_STARTED = "not_started"
 ANALYSIS_DATA_DONE = "data_analysis_done"
@@ -36,6 +45,9 @@ def lifecycle_from_state(state: dict[str, Any] | None) -> ProjectLifecycle:
         LIFECYCLE_CREATED,
         LIFECYCLE_PROJECT_INITIALIZED,
         LIFECYCLE_DATASETS_RECORDED,
+        LIFECYCLE_PROBLEM_ANALYSIS_RUNNING,
+        LIFECYCLE_PROBLEM_ANALYSIS_READY,
+        LIFECYCLE_PROBLEM_ANALYSIS_FAILED,
         LIFECYCLE_DATA_ANALYSIS_DONE,
         LIFECYCLE_RESEARCH_TASK_COMPLETE,
     }:
@@ -53,6 +65,20 @@ def lifecycle_from_state(state: dict[str, Any] | None) -> ProjectLifecycle:
     return LIFECYCLE_CREATED
 
 
+def _data_analysis_label(state: dict[str, Any] | None, lifecycle: ProjectLifecycle) -> str:
+    analysis = (state or {}).get("analysis_status")
+    eda = (state or {}).get("eda_report")
+    if (
+        analysis == ANALYSIS_DATA_DONE
+        or lifecycle in {LIFECYCLE_DATA_ANALYSIS_DONE, LIFECYCLE_RESEARCH_TASK_COMPLETE}
+        or (isinstance(eda, dict) and bool(eda))
+    ):
+        return "done"
+    if lifecycle == LIFECYCLE_DATASETS_RECORDED or lifecycle in _PROBLEM_ANALYSIS_LIFECYCLES:
+        return "datasets recorded"
+    return "not done"
+
+
 def distinguish_status(state: dict[str, Any] | None) -> dict[str, str]:
     """Human-readable status board: init vs data analysis vs research complete."""
     lifecycle = lifecycle_from_state(state)
@@ -65,14 +91,11 @@ def distinguish_status(state: dict[str, Any] | None) -> dict[str, str]:
                 LIFECYCLE_DATASETS_RECORDED,
                 LIFECYCLE_DATA_ANALYSIS_DONE,
                 LIFECYCLE_RESEARCH_TASK_COMPLETE,
+                *_PROBLEM_ANALYSIS_LIFECYCLES,
             }
             else "not started"
         ),
-        "data_analysis": (
-            "done"
-            if lifecycle in {LIFECYCLE_DATA_ANALYSIS_DONE, LIFECYCLE_RESEARCH_TASK_COMPLETE}
-            else ("datasets recorded" if lifecycle == LIFECYCLE_DATASETS_RECORDED else "not done")
-        ),
+        "data_analysis": _data_analysis_label(state, lifecycle),
         "research_task": (
             "complete"
             if lifecycle == LIFECYCLE_RESEARCH_TASK_COMPLETE

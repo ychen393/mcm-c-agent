@@ -17,6 +17,9 @@ ProjectLifecycle = Literal[
     "created",
     "project_initialized",
     "datasets_recorded",
+    "problem_analysis_running",
+    "problem_analysis_ready",
+    "problem_analysis_failed",
     "data_analysis_done",
     "research_task_complete",
 ]
@@ -270,6 +273,7 @@ class ResearchStateSnapshot(BaseModel):
     workspace_phases: dict[str, str] = Field(default_factory=dict)
     approval_status: dict[str, str] = Field(default_factory=dict)
     errors: list[dict[str, Any]] = Field(default_factory=list)
+    problem_specification: dict[str, Any] = Field(default_factory=dict)
     data_resume: DataResumeMode = "reupload_required"
 
     @model_validator(mode="before")

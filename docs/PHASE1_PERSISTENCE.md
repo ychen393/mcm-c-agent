@@ -59,4 +59,5 @@ Local `run_id` values are validated (`run_<12 hex>`) on every read and write. Re
 
 - Live PostgreSQL server acceptance (CI uses local + SQLite-backed store exercises; real PG is preferred when reachable but not required for unit CI).
 - Full LangGraph research checkpoint / ADR-001 PostgresSaver.
-- Problem Analyst → `ProblemSpecification`, problem-aware EDA, joint modeling (Phase 2+).
+- Problem Analyst is implemented on the Phase 2 branch. See `docs/PHASE2_PROBLEM_ANALYST.md`.
+- Problem-aware EDA, joint modeling, and the LangGraph research checkpointer remain later work.
