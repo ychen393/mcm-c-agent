@@ -18,6 +18,7 @@ from app.foundation_panel import (
     render_project_phases,
     sync_foundation_state,
 )
+from app.literature_panel import render_literature_evidence_panel
 from app.persistence_panel import get_or_create_store, render_persistence_panel
 from app.problem_analyst_panel import render_problem_analyst_panel
 from app.relationship_panel import render_relationship_panel
@@ -428,11 +429,12 @@ def _render_chart_plan(plan: ChartPlan) -> None:
 
 with st.sidebar:
     st.subheader("Workspace")
-    st.info("Phase 3 · Problem-aware multi-dataset EDA")
+    st.info("Phase 4 · Literature & Evidence")
     st.caption(f"Environment: {settings.app_env}")
     st.caption(f"LLM provider: {settings.llm_provider}")
     st.caption(f"LLM model: {settings.llm_model}")
     st.caption(f"Problem Analyst LLM: {settings.problem_analyst_use_llm}")
+    st.caption(f"Literature live retrieval: {settings.literature_live_retrieval}")
 
 left, right = st.columns([1.3, 1])
 with left:
@@ -469,12 +471,13 @@ with left:
 
 with right:
     st.subheader("System status")
-    st.metric("Milestone", "Phase 3")
+    st.metric("Milestone", "Phase 4")
     st.metric("Workflow nodes", "2")
     st.metric("Configured provider", settings.llm_provider)
     st.caption(
         "Foundation initializes the project. Problem Analyst emits ProblemSpecification. "
-        "Phase 3 adds problem-aware multi-dataset EDA. Joint strategy modeling is still out of scope."
+        "Phase 3 adds problem-aware multi-dataset EDA. Phase 4 gathers corpus-backed "
+        "evidence cards. Joint strategy modeling / H1 remain out of scope."
     )
     st.info(
         "Independent profiles and relationship previews never auto-merge. "
@@ -976,6 +979,22 @@ if bundle is not None and not bundle_rejected:
         column_units_by_dataset=st.session_state.get("eda_bundle_units"),
         temporal_frequency_by_dataset=st.session_state.get("eda_bundle_frequencies"),
     )
+eda_plan_for_lit = st.session_state.get("problem_aware_eda_plan")
+eda_report_for_lit = None
+if isinstance(recorded_state, dict):
+    maybe_eda = recorded_state.get("eda_report")
+    if isinstance(maybe_eda, dict):
+        eda_report_for_lit = maybe_eda
+render_literature_evidence_panel(
+    settings=settings,
+    problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
+    eda_plan=eda_plan_for_lit if isinstance(eda_plan_for_lit, dict) else None,
+    eda_report=eda_report_for_lit,
+    recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
+    project_id=project_id,
+    project_name=project_name,
+    input_signature=form_signature,
+)
 render_persistence_panel(
     project_store,
     project_id=project_id,

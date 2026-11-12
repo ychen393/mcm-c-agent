@@ -15,6 +15,7 @@ class ResearchState(TypedDict, total=False):
     workspace_phases: dict[str, str]
     problem_specification: dict[str, Any]
     eda_report: dict[str, Any]
+    evidence_report: dict[str, Any]
     research_proposal: dict[str, Any]
     disagreement_log: list[dict[str, Any]]
     decision_report: dict[str, Any]

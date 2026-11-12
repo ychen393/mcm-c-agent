@@ -1,0 +1,189 @@
+{
+  "corpus_id": "2022_mcm_c_fixture_v1",
+  "corpus_version": "1.0",
+  "problem_ids": [
+    "2022_mcm_c"
+  ],
+  "disclaimer": "Synthetic CI stubs only. Not real MCM papers or peer-reviewed sources.",
+  "sources": [
+    {
+      "source_id": "fx_txn_cost_portfolio",
+      "title": "Fixture note: portfolio choice with proportional transaction costs",
+      "authors": [
+        "MCM C Fixture Corpus"
+      ],
+      "year": 2022,
+      "venue": "CI fixture bundle",
+      "source_type": "fixture_stub",
+      "original_url": null,
+      "local_path": "knowledge/fixture_corpus/snippets/fx_txn_cost_portfolio.txt",
+      "publisher": "mcm-c-agent fixtures",
+      "license_or_rights": "internal fixture; not for redistribution as scholarship",
+      "acquisition_method": "fixture_bundle",
+      "allowed_operations": [
+        "metadata_index",
+        "summarize",
+        "excerpt_quote"
+      ],
+      "review_status": "fixture",
+      "notes": "Illustrates \u03b1-cost aware rebalancing themes for gold/bitcoin trading problems.",
+      "keywords": [
+        "transaction costs",
+        "portfolio",
+        "rebalancing",
+        "gold",
+        "bitcoin",
+        "alpha"
+      ],
+      "themes": [
+        "transaction_costs",
+        "portfolio_allocation",
+        "trading_strategy"
+      ],
+      "rq_hints": [
+        "rq_best_strategy_value",
+        "rq_best_strategy_evidence",
+        "rq_transaction_sensitivity"
+      ],
+      "snippet_file": "knowledge/fixture_corpus/snippets/fx_txn_cost_portfolio.txt",
+      "method_notes": [
+        {
+          "note_id": "mn_cost_aware_rebalance",
+          "method_name": "Cost-aware rebalancing threshold",
+          "summary": "Only rebalance when expected edge exceeds proportional transaction costs (\u03b1).",
+          "applicability": "Useful when \u03b1_gold and \u03b1_bitcoin differ and holdings update daily.",
+          "limitations": "Fixture only; thresholds must be estimated from past prices only."
+        }
+      ],
+      "citation": {
+        "citation_key": "FixtureTxnCost2022",
+        "citation_type": "fixture",
+        "bibtex_fields": {
+          "title": "Fixture note: portfolio choice with proportional transaction costs",
+          "year": "2022",
+          "note": "CI fixture stub \u2014 not a real publication"
+        }
+      },
+      "claim_summary": "Transaction costs should gate rebalancing; unequal \u03b1 across assets can change turnover."
+    },
+    {
+      "source_id": "fx_past_price_only",
+      "title": "Fixture note: causal decision rules on past price streams",
+      "authors": [
+        "MCM C Fixture Corpus"
+      ],
+      "year": 2022,
+      "venue": "CI fixture bundle",
+      "source_type": "fixture_stub",
+      "original_url": null,
+      "local_path": "knowledge/fixture_corpus/snippets/fx_past_price_only.txt",
+      "publisher": "mcm-c-agent fixtures",
+      "license_or_rights": "internal fixture; not for redistribution as scholarship",
+      "acquisition_method": "fixture_bundle",
+      "allowed_operations": [
+        "metadata_index",
+        "summarize",
+        "excerpt_quote"
+      ],
+      "review_status": "fixture",
+      "notes": "Supports the contest use-only-past-data constraint.",
+      "keywords": [
+        "past prices",
+        "causal",
+        "walk-forward",
+        "no lookahead",
+        "trading calendar"
+      ],
+      "themes": [
+        "information_constraint",
+        "validation",
+        "trading_strategy"
+      ],
+      "rq_hints": [
+        "rq_best_strategy_value",
+        "rq_best_strategy_evidence",
+        "rq_trader_memorandum"
+      ],
+      "snippet_file": "knowledge/fixture_corpus/snippets/fx_past_price_only.txt",
+      "method_notes": [
+        {
+          "note_id": "mn_walk_forward",
+          "method_name": "Walk-forward / expanding-window evaluation",
+          "summary": "Evaluate decisions with only information available on each day; forbid future prices.",
+          "applicability": "Matches MCM C daily decision and past-stream constraint.",
+          "limitations": "Does not by itself prove optimality of a strategy."
+        }
+      ],
+      "citation": {
+        "citation_key": "FixturePastPrice2022",
+        "citation_type": "fixture",
+        "bibtex_fields": {
+          "title": "Fixture note: causal decision rules on past price streams",
+          "year": "2022",
+          "note": "CI fixture stub \u2014 not a real publication"
+        }
+      },
+      "claim_summary": "Daily trading rules must be causal: only the past price stream may inform each decision."
+    },
+    {
+      "source_id": "fx_calendar_assets",
+      "title": "Fixture note: dual-asset calendars (cash, gold, bitcoin)",
+      "authors": [
+        "MCM C Fixture Corpus"
+      ],
+      "year": 2022,
+      "venue": "CI fixture bundle",
+      "source_type": "fixture_stub",
+      "original_url": null,
+      "local_path": "knowledge/fixture_corpus/snippets/fx_calendar_assets.txt",
+      "publisher": "mcm-c-agent fixtures",
+      "license_or_rights": "internal fixture; not for redistribution as scholarship",
+      "acquisition_method": "fixture_bundle",
+      "allowed_operations": [
+        "metadata_index",
+        "summarize",
+        "excerpt_quote"
+      ],
+      "review_status": "fixture",
+      "notes": "Gold traded only on open days; bitcoin daily \u2014 state vector [cash, gold, bitcoin].",
+      "keywords": [
+        "gold",
+        "bitcoin",
+        "trading days",
+        "market open",
+        "cash",
+        "LBMA",
+        "BCHAIN"
+      ],
+      "themes": [
+        "trading_calendar",
+        "assets",
+        "data_alignment"
+      ],
+      "rq_hints": [
+        "rq_best_strategy_value",
+        "rq_trader_memorandum"
+      ],
+      "snippet_file": "knowledge/fixture_corpus/snippets/fx_calendar_assets.txt",
+      "method_notes": [
+        {
+          "note_id": "mn_calendar_mask",
+          "method_name": "Calendar-aware trade mask",
+          "summary": "Apply per-asset tradeability masks so gold cannot trade on closed days while bitcoin can.",
+          "applicability": "Required when merging LBMA-GOLD and BCHAIN-MKPRU style series.",
+          "limitations": "Fixture does not prescribe a join strategy; EDA must confirm date keys."
+        }
+      ],
+      "citation": {
+        "citation_key": "FixtureCalendar2022",
+        "citation_type": "fixture",
+        "bibtex_fields": {
+          "title": "Fixture note: dual-asset calendars (cash, gold, bitcoin)",
+          "year": "2022",
+          "note": "CI fixture stub \u2014 not a real publication"
+        }
+      },
+      "claim_summary": "Asset calendars differ; models must encode gold open-day limits and daily bitcoin trades."
+    }
+  ]
+}

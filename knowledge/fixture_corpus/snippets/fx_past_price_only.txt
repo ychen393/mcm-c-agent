@@ -1,0 +1,4 @@
+FIXTURE SNIPPET — not a real paper.
+A decision made on day t may use only prices observed on days ≤ t. Walk-forward
+or expanding-window evaluation enforces this causality. Using future prices for
+feature construction or label leakage violates the contest past-stream rule.

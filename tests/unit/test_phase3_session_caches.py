@@ -11,6 +11,7 @@ from streamlit.testing.v1 import AppTest
 from app.problem_analyst_panel import PROBLEM_SPEC_SESSION_KEY
 from app.session_caches import (
     PHASE3_EDA_SESSION_KEYS,
+    PHASE4_LITERATURE_SESSION_KEYS,
     clear_derived_session_caches,
     clear_phase3_eda_session_caches,
 )
@@ -53,6 +54,11 @@ def _stale_session() -> dict:
             "right_key": "Date",
             "join_type": "inner",
         },
+        "literature_evidence_report": {
+            "problem_id": "stale_lit",
+            "cards": [],
+            "invented_sources": False,
+        },
         "other": "keep",
         "foundation_input_signature": "sig-unchanged-on-history-load",
     }
@@ -73,6 +79,8 @@ def test_clear_derived_session_caches_clears_phase2_and_phase3():
     clear_derived_session_caches(session)
     assert PROBLEM_SPEC_SESSION_KEY not in session
     for key in PHASE3_EDA_SESSION_KEYS:
+        assert key not in session
+    for key in PHASE4_LITERATURE_SESSION_KEYS:
         assert key not in session
     assert session["other"] == "keep"
     # History load must clear caches even when signature is left in place.

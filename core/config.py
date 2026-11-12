@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     project_store_backend: Literal['auto', 'local', 'postgres'] = 'auto'
     # Phase 2 Problem Analyst: keep LLM extraction off by default for CI.
     problem_analyst_use_llm: bool = False
+    # Phase 4 Literature & Evidence: live retrieval off by default for CI.
+    literature_live_retrieval: bool = False
     upload_dir: Path = Path('./data/uploads')
     output_dir: Path = Path('./outputs')
     @model_validator(mode='after')

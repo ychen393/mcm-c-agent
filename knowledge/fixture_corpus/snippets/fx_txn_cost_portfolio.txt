@@ -1,0 +1,5 @@
+FIXTURE SNIPPET — not a real paper.
+When proportional transaction costs α apply to buys and sells, frequent rebalancing
+can erase apparent alpha. A practical rule is to trade only when the expected
+improvement exceeds α-weighted turnover. Unequal α across assets (for example
+α_gold ≠ α_bitcoin) implies asymmetric friction and different optimal turnover.

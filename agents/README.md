@@ -21,11 +21,19 @@ The planner service is connected to the Streamlit Dataset Explorer through an ex
 - **Optional LLM:** `PROBLEM_ANALYST_USE_LLM` / `use_llm=True`; one structured repair; 2022 C falls back to deterministic on persistent invalid output.
 - **UI:** Research Lab Problem Analyst panel shows validated JSON; does not start joint modeling.
 
+## Phase 4 — Literature & Evidence
+
+- **Implementation:** `agents/literature_evidence.py` exposes `gather_literature_evidence()`.
+- **Contract:** `schemas/evidence.py` (`EvidenceCard`, `EvidenceGap`, `LiteratureEvidenceReport`).
+- **Default path:** offline fixture corpus under `knowledge/fixture_corpus/` (synthetic CI stubs only).
+- **Optional live retrieval:** `LITERATURE_LIVE_RETRIEVAL` / `use_live=True` — Phase 4 stub records unavailability and never invents sources.
+- **UI:** Research Lab Literature & Evidence panel reviews cards/gaps and attaches sanitized `evidence_report` + `citations`.
+- **Phase 5 stub:** `agents/research_strategy_stub.py` explicitly marks Research Strategy / H1 as not implemented.
+
 ## Planned later agents
 
-- Literature / Evidence Researcher (after source and competition-compliance gates)
-- Research Strategy / Debate Critic
-- Insight Analyst and EDA Reviewer (Phase C)
+- Research Strategy / Debate Critic (Phase 5 / H1)
+- Insight Analyst and EDA Reviewer (legacy Phase C naming)
 - Model Builder and Validator
 - Paper Writer and Reviewer
 

@@ -1,0 +1,4 @@
+FIXTURE SNIPPET — not a real paper.
+A three-asset state [cash, gold troy ounces, bitcoin] must respect calendars:
+bitcoin may trade every day; gold only on market-open days. Aligning LBMA gold
+and bitcoin price series requires explicit calendar masks before any strategy.
