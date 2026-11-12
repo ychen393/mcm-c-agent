@@ -119,6 +119,39 @@ def test_foundation_graph_clears_stale_phase4_evidence_products():
     assert [item["file_name"] for item in result["uploaded_files"]] == ["LBMA-GOLD.csv"]
 
 
+def test_foundation_graph_clears_stale_phase5_research_h1_products():
+    """Phase 5: proposal / critique / disagreement / H1 clear on foundation rebuild."""
+    from core.foundation import cleared_derived_products
+
+    cleared = cleared_derived_products()
+    assert cleared["research_proposal"] == {}
+    assert cleared["decision_report"] == {}
+    assert cleared["disagreement_log"] == []
+    assert cleared["approval_status"] == {}
+
+    state = new_research_state("p-phase5-clear", "Phase5 Clear Test")
+    state["uploaded_files"] = [
+        {
+            "dataset_id": "ds_lbma-gold_abc123abc123",
+            "file_name": "LBMA-GOLD.csv",
+            "sha256": "a" * 64,
+            "row_count": 4,
+        }
+    ]
+    state["dataset_metadata"] = {"selection_status": "ready"}
+    state["research_proposal"] = {"proposal_id": "prop_stale", "candidates": []}
+    state["decision_report"] = {"h1": {"status": "approved", "auto_approved": False}}
+    state["disagreement_log"] = [{"finding_id": "cf_stale", "statement": "stale"}]
+    state["approval_status"] = {"h1": "approved"}
+    state["experiment_logs"] = [{"run": "keep"}]
+    result = build_foundation_graph().invoke(state)
+    assert result["research_proposal"] == {}
+    assert result["decision_report"] == {}
+    assert result["disagreement_log"] == []
+    assert result["approval_status"] == {}
+    assert result["experiment_logs"] == [{"run": "keep"}]
+
+
 def test_foundation_graph_rejects_secret_bearing_uploaded_files():
     state = new_research_state("p-002", "Graph Test")
     state["uploaded_files"] = [

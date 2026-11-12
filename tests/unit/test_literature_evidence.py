@@ -148,7 +148,9 @@ def test_live_retrieval_stub_does_not_invent():
         assert card.source.source_id in corpus_source_ids()
 
 
-def test_phase5_stub_not_claiming_h1():
+def test_phase5_status_available_without_auto_approve():
     status = research_strategy_status()
-    assert status["implemented"] is False
-    assert status["h1_available"] is False
+    assert status["implemented"] is True
+    assert status["h1_available"] is True
+    assert status["h1_auto_approve"] is False
+    assert status["modeling_requires_h1"] is True

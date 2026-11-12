@@ -22,6 +22,7 @@ from app.literature_panel import render_literature_evidence_panel
 from app.persistence_panel import get_or_create_store, render_persistence_panel
 from app.problem_analyst_panel import render_problem_analyst_panel
 from app.relationship_panel import render_relationship_panel
+from app.research_h1_panel import render_research_h1_panel
 from core.config import get_settings
 from database.repositories import build_project_store
 from schemas.chart_plan import ChartPlan
@@ -429,12 +430,13 @@ def _render_chart_plan(plan: ChartPlan) -> None:
 
 with st.sidebar:
     st.subheader("Workspace")
-    st.info("Phase 4 · Literature & Evidence")
+    st.info("Phase 5 · Research Strategy → H1")
     st.caption(f"Environment: {settings.app_env}")
     st.caption(f"LLM provider: {settings.llm_provider}")
     st.caption(f"LLM model: {settings.llm_model}")
     st.caption(f"Problem Analyst LLM: {settings.problem_analyst_use_llm}")
     st.caption(f"Literature live retrieval: {settings.literature_live_retrieval}")
+    st.caption(f"Research Strategy LLM: {settings.research_strategy_use_llm}")
 
 left, right = st.columns([1.3, 1])
 with left:
@@ -471,13 +473,14 @@ with left:
 
 with right:
     st.subheader("System status")
-    st.metric("Milestone", "Phase 4")
+    st.metric("Milestone", "Phase 5")
     st.metric("Workflow nodes", "2")
     st.metric("Configured provider", settings.llm_provider)
     st.caption(
         "Foundation initializes the project. Problem Analyst emits ProblemSpecification. "
-        "Phase 3 adds problem-aware multi-dataset EDA. Phase 4 gathers corpus-backed "
-        "evidence cards. Joint strategy modeling / H1 remain out of scope."
+        "Phase 3–4 add EDA and literature evidence. Phase 5 synthesizes candidates, "
+        "critiques them, and requires explicit human H1 approval. Modeling stays blocked "
+        "until H1 is approved (Phase 6 not started)."
     )
     st.info(
         "Independent profiles and relationship previews never auto-merge. "
@@ -990,6 +993,26 @@ render_literature_evidence_panel(
     problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
     eda_plan=eda_plan_for_lit if isinstance(eda_plan_for_lit, dict) else None,
     eda_report=eda_report_for_lit,
+    recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
+    project_id=project_id,
+    project_name=project_name,
+    input_signature=form_signature,
+)
+evidence_for_h1 = None
+if isinstance(recorded_state, dict):
+    maybe_ev = recorded_state.get("evidence_report")
+    if isinstance(maybe_ev, dict) and maybe_ev:
+        evidence_for_h1 = maybe_ev
+if evidence_for_h1 is None:
+    cached_ev = st.session_state.get("literature_evidence_report")
+    if isinstance(cached_ev, dict) and cached_ev:
+        evidence_for_h1 = cached_ev
+render_research_h1_panel(
+    settings=settings,
+    problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
+    eda_plan=eda_plan_for_lit if isinstance(eda_plan_for_lit, dict) else None,
+    eda_report=eda_report_for_lit,
+    evidence_report=evidence_for_h1,
     recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
     project_id=project_id,
     project_name=project_name,

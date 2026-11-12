@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     problem_analyst_use_llm: bool = False
     # Phase 4 Literature & Evidence: live retrieval off by default for CI.
     literature_live_retrieval: bool = False
+    # Phase 5 Research Strategy / Debate: optional LLM off by default for CI.
+    research_strategy_use_llm: bool = False
     upload_dir: Path = Path('./data/uploads')
     output_dir: Path = Path('./outputs')
     @model_validator(mode='after')
