@@ -14,6 +14,7 @@
 | Item | Value |
 | --- | --- |
 | Unified baseline branch | `cursor/phase0-unified-baseline-ad8e` |
+| **Fixed baseline SHA** | `20c827ba3ffe9b638e209f54743e2cc42d4ee1ad` |
 | Product code tip (pre–Phase 0 docs) | `37dbabcfc8778ed512a4607dbf860db71c7d342f` (`cursor/slice3-safe-join-preview-a465`) |
 | Competing fork (not adopted) | Draft PR #24 / `feature/mvp-relationship-20261109` @ `4cab04db2f69e0edc622a3c5f7c32636c4e1c692` |
 | Frozen `main` (unchanged) | `c6fbb597f719ebe515bfe1720d511498505040af` |

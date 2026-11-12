@@ -140,6 +140,7 @@
   "phase0": {
     "snapshot_date": "2026-11-12",
     "unified_branch": "cursor/phase0-unified-baseline-ad8e",
+    "unified_baseline_sha": "20c827ba3ffe9b638e209f54743e2cc42d4ee1ad",
     "selected_chain": "PR#1\u2192#2\u2192#14\u2192#22\u2192#25",
     "selected_tip_sha": "37dbabcfc8778ed512a4607dbf860db71c7d342f",
     "selected_tip_pr": 25,

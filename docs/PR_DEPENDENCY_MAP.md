@@ -27,7 +27,7 @@ main @ c6fbb597f719ebe515bfe1720d511498505040af
 | 3 | [#14](https://github.com/ychen393/mcm-c-agent/pull/14) | `feature/11-dataset-bundle` | #2 | Multi-dataset registry |
 | 4 | [#22](https://github.com/ychen393/mcm-c-agent/pull/22) | `cursor/multi-upload-independent-eda-d360` | #14 | Multi-file independent EDA UI |
 | 5 | [#25](https://github.com/ychen393/mcm-c-agent/pull/25) | `cursor/slice3-safe-join-preview-a465` | #22 | Safe join preview (**selected tip**) |
-| 6 | Phase 0 Draft | `cursor/phase0-unified-baseline-ad8e` | #25 tip | Docs + research-state preservation only |
+| 6 | Phase 0 Draft | `cursor/phase0-unified-baseline-ad8e` @ `20c827ba3ffe9b638e209f54743e2cc42d4ee1ad` | #25 tip | Docs + research-state preservation only |
 
 **Phase 0 unified product tip** = checkout `cursor/phase0-unified-baseline-ad8e` (or the SHA recorded in `docs/BASELINE_AUDIT.md` after the Phase 0 commit).
 
@@ -93,3 +93,4 @@ feature/m1b-visual-eda
 | `#5` checkpoint head | `d5dd95d0e1ffb802c5f3a87c38184631f99f8c1b` |
 | `#3` governance head | `91bf8fdfcdc6588e83c28b1ba9d629a6cfa45a6c` |
 | `#24`∩`#25` merge-base | `cc9f0a448599ed5772b7bc8562f6695bade6323f` |
+| Phase 0 fixed baseline | `20c827ba3ffe9b638e209f54743e2cc42d4ee1ad` |
