@@ -15,6 +15,8 @@
 
 Persisted dataset facts: file name, SHA-256, dataset id, fields (column / qualified names), row/column counts, profile warnings. **Never** raw file bytes, sample cells, or API keys.
 
+Sanitization is **fail-closed**: forbidden keys (`api_key`, provider `*_api_key`, `raw_bytes`, frames, tokens, etc.) anywhere in nested dict/list structures raise before write. `uploaded_files` entries keep an allowlist of provenance fields only.
+
 ## Backends
 
 1. **PostgreSQL (preferred)** when `database_url` accepts a connection and schema init succeeds. Tables: `research_projects`, `research_runs`, `dataset_refs`, `artifact_refs`, `approval_decisions` (names avoid the M0 UUID `projects` scaffold).
@@ -45,10 +47,16 @@ Changing problem text, uploaded files, project ID, or model config (provider / m
 ## Save / reopen / continue / history
 
 - **Save:** automatic on initialize and whenever recorded inputs change; also available via the persistence panel.
-- **Reopen:** load a saved project’s active run into the session.
-- **Continue:** resume the active (or selected) run; stale historical runs surface an explicit warning.
+- **Reopen / Continue:** restore **provenance and run history only**. Uploaded file bytes and DataFrames are **not** stored. `data_resume=reupload_required` is always set; the UI warns that matching files must be re-uploaded (SHA-256 check via the normal uploader) before EDA. This is **not** a full research resume.
 - **History:** version list with lifecycle, dataset count, and signature.
+- **Backend change:** `data/projects/.last_store_backend` records the last backend. If `auto` switches (local ↔ postgres), `StoreInfo.backend_mismatch_message` warns that projects are not silently lost.
 
-## Out of scope (Phase 2+)
+## Path safety
 
-Problem Analyst → `ProblemSpecification`, problem-aware EDA, literature agent, and LangGraph Postgres checkpointer spike remain later phases.
+Local `run_id` values are validated (`run_<12 hex>`) on every read and write. Read-only queries do not `mkdir`. Traversal / absolute paths are rejected without mutating the project tree.
+
+## Out of scope / untested here
+
+- Live PostgreSQL server acceptance (CI uses local + SQLite-backed store exercises; real PG is preferred when reachable but not required for unit CI).
+- Full LangGraph research checkpoint / ADR-001 PostgresSaver.
+- Problem Analyst → `ProblemSpecification`, problem-aware EDA, joint modeling (Phase 2+).

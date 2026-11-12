@@ -18,7 +18,14 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from core.ids import new_approval_id, new_artifact_id, new_run_id, utc_now_iso, validate_project_id
+from core.ids import (
+    new_approval_id,
+    new_artifact_id,
+    new_run_id,
+    utc_now_iso,
+    validate_project_id,
+    validate_run_id,
+)
 from core.lifecycle import (
     LIFECYCLE_DATASETS_RECORDED,
     LIFECYCLE_PROJECT_INITIALIZED,
@@ -33,19 +40,21 @@ from database.models import (
     ResearchRunRow,
 )
 from schemas.persistence import (
+    REUPLOAD_REQUIRED_MESSAGE,
     ApprovalDecisionRecord,
     ArtifactRefRecord,
     DatasetRefRecord,
     ProjectHistoryEntry,
     ProjectRecord,
     ResearchRunRecord,
-    ResearchStateSnapshot,
     StoreInfo,
+    sanitize_state_for_persistence,
 )
 
 logger = logging.getLogger(__name__)
 
 PROJECTS_DIRNAME = "projects"
+BACKEND_MARKER = ".last_store_backend"
 
 
 def _iso(value: Any) -> str:
@@ -88,8 +97,49 @@ def _datasets_from_state(state: dict[str, Any], *, project_id: str, run_id: str)
 
 
 def _sanitize_state(state: dict[str, Any]) -> dict[str, Any]:
-    snapshot = ResearchStateSnapshot.model_validate(state)
-    return snapshot.model_dump(mode="python")
+    """Fail closed: nested secrets / bytes raise; never reach disk or DB."""
+    return sanitize_state_for_persistence(state)
+
+
+def _backend_marker_path(projects_root: Path) -> Path:
+    return Path(projects_root) / BACKEND_MARKER
+
+
+def read_last_backend(projects_root: Path) -> str | None:
+    path = _backend_marker_path(projects_root)
+    if not path.exists():
+        return None
+    value = path.read_text(encoding="utf-8").strip().lower()
+    return value or None
+
+
+def write_last_backend(projects_root: Path, backend: str) -> None:
+    root = Path(projects_root)
+    root.mkdir(parents=True, exist_ok=True)
+    _backend_marker_path(root).write_text(backend + "\n", encoding="utf-8")
+
+
+def backend_mismatch_message(previous: str | None, current: str, *, local_root: Path) -> str | None:
+    if not previous or previous == current:
+        return None
+    if previous == "local" and current == "postgres":
+        return (
+            f"Project store backend changed from local → postgres. "
+            f"Projects previously saved under `{local_root}` are not auto-imported. "
+            "They are not lost on disk — switch PROJECT_STORE_BACKEND=local to reopen them, "
+            "or re-save into Postgres after review."
+        )
+    if previous == "postgres" and current == "local":
+        return (
+            "Project store backend changed from postgres → local. "
+            "Projects that lived only in PostgreSQL will not appear in this local root. "
+            "Restore DATABASE_URL / PROJECT_STORE_BACKEND=postgres to reopen them; "
+            "they are not silently deleted."
+        )
+    return (
+        f"Project store backend changed from {previous} → {current}. "
+        "Confirm where projects were last saved before assuming they are missing."
+    )
 
 
 class ProjectStore(ABC):
@@ -156,18 +206,32 @@ class ProjectStore(ABC):
 class LocalProjectStore(ProjectStore):
     """Filesystem layout under ``root / project_id / runs / run_id``."""
 
-    def __init__(self, root: Path):
+    def __init__(
+        self,
+        root: Path,
+        *,
+        backend_changed: bool = False,
+        previous_backend: str | None = None,
+        mismatch_message: str | None = None,
+    ):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        self._backend_changed = backend_changed
+        self._previous_backend = previous_backend
+        self._mismatch_message = mismatch_message
 
     def info(self) -> StoreInfo:
         return StoreInfo(
             backend="local",
             detail=(
                 "PostgreSQL unavailable or unreachable; using local project store. "
-                "Organize files by project_id/run_id under this root."
+                "Organize files by project_id/run_id under this root. "
+                + REUPLOAD_REQUIRED_MESSAGE
             ),
             root=str(self.root.resolve()),
+            backend_changed=self._backend_changed,
+            previous_backend=self._previous_backend,
+            backend_mismatch_message=self._mismatch_message,
         )
 
     def _project_dir(self, project_id: str) -> Path:
@@ -176,14 +240,24 @@ class LocalProjectStore(ProjectStore):
     def _project_path(self, project_id: str) -> Path:
         return self._project_dir(project_id) / "project.json"
 
-    def _runs_dir(self, project_id: str) -> Path:
+    def _runs_dir(self, project_id: str, *, create: bool = True) -> Path:
         path = self._project_dir(project_id) / "runs"
-        path.mkdir(parents=True, exist_ok=True)
+        if create:
+            path.mkdir(parents=True, exist_ok=True)
         return path
 
-    def _run_dir(self, project_id: str, run_id: str) -> Path:
-        path = self._runs_dir(project_id) / run_id
-        path.mkdir(parents=True, exist_ok=True)
+    def _run_dir(self, project_id: str, run_id: str, *, create: bool = True) -> Path:
+        """Resolve a run directory. Always validates ``run_id``; mkdir only when create=True."""
+        safe_run = validate_run_id(run_id)
+        runs_dir = self._runs_dir(project_id, create=create)
+        path = (runs_dir / safe_run).resolve()
+        runs_root = runs_dir.resolve()
+        if path != runs_root and runs_root not in path.parents:
+            raise ValueError("run_id resolves outside the project runs directory.")
+        if path.name != safe_run:
+            raise ValueError("run_id path segment mismatch.")
+        if create:
+            path.mkdir(parents=True, exist_ok=True)
         return path
 
     def _read_json(self, path: Path) -> dict[str, Any] | None:
@@ -288,9 +362,10 @@ class LocalProjectStore(ProjectStore):
             and existing.active_run_id
             and not force_new_run
         )
+        run_data: dict[str, Any] | None = None
         if same_signature and existing and existing.active_run_id:
             run_id = existing.active_run_id
-            run_data = self._read_json(self._run_dir(project_id, run_id) / "run.json")
+            run_data = self._read_json(self._run_dir(project_id, run_id, create=False) / "run.json")
             version = int(run_data["version"]) if run_data else 1
             parent_run_id = run_data.get("parent_run_id") if run_data else None
             mark_previous_stale = False
@@ -334,23 +409,29 @@ class LocalProjectStore(ProjectStore):
         return project, run, sanitized
 
     def load_active_state(self, project_id: str) -> dict[str, Any] | None:
-        project = self.get_project(project_id)
-        if not project or not project.active_run_id:
-            return None
-        return self.load_run_state(project_id, project.active_run_id)
+        """Reopen the active run. Provenance only — frames require re-upload."""
+        return self.continue_run(project_id)
 
     def load_run_state(self, project_id: str, run_id: str) -> dict[str, Any] | None:
-        data = self._read_json(self._run_dir(project_id, run_id) / "state.json")
+        try:
+            path = self._run_dir(project_id, run_id, create=False) / "state.json"
+        except ValueError:
+            return None
+        data = self._read_json(path)
         return _sanitize_state(data) if data else None
 
     def history(self, project_id: str) -> list[ProjectHistoryEntry]:
         project_id = validate_project_id(project_id)
-        runs_dir = self._project_dir(project_id) / "runs"
+        runs_dir = self._runs_dir(project_id, create=False)
         if not runs_dir.exists():
             return []
         entries: list[ProjectHistoryEntry] = []
         for child in runs_dir.iterdir():
             if not child.is_dir():
+                continue
+            try:
+                validate_run_id(child.name)
+            except ValueError:
                 continue
             run_data = self._read_json(child / "run.json")
             if not run_data:
@@ -378,15 +459,24 @@ class LocalProjectStore(ProjectStore):
         target = run_id or project.active_run_id
         if not target:
             return None
-        run_data = self._read_json(self._run_dir(project_id, target) / "run.json")
+        try:
+            run_path = self._run_dir(project_id, target, create=False) / "run.json"
+        except ValueError:
+            return None
+        run_data = self._read_json(run_path)
         if not run_data:
             return None
         state = self.load_run_state(project_id, target)
         if state is None:
             return None
+        state = dict(state)
+        state["data_resume"] = "reupload_required"
+        state.setdefault("errors", [])
+        if not any(err.get("code") == "reupload_required" for err in state["errors"]):
+            state["errors"] = list(state["errors"]) + [
+                {"code": "reupload_required", "message": REUPLOAD_REQUIRED_MESSAGE}
+            ]
         if run_data.get("status") == "stale" and target != project.active_run_id:
-            state = dict(state)
-            state.setdefault("errors", [])
             state["errors"] = list(state["errors"]) + [
                 {
                     "code": "stale_run",
@@ -399,7 +489,7 @@ class LocalProjectStore(ProjectStore):
         return state
 
     def add_artifact(self, artifact: ArtifactRefRecord) -> ArtifactRefRecord:
-        path = self._run_dir(artifact.project_id, artifact.run_id) / "artifacts.json"
+        path = self._run_dir(artifact.project_id, artifact.run_id, create=True) / "artifacts.json"
         items = self._read_json(path) or []
         payload = artifact.model_dump(mode="python")
         items = [item for item in items if item.get("artifact_id") != artifact.artifact_id]
@@ -414,11 +504,15 @@ class LocalProjectStore(ProjectStore):
         target = run_id or project.active_run_id
         if not target:
             return []
-        items = self._read_json(self._run_dir(project_id, target) / "artifacts.json") or []
+        try:
+            path = self._run_dir(project_id, target, create=False) / "artifacts.json"
+        except ValueError:
+            return []
+        items = self._read_json(path) or []
         return [ArtifactRefRecord.model_validate(item) for item in items]
 
     def add_approval(self, decision: ApprovalDecisionRecord) -> ApprovalDecisionRecord:
-        path = self._run_dir(decision.project_id, decision.run_id) / "approvals.json"
+        path = self._run_dir(decision.project_id, decision.run_id, create=True) / "approvals.json"
         items = self._read_json(path) or []
         payload = decision.model_dump(mode="python")
         items = [item for item in items if item.get("approval_id") != decision.approval_id]
@@ -427,8 +521,13 @@ class LocalProjectStore(ProjectStore):
         return decision
 
     def invalidate_approvals(self, project_id: str, run_id: str, *, reason: str) -> int:
-        path = self._run_dir(project_id, run_id) / "approvals.json"
+        try:
+            path = self._run_dir(project_id, run_id, create=False) / "approvals.json"
+        except ValueError:
+            return 0
         items = self._read_json(path) or []
+        if not items:
+            return 0
         count = 0
         for item in items:
             if item.get("status") in {"approved", "pending"}:
@@ -443,16 +542,35 @@ class LocalProjectStore(ProjectStore):
 class PostgresProjectStore(ProjectStore):
     """SQLAlchemy-backed project store."""
 
-    def __init__(self, engine: Engine):
+    def __init__(
+        self,
+        engine: Engine,
+        *,
+        backend_changed: bool = False,
+        previous_backend: str | None = None,
+        mismatch_message: str | None = None,
+        local_root_hint: Path | None = None,
+    ):
         self.engine = engine
         Base.metadata.create_all(engine)
         self._session_factory = sessionmaker(bind=engine, expire_on_commit=False)
+        self._backend_changed = backend_changed
+        self._previous_backend = previous_backend
+        self._mismatch_message = mismatch_message
+        self._local_root_hint = local_root_hint
 
     def info(self) -> StoreInfo:
+        root = str(self._local_root_hint.resolve()) if self._local_root_hint else None
         return StoreInfo(
             backend="postgres",
-            detail="Projects, runs, dataset refs, artifacts, and approvals stored in PostgreSQL.",
-            root=None,
+            detail=(
+                "Projects, runs, dataset refs, artifacts, and approvals stored in PostgreSQL. "
+                + REUPLOAD_REQUIRED_MESSAGE
+            ),
+            root=root,
+            backend_changed=self._backend_changed,
+            previous_backend=self._previous_backend,
+            backend_mismatch_message=self._mismatch_message,
         )
 
     def _session(self) -> Session:
@@ -630,14 +748,16 @@ class PostgresProjectStore(ProjectStore):
             return project, run, sanitized
 
     def load_active_state(self, project_id: str) -> dict[str, Any] | None:
-        project = self.get_project(project_id)
-        if not project or not project.active_run_id:
-            return None
-        return self.load_run_state(project_id, project.active_run_id)
+        """Reopen the active run. Provenance only — frames require re-upload."""
+        return self.continue_run(project_id)
 
     def load_run_state(self, project_id: str, run_id: str) -> dict[str, Any] | None:
+        try:
+            safe_run = validate_run_id(run_id)
+        except ValueError:
+            return None
         with self._session() as session:
-            row = session.get(ResearchRunRow, run_id)
+            row = session.get(ResearchRunRow, safe_run)
             if row is None or row.project_id != validate_project_id(project_id):
                 return None
             return _sanitize_state(dict(row.state_json or {}))
@@ -675,13 +795,22 @@ class PostgresProjectStore(ProjectStore):
         target = run_id or project.active_run_id
         if not target:
             return None
+        try:
+            safe_run = validate_run_id(target)
+        except ValueError:
+            return None
         with self._session() as session:
-            row = session.get(ResearchRunRow, target)
+            row = session.get(ResearchRunRow, safe_run)
             if row is None or row.project_id != validate_project_id(project_id):
                 return None
             state = _sanitize_state(dict(row.state_json or {}))
-            if row.status == "stale" and target != project.active_run_id:
-                state.setdefault("errors", [])
+            state["data_resume"] = "reupload_required"
+            state.setdefault("errors", [])
+            if not any(err.get("code") == "reupload_required" for err in state["errors"]):
+                state["errors"] = list(state["errors"]) + [
+                    {"code": "reupload_required", "message": REUPLOAD_REQUIRED_MESSAGE}
+                ]
+            if row.status == "stale" and safe_run != project.active_run_id:
                 state["errors"] = list(state["errors"]) + [
                     {
                         "code": "stale_run",
@@ -694,6 +823,7 @@ class PostgresProjectStore(ProjectStore):
             return state
 
     def add_artifact(self, artifact: ArtifactRefRecord) -> ArtifactRefRecord:
+        validate_run_id(artifact.run_id)
         with self._session() as session:
             row = session.get(ArtifactRefRow, artifact.artifact_id)
             if row is None:
@@ -716,11 +846,15 @@ class PostgresProjectStore(ProjectStore):
         target = run_id or project.active_run_id
         if not target:
             return []
+        try:
+            safe_run = validate_run_id(target)
+        except ValueError:
+            return []
         with self._session() as session:
             rows = session.scalars(
                 select(ArtifactRefRow).where(
                     ArtifactRefRow.project_id == validate_project_id(project_id),
-                    ArtifactRefRow.run_id == target,
+                    ArtifactRefRow.run_id == safe_run,
                 )
             ).all()
             return [
@@ -739,6 +873,7 @@ class PostgresProjectStore(ProjectStore):
             ]
 
     def add_approval(self, decision: ApprovalDecisionRecord) -> ApprovalDecisionRecord:
+        validate_run_id(decision.run_id)
         with self._session() as session:
             row = session.get(ApprovalDecisionRow, decision.approval_id)
             if row is None:
@@ -755,11 +890,15 @@ class PostgresProjectStore(ProjectStore):
             return decision
 
     def invalidate_approvals(self, project_id: str, run_id: str, *, reason: str) -> int:
+        try:
+            safe_run = validate_run_id(run_id)
+        except ValueError:
+            return 0
         with self._session() as session:
             rows = session.scalars(
                 select(ApprovalDecisionRow).where(
                     ApprovalDecisionRow.project_id == validate_project_id(project_id),
-                    ApprovalDecisionRow.run_id == run_id,
+                    ApprovalDecisionRow.run_id == safe_run,
                     ApprovalDecisionRow.status.in_(("approved", "pending")),
                 )
             ).all()
@@ -797,28 +936,46 @@ def open_project_store(
 
     ``force_backend`` may be ``local`` or ``postgres``. Schema-init failures
     always fall back to local so Streamlit still boots without a migrated DB.
+    A backend change since the last process is recorded on ``StoreInfo`` so the
+    UI can warn that projects are not silently lost.
     """
     root = Path(projects_root)
     root.mkdir(parents=True, exist_ok=True)
+    previous = read_last_backend(root)
 
-    def _local() -> LocalProjectStore:
-        store = LocalProjectStore(root)
-        logger.info("Project store backend: local (%s)", root.resolve())
+    def _finish(store: ProjectStore, backend: str) -> ProjectStore:
+        write_last_backend(root, backend)
+        logger.info("Project store backend: %s", backend)
         return store
 
+    def _local(*, changed: bool = False, message: str | None = None) -> LocalProjectStore:
+        return LocalProjectStore(
+            root,
+            backend_changed=changed,
+            previous_backend=previous,
+            mismatch_message=message,
+        )
+
     backend = (force_backend or ("postgres" if prefer_postgres else "local")).lower()
-    if backend == "local":
-        return _local()
-    if backend not in {"postgres", "auto"} and not prefer_postgres:
-        return _local()
+    if backend == "local" or (backend not in {"postgres", "auto"} and not prefer_postgres):
+        message = backend_mismatch_message(previous, "local", local_root=root.resolve())
+        return _finish(_local(changed=bool(message), message=message), "local")
 
     engine = probe_postgres(database_url)
     if engine is None:
         if force_backend == "postgres":
             raise RuntimeError("PostgreSQL was required but is unreachable.")
-        return _local()
+        message = backend_mismatch_message(previous, "local", local_root=root.resolve())
+        return _finish(_local(changed=bool(message), message=message), "local")
     try:
-        store = PostgresProjectStore(engine)
+        message = backend_mismatch_message(previous, "postgres", local_root=root.resolve())
+        store: ProjectStore = PostgresProjectStore(
+            engine,
+            backend_changed=bool(message),
+            previous_backend=previous,
+            mismatch_message=message,
+            local_root_hint=root,
+        )
     except Exception as exc:  # noqa: BLE001 — soft fallback for schema clashes
         logger.warning(
             "PostgreSQL project schema unavailable (%s); using local project store.",
@@ -826,9 +983,9 @@ def open_project_store(
         )
         if force_backend == "postgres":
             raise
-        return _local()
-    logger.info("Project store backend: postgres")
-    return store
+        message = backend_mismatch_message(previous, "local", local_root=root.resolve())
+        return _finish(_local(changed=bool(message), message=message), "local")
+    return _finish(store, "postgres")
 
 
 def default_projects_root(upload_dir: Path | None = None, output_dir: Path | None = None) -> Path:

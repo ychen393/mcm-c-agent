@@ -255,19 +255,14 @@ def test_persisted_state_rejects_api_keys(tmp_path):
     state, signature, _ = _state_for([("LBMA-GOLD.csv", GOLD)])
     dirty = dict(state)
     dirty["llm_api_key"] = "sk-secret"
-    dirty["dataset_metadata"] = dict(dirty.get("dataset_metadata") or {})
-    project, run, saved = store.save_project_state(
-        project_id="mcm-safe",
-        project_name="Safe Persist",
-        state=dirty,
-        input_signature=signature,
-    )
-    dump = json.dumps(saved)
-    assert "sk-secret" not in dump
-    assert "llm_api_key" not in saved
-    reloaded = store.load_active_state("mcm-safe")
-    assert reloaded is not None
-    assert "llm_api_key" not in reloaded
+    with pytest.raises(ValueError, match="forbidden key"):
+        store.save_project_state(
+            project_id="mcm-safe",
+            project_name="Safe Persist",
+            state=dirty,
+            input_signature=signature,
+        )
+    assert store.get_project("mcm-safe") is None
 
 
 @pytest.mark.parametrize("backend", ["local"])

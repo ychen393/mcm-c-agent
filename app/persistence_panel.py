@@ -8,6 +8,7 @@ import streamlit as st
 
 from core.lifecycle import RECOMPUTE_PROMPT, distinguish_status
 from core.project_store import ProjectStore
+from schemas.persistence import REUPLOAD_REQUIRED_MESSAGE
 
 STORE_KEY = "project_store"
 STALE_NOTICE_KEY = "persistence_stale_notice"
@@ -47,6 +48,7 @@ def persist_foundation_state(
         st.session_state[STALE_NOTICE_KEY] = RECOMPUTE_PROMPT
     saved = dict(saved)
     saved["run_id"] = run.run_id
+    saved["data_resume"] = "reupload_required"
     return saved
 
 
@@ -65,11 +67,19 @@ def render_persistence_panel(
         f"Backend: **{info.backend}** — {info.detail}"
         + (f" Root: `{info.root}`" if info.root else "")
     )
+    if info.backend_changed and info.backend_mismatch_message:
+        st.warning(info.backend_mismatch_message)
+    st.info(REUPLOAD_REQUIRED_MESSAGE)
 
     status = distinguish_status(recorded_state)
     st.markdown(f"**Project init:** {status['project_init']}")
     st.markdown(f"**Data analysis:** {status['data_analysis']}")
     st.markdown(f"**Research task:** {status['research_task']}")
+    if recorded_state is not None:
+        st.markdown(
+            f"**Data resume:** `{recorded_state.get('data_resume', 'reupload_required')}` "
+            "(provenance only — not a full EDA resume)"
+        )
 
     if st.session_state.pop(STALE_NOTICE_KEY, None):
         st.warning(RECOMPUTE_PROMPT)
@@ -104,7 +114,11 @@ def render_persistence_panel(
                 st.session_state["last_run"] = loaded
                 st.session_state["foundation_initialized"] = True
                 st.session_state.pop("foundation_input_signature", None)
-                st.success(f"Reopened run {loaded.get('run_id')}.")
+                st.warning(REUPLOAD_REQUIRED_MESSAGE)
+                st.success(
+                    f"Reopened provenance for run {loaded.get('run_id')}. "
+                    "Re-upload matching files before EDA."
+                )
                 st.rerun()
     with col_c:
         if st.button("Continue active run", disabled=not project_id.strip()):
@@ -115,10 +129,14 @@ def render_persistence_panel(
                 st.session_state["last_run"] = loaded
                 st.session_state["foundation_initialized"] = True
                 st.session_state.pop("foundation_input_signature", None)
+                st.warning(REUPLOAD_REQUIRED_MESSAGE)
                 if any(err.get("code") == "stale_run" for err in loaded.get("errors") or []):
                     st.warning(RECOMPUTE_PROMPT)
                 else:
-                    st.success(f"Continuing run {loaded.get('run_id')}.")
+                    st.success(
+                        f"Continuing provenance for run {loaded.get('run_id')}. "
+                        "Re-upload matching files before EDA."
+                    )
                 st.rerun()
 
     history = store.history(project_id) if project_id.strip() else []
@@ -150,6 +168,7 @@ def render_persistence_panel(
             else:
                 st.session_state["last_run"] = loaded
                 st.session_state["foundation_initialized"] = True
+                st.warning(REUPLOAD_REQUIRED_MESSAGE)
                 if any(err.get("code") == "stale_run" for err in loaded.get("errors") or []):
                     st.warning(
                         "Loaded a stale historical run. Approvals from that version must not be reused."
