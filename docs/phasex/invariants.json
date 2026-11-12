@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "phase": "X",
+  "title": "Cursor development agent closed loop",
+  "invariants": [
+    {
+      "id": "PX-I1",
+      "title": "No merge-to-main automation",
+      "doc_marker": "Invariant PX-I1",
+      "checks": [
+        "ci_workflow_has_no_merge_main",
+        "docs_state_no_merge_without_owner"
+      ]
+    },
+    {
+      "id": "PX-I2",
+      "title": "H1/H2/H3 not auto-approved in product paths",
+      "doc_marker": "Invariant PX-I2",
+      "checks": [
+        "product_schemas_reject_auto_approved_h_gates",
+        "product_builders_force_auto_approved_false"
+      ]
+    },
+    {
+      "id": "PX-I3",
+      "title": "Evaluator gate file exists",
+      "doc_marker": "Invariant PX-I3",
+      "checks": [
+        "evaluator_gate_doc_exists",
+        "phase_x_doc_references_evaluator_gate"
+      ]
+    },
+    {
+      "id": "PX-I4",
+      "title": "Research Agents ≠ Cursor-dev Agents",
+      "doc_marker": "Invariant PX-I4",
+      "checks": [
+        "phase_x_doc_states_lane_separation",
+        "baseline_audit_states_lane_separation"
+      ]
+    },
+    {
+      "id": "PX-I5",
+      "title": "No live Cursor Cloud credentials in product runtime",
+      "doc_marker": "Invariant PX-I5",
+      "checks": [
+        "product_runtime_has_no_cursor_cloud_secrets",
+        "product_runtime_does_not_spawn_cloud_agents"
+      ]
+    },
+    {
+      "id": "PX-I6",
+      "title": "Owner gates for merge/deploy/H1-H3",
+      "doc_marker": "Invariant PX-I6",
+      "checks": [
+        "phase_x_doc_states_owner_gates"
+      ]
+    }
+  ]
+}

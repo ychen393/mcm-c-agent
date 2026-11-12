@@ -71,6 +71,8 @@ feature/m1b-visual-eda
 
 `AGENTS.md` / `docs/AUTONOMY_POLICY.md` / `docs/PROJECT_STATUS.md` remain on governance/cowork branches until a **separate** Cursor-dev integration milestone (Roadmap Phase X), not Phase 0–1 product work.
 
+Phase X durable loop docs (still Draft-only; no merge to `main`): see `docs/PHASEX_CURSOR_DEV_LOOP.md` and `docs/phasex/` (invariants + evaluator-gate mirror). Research-agent product runtime stays untouched by that lane.
+
 ## E. Recommended future merge policy (owner-gated)
 
 1. Keep `main` frozen until owner accepts a stacked product promotion plan.
