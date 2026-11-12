@@ -53,7 +53,7 @@ def workspace_phases(dataset_count: int) -> dict[str, str]:
 
 
 def cleared_derived_products() -> dict[str, Any]:
-    """Drop reports, approvals, plans, and Phase 4/5/6/7 attach products.
+    """Drop reports, approvals, plans, and Phase 4/5/6/7/8 attach products.
 
     Experiment / AI usage logs stay. Literature ``citations`` are cleared with
     ``evidence_report`` because they are Phase 4 attach products, not durable logs.
@@ -62,6 +62,8 @@ def cleared_derived_products() -> dict[str, Any]:
     Phase 6 ``model_artifacts`` clear with other derived products; ``experiment_logs``
     remain as durable run logs (Phase 1 semantics).
     Phase 7 ``validation_report`` clears with approvals so a stale H2 cannot survive.
+    Phase 8 ``paper_outline`` / ``latex_source`` / ``review_report`` clear with
+    approvals so a stale H3 cannot survive.
     """
     return {
         "problem_specification": {},

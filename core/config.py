@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     modeling_allow_sandboxed_python: bool = False
     # Phase 7 Validation / Sensitivity: optional LLM critique off by default for CI.
     validation_use_llm: bool = False
+    # Phase 8 Paper Planner / LaTeX: optional LLM outline off by default for CI.
+    paper_use_llm: bool = False
     upload_dir: Path = Path('./data/uploads')
     output_dir: Path = Path('./outputs')
     @model_validator(mode='after')

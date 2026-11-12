@@ -24,6 +24,7 @@ from app.persistence_panel import get_or_create_store, render_persistence_panel
 from app.problem_analyst_panel import render_problem_analyst_panel
 from app.relationship_panel import render_relationship_panel
 from app.research_h1_panel import render_research_h1_panel
+from app.paper_h3_panel import render_paper_h3_panel
 from app.validation_h2_panel import render_validation_h2_panel
 from core.config import get_settings
 from database.repositories import build_project_store
@@ -1029,6 +1030,14 @@ render_modeling_experiment_panel(
     input_signature=form_signature,
 )
 render_validation_h2_panel(
+    settings=settings,
+    problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
+    recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
+    project_id=project_id,
+    project_name=project_name,
+    input_signature=form_signature,
+)
+render_paper_h3_panel(
     settings=settings,
     problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
     recorded_state=recorded_state if isinstance(recorded_state, dict) else None,

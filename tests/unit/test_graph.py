@@ -218,6 +218,46 @@ def test_foundation_graph_clears_phase7_validation_and_h2():
     assert validation_allowed(result) is False
 
 
+def test_foundation_graph_clears_phase8_paper_and_h3():
+    """Phase 8: paper_outline / latex / review + H3 clear on foundation rebuild."""
+    from core.foundation import cleared_derived_products
+
+    cleared = cleared_derived_products()
+    assert cleared["paper_outline"] == {}
+    assert cleared["latex_source"] == ""
+    assert cleared["review_report"] == {}
+    assert cleared["approval_status"] == {}
+
+    state = new_research_state("p-phase8-clear", "Phase8 Clear Test")
+    state["uploaded_files"] = [
+        {
+            "dataset_id": "ds_lbma-gold_abc123abc123",
+            "file_name": "LBMA-GOLD.csv",
+            "sha256": "a" * 64,
+            "row_count": 4,
+        }
+    ]
+    state["dataset_metadata"] = {"selection_status": "ready"}
+    state["paper_outline"] = {"outline_id": "pout_stale", "package_id": "ppkg_stale"}
+    state["latex_source"] = "\\begin{document}stale\\end{document}"
+    state["review_report"] = {"review_id": "prev_stale"}
+    state["decision_report"] = {"h3": {"status": "approved", "auto_approved": False}}
+    state["approval_status"] = {"h1": "approved", "h2": "approved", "h3": "approved"}
+    state["experiment_logs"] = [{"run_id": "erun_keep", "status": "completed"}]
+    result = build_foundation_graph().invoke(state)
+    assert result["paper_outline"] == {}
+    assert result["latex_source"] == ""
+    assert result["review_report"] == {}
+    assert result["decision_report"] == {}
+    assert result["approval_status"] == {}
+    assert result["experiment_logs"] == [{"run_id": "erun_keep", "status": "completed"}]
+    from paper.gate import e2e_allowed
+    from validation.gate import paper_allowed
+
+    assert paper_allowed(result) is False
+    assert e2e_allowed(result) is False
+
+
 def test_foundation_graph_rejects_secret_bearing_uploaded_files():
     state = new_research_state("p-002", "Graph Test")
     state["uploaded_files"] = [
