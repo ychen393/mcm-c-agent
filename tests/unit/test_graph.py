@@ -49,7 +49,7 @@ def test_foundation_graph_keeps_provenance_and_clears_stale_products():
     state["approval_status"] = {"h1": "approved"}
     state["research_proposal"] = {"strategy": "trade gold"}
     state["decision_report"] = {"action": "buy"}
-    state["citations"] = [{"title": "leave this log alone"}]
+    state["citations"] = [{"title": "stale literature citation"}]
     state["experiment_logs"] = [{"run": "leave this log alone"}]
     result = build_foundation_graph().invoke(state)
     assert result["current_stage"] == "datasets_loaded"
@@ -67,12 +67,56 @@ def test_foundation_graph_keeps_provenance_and_clears_stale_products():
     assert result["approval_status"] == {}
     assert result["research_proposal"] == {}
     assert result["decision_report"] == {}
-    assert result["citations"] == [{"title": "leave this log alone"}]
+    assert result["citations"] == []
     assert result["experiment_logs"] == [{"run": "leave this log alone"}]
     assert result["workspace_phases"]["independent_eda"] == "ready"
     assert result["workspace_phases"]["relationship_preview"] == "ready"
     assert result["workspace_phases"]["joint_analysis"] == NOT_IMPLEMENTED
     assert result["workspace_phases"]["strategy_modeling"] == NOT_IMPLEMENTED
+
+
+def test_foundation_graph_clears_stale_phase4_evidence_products():
+    """P1: evidence_report + literature citations clear with other derived products."""
+    from core.foundation import cleared_derived_products
+
+    cleared = cleared_derived_products()
+    assert cleared["evidence_report"] == {}
+    assert cleared["citations"] == []
+    assert cleared["problem_specification"] == {}
+    assert cleared["eda_report"] == {}
+
+    state = new_research_state("p-phase4-clear", "Phase4 Clear Test")
+    state["uploaded_files"] = [
+        {
+            "dataset_id": "ds_lbma-gold_abc123abc123",
+            "file_name": "LBMA-GOLD.csv",
+            "sha256": "a" * 64,
+            "row_count": 4,
+        }
+    ]
+    state["dataset_metadata"] = {"selection_status": "ready"}
+    state["problem_specification"] = {"problem_id": "stale_2022_mcm_c"}
+    state["eda_report"] = {"stale": True, "mode": "independent_multi"}
+    state["evidence_report"] = {
+        "problem_id": "stale_lit",
+        "cards": [{"card_id": "ec_stale"}],
+        "invented_sources": False,
+    }
+    state["citations"] = [
+        {
+            "citation_key": "FixtureStale",
+            "source_id": "fx_txn_cost_portfolio",
+            "verification_status": "verified_fixture",
+        }
+    ]
+    state["experiment_logs"] = [{"run": "keep"}]
+    result = build_foundation_graph().invoke(state)
+    assert result["problem_specification"] == {}
+    assert result["eda_report"] == {}
+    assert result["evidence_report"] == {}
+    assert result["citations"] == []
+    assert result["experiment_logs"] == [{"run": "keep"}]
+    assert [item["file_name"] for item in result["uploaded_files"]] == ["LBMA-GOLD.csv"]
 
 
 def test_foundation_graph_rejects_secret_bearing_uploaded_files():
