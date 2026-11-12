@@ -163,15 +163,11 @@ def sync_foundation_state(
                 input_signature=signature,
             )
         st.session_state["last_run"] = result
-        # Derived products (including ProblemSpecification) were cleared on rebuild;
-        # drop the orphan UI cache so it cannot outrank the new recorded state.
-        from app.problem_analyst_panel import clear_problem_specification_cache
+        # Derived products were cleared on rebuild; drop orphan UI caches so they
+        # cannot outrank the new recorded state (Phase 2 + Phase 3 session keys).
+        from app.session_caches import clear_derived_session_caches
 
-        clear_problem_specification_cache()
-        st.session_state.pop("problem_aware_eda_plan", None)
-        st.session_state.pop("integration_preview_confirmation", None)
-        st.session_state.pop("integration_preview_result", None)
-        st.session_state.pop("integration_preview_selection", None)
+        clear_derived_session_caches()
     except (TypeError, ValueError) as exc:
         st.error(str(exc))
         return False

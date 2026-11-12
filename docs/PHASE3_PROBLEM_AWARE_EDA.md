@@ -16,6 +16,7 @@ Problem-aware exploratory analysis over 1–N CSV/XLSX uploads, conditioned on a
 5. **ProblemSpecification-conditioned plan** — `tools/problem_aware_eda.build_problem_aware_eda_plan` matches uploads to `supplied_datasets`, surfaces constraints such as `c_past_data_only` / `c_only_supplied_data`, and suggests relationship stances from evidence only. Deterministic; **no live LLM required**.
 6. **Sanitized persistence** — Compact `eda_report` summaries + `artifact_refs` via `tools/eda_persistence.py`, respecting Phase 1 `sanitize_state_for_persistence` / forbidden keys. Lifecycle may advance to `data_analysis_done` after approved/recorded independent EDA. Reopen remains `reupload_required`.
 7. **CI-safe defaults** — Planner and intake are offline; `PROBLEM_ANALYST_USE_LLM` stays off for green CI.
+8. **Session cache clears** — `app/session_caches.clear_derived_session_caches` drops ProblemSpecification + Phase 3 plan/preview keys on foundation rebuild, reopen, continue, and **history load** (history does not pop the foundation signature).
 
 ## Contracts
 

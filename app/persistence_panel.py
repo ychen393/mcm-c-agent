@@ -6,7 +6,7 @@ from typing import Any
 
 import streamlit as st
 
-from app.problem_analyst_panel import clear_problem_specification_cache
+from app.session_caches import clear_derived_session_caches
 from core.lifecycle import RECOMPUTE_PROMPT, distinguish_status
 from core.project_store import ProjectStore
 from schemas.persistence import REUPLOAD_REQUIRED_MESSAGE
@@ -115,7 +115,7 @@ def render_persistence_panel(
                 st.session_state["last_run"] = loaded
                 st.session_state["foundation_initialized"] = True
                 st.session_state.pop("foundation_input_signature", None)
-                clear_problem_specification_cache()
+                clear_derived_session_caches()
                 st.warning(REUPLOAD_REQUIRED_MESSAGE)
                 st.success(
                     f"Reopened provenance for run {loaded.get('run_id')}. "
@@ -131,7 +131,7 @@ def render_persistence_panel(
                 st.session_state["last_run"] = loaded
                 st.session_state["foundation_initialized"] = True
                 st.session_state.pop("foundation_input_signature", None)
-                clear_problem_specification_cache()
+                clear_derived_session_caches()
                 st.warning(REUPLOAD_REQUIRED_MESSAGE)
                 if any(err.get("code") == "stale_run" for err in loaded.get("errors") or []):
                     st.warning(RECOMPUTE_PROMPT)
@@ -171,7 +171,10 @@ def render_persistence_panel(
             else:
                 st.session_state["last_run"] = loaded
                 st.session_state["foundation_initialized"] = True
-                clear_problem_specification_cache()
+                # History load does not pop foundation_input_signature — must still
+                # clear Phase 3 EDA session caches so Record cannot persist stale
+                # confirmation/plan into the loaded run (Phase 3 P1).
+                clear_derived_session_caches()
                 st.warning(REUPLOAD_REQUIRED_MESSAGE)
                 if any(err.get("code") == "stale_run" for err in loaded.get("errors") or []):
                     st.warning(
