@@ -1,7 +1,7 @@
 """Multi-dataset relationship table and an explicit join preview.
 
 The panel never starts a preview on its own and never stores the preview as a
-dataset, chart plan, or file.
+merged dataset. Phase 3 may record a compact confirmation note (still joined=False).
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from collections.abc import Mapping
 import streamlit as st
 
 from tools.dataset_bundle import DatasetBundle
+from tools.eda_persistence import compact_integration_confirmation
 from tools.relationship_profiler import (
     preview_join,
     profile_relationships,
@@ -91,8 +92,19 @@ def render_relationship_panel(
             column_units_by_dataset=units,
             temporal_frequency_by_dataset=frequencies,
         )
+        st.session_state["integration_preview_result"] = result.model_dump(mode="json")
+        st.session_state["integration_preview_selection"] = {
+            "left_dataset_id": id_by_name[left_name],
+            "right_dataset_id": id_by_name[right_name],
+            "left_key": left_key,
+            "right_key": right_key,
+            "join_type": join_label.lower(),
+        }
         if result.status == "blocked":
             st.error(result.message)
+            st.caption(
+                "Blocked previews are not merged. You can still compare datasets side by side."
+            )
             return
         for warning in result.warnings:
             st.warning(warning)
@@ -113,6 +125,48 @@ def render_relationship_panel(
             f"right {result.unmatched_right_rows}. "
             f"Cardinality: {result.cardinality}."
         )
+
+    pending = st.session_state.get("integration_preview_result")
+    selection = st.session_state.get("integration_preview_selection")
+    if isinstance(pending, dict) and isinstance(selection, dict):
+        st.markdown("**Integration preview confirmation**")
+        st.caption(
+            "Confirming records keys, strategy, and unmatched/collision warnings into "
+            "project state. It does **not** create a merged dataset."
+        )
+        if st.button(
+            "Confirm integration preview (no merge)",
+            key="confirm_integration_preview",
+        ):
+            confirmation = compact_integration_confirmation(
+                left_dataset_id=str(selection["left_dataset_id"]),
+                right_dataset_id=str(selection["right_dataset_id"]),
+                left_key=str(selection["left_key"]),
+                right_key=str(selection["right_key"]),
+                join_type=str(selection["join_type"]),
+                preview=pending,
+            )
+            st.session_state["integration_preview_confirmation"] = confirmation
+            if st.session_state.get("last_run") is not None:
+                updated = dict(st.session_state["last_run"])
+                eda = dict(updated.get("eda_report") or {})
+                eda["integration_confirmation"] = confirmation
+                eda["joined"] = False
+                updated["eda_report"] = eda
+                phases = dict(updated.get("workspace_phases") or {})
+                phases["relationship_preview"] = "confirmed_preview"
+                updated["workspace_phases"] = phases
+                st.session_state["last_run"] = updated
+            if pending.get("status") == "blocked":
+                st.warning(
+                    "Recorded that this integration is blocked / cannot safely join. "
+                    "No merge was performed."
+                )
+            else:
+                st.success(
+                    "Integration preview confirmed in project state. "
+                    "Sources are unchanged; joined remains false."
+                )
 
 
 def _prefer(key: str, options: list[str], preferred: str) -> None:

@@ -50,7 +50,7 @@ Research Lab → **Problem Analyst** panel: Analyze problem → show validated J
 
 ## Out of scope (Phase 3+)
 
-- Problem-aware multi-dataset EDA / joins
+- Problem-aware multi-dataset EDA / joins → see `docs/PHASE3_PROBLEM_AWARE_EDA.md`
 - Literature & Evidence Agent
 - Research strategy / H1
 - Modeling, validation, LaTeX

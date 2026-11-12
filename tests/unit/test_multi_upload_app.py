@@ -83,10 +83,19 @@ def test_two_and_three_uploads_render_independent_profiles():
     assert "ds_sales_" in qualified and "ds_weather_" in qualified
     assert "ds_sales_" in qualified and ".value" in qualified
     assert qualified.index("ds_sales_") != qualified.index("ds_weather_")
-    sales_profile = at.dataframe[2].value
-    weather_profile = at.dataframe[4].value
-    assert sales_profile.loc[sales_profile["Column"] == "value", "Mean"].iloc[0] == 20
-    assert weather_profile.loc[weather_profile["Column"] == "value", "Mean"].iloc[0] == 90
+
+    def _profile_mean(frames, column: str, expected_mean: float) -> bool:
+        for frame in frames:
+            if "Column" not in frame.columns or "Mean" not in frame.columns:
+                continue
+            matched = frame.loc[frame["Column"] == column, "Mean"]
+            if not matched.empty and matched.iloc[0] == expected_mean:
+                return True
+        return False
+
+    frames = [item.value for item in at.dataframe]
+    assert _profile_mean(frames, "value", 20)
+    assert _profile_mean(frames, "value", 90)
     assert "Generate chart plan" not in _button_labels(at)
     assert "Use AI Visual EDA Planner" not in [box.label for box in at.checkbox]
     text = _messages(at)

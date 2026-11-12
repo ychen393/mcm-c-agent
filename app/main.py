@@ -10,6 +10,7 @@ from app.dataset_workspace import (
     describe_independent_eda,
     pending_plan_matches,
 )
+from app.eda_plan_panel import render_problem_aware_eda_panel
 from app.foundation_panel import (
     INIT_MESSAGE,
     compute_form_signature,
@@ -35,6 +36,13 @@ from tools.dataset_bundle import (
 )
 from tools.eda_artifacts import save_eda_artifacts
 from tools.eda_engine import build_eda_report
+from tools.eda_persistence import (
+    build_compact_eda_report,
+    compact_relationship_summary,
+    persist_approved_eda_into_state,
+)
+from tools.intake_errors import classify_upload_errors, format_intake_error_messages
+from tools.relationship_profiler import profile_relationships
 
 base_settings = get_settings()
 st.set_page_config(page_title=base_settings.app_name, page_icon="🧮", layout="wide")
@@ -295,6 +303,10 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
             except ValueError as exc:
                 units[ref.dataset_id] = {}
                 st.error(str(exc))
+    # Stash notes for the post-sync problem-aware plan panel (avoids stale specs).
+    st.session_state["eda_bundle_units"] = units
+    st.session_state["eda_bundle_frequencies"] = frequencies
+    st.session_state["eda_bundle_sources"] = sources
     profiles = build_bundle_profiles(
         bundle,
         column_units_by_dataset=units,
@@ -312,6 +324,60 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
         column_units_by_dataset=units,
         temporal_frequency_by_dataset=frequencies,
     )
+    if st.button(
+        "Record independent EDA summaries into project state",
+        key="persist_multi_eda_summaries",
+        help=(
+            "Stores sanitized per-dataset summaries and relationship metadata. "
+            "Does not store rows, bytes, or a merged table."
+        ),
+    ):
+        recorded = st.session_state.get("last_run")
+        if not isinstance(recorded, dict) or not recorded.get("run_id"):
+            st.error("Initialize the project before recording EDA into project state.")
+        else:
+            try:
+                rel = profile_relationships(
+                    bundle,
+                    column_units_by_dataset=units,
+                    temporal_frequency_by_dataset=frequencies,
+                )
+                plan_payload = st.session_state.get("problem_aware_eda_plan")
+                confirmation = st.session_state.get("integration_preview_confirmation")
+                compact = build_compact_eda_report(
+                    project_id=bundle.project_id,
+                    bundle_fingerprint=bundle.fingerprint,
+                    profiles=list(profiles.values()),
+                    plan=plan_payload,
+                    relationship_summary=compact_relationship_summary(rel),
+                    integration_confirmation=(
+                        confirmation if isinstance(confirmation, dict) else None
+                    ),
+                    mode="independent_multi",
+                )
+                form_sig = st.session_state.get("foundation_input_signature")
+                if not form_sig:
+                    st.error("Foundation signature missing; re-initialize the project.")
+                else:
+                    store = get_or_create_store(lambda: build_project_store(settings))
+                    saved = persist_approved_eda_into_state(
+                        store,
+                        project_id=str(recorded.get("project_id") or bundle.project_id),
+                        project_name=str(
+                            recorded.get("project_name") or project_name
+                        ),
+                        state=recorded,
+                        input_signature=str(form_sig),
+                        compact_eda=compact,
+                        note="phase3-independent-multi-eda",
+                    )
+                    st.session_state["last_run"] = saved
+                    st.success(
+                        "Independent EDA summaries recorded. "
+                        f"lifecycle={saved.get('lifecycle')} · joined=false"
+                    )
+            except Exception as exc:
+                st.error(f"Failed to record EDA state: {type(exc).__name__}: {exc}")
 
 
 def _render_chart_plan(plan: ChartPlan) -> None:
@@ -362,7 +428,7 @@ def _render_chart_plan(plan: ChartPlan) -> None:
 
 with st.sidebar:
     st.subheader("Workspace")
-    st.info("Phase 2 · Problem Analyst + M1-B Visual EDA")
+    st.info("Phase 3 · Problem-aware multi-dataset EDA")
     st.caption(f"Environment: {settings.app_env}")
     st.caption(f"LLM provider: {settings.llm_provider}")
     st.caption(f"LLM model: {settings.llm_model}")
@@ -403,15 +469,16 @@ with left:
 
 with right:
     st.subheader("System status")
-    st.metric("Milestone", "Phase 2")
+    st.metric("Milestone", "Phase 3")
     st.metric("Workflow nodes", "2")
     st.metric("Configured provider", settings.llm_provider)
     st.caption(
-        "Foundation nodes initialize the project. Problem Analyst emits ProblemSpecification. "
-        "Joint strategy modeling is still out of scope."
+        "Foundation initializes the project. Problem Analyst emits ProblemSpecification. "
+        "Phase 3 adds problem-aware multi-dataset EDA. Joint strategy modeling is still out of scope."
     )
     st.info(
-        "The planner proposes charts; Python validates and renders them only after your approval."
+        "Independent profiles and relationship previews never auto-merge. "
+        "Chart execution still requires explicit approval."
     )
 
 st.divider()
@@ -441,6 +508,10 @@ if len(uploaded_files) > ABSOLUTE_MAX_DATASETS:
         f"Dataset bundle accepts at most {ABSOLUTE_MAX_DATASETS} files; "
         f"received {len(uploaded_files)}."
     )
+    for message in format_intake_error_messages(
+        classify_upload_errors(upload_payloads)
+    ):
+        st.error(message)
     _drop_stale_approval(None)
 elif not uploaded_files:
     _drop_stale_approval(None)
@@ -450,10 +521,19 @@ else:
     except ValueError as exc:
         bundle_rejected = True
         st.error(str(exc))
+        for message in format_intake_error_messages(
+            classify_upload_errors(upload_payloads)
+        ):
+            if message != str(exc):
+                st.error(message)
         _drop_stale_approval(None)
     except Exception as exc:
         bundle_rejected = True
         st.error(f"Dataset processing failed: {type(exc).__name__}: {exc}")
+        for message in format_intake_error_messages(
+            classify_upload_errors(upload_payloads)
+        ):
+            st.error(message)
         _drop_stale_approval(None)
     else:
         dataset_count = len(bundle.datasets)
@@ -637,6 +717,40 @@ else:
                         st.session_state["eda_artifacts"] = artifacts
                         st.session_state["eda_report_dataset_sha"] = dataset.sha256
                         st.session_state["eda_report_project_id"] = pending_report.project_id
+                        recorded = st.session_state.get("last_run")
+                        form_sig = st.session_state.get("foundation_input_signature")
+                        if (
+                            isinstance(recorded, dict)
+                            and recorded.get("run_id")
+                            and form_sig
+                        ):
+                            profiles = build_bundle_profiles(bundle)
+                            plan_payload = st.session_state.get("problem_aware_eda_plan")
+                            compact = build_compact_eda_report(
+                                project_id=pending_report.project_id,
+                                bundle_fingerprint=bundle.fingerprint,
+                                profiles=list(profiles.values()),
+                                plan=plan_payload,
+                                mode="single_file_charts",
+                            )
+                            # Strip forbidden dense fields from session full report before store.
+                            store = get_or_create_store(lambda: build_project_store(settings))
+                            saved = persist_approved_eda_into_state(
+                                store,
+                                project_id=str(
+                                    recorded.get("project_id") or pending_report.project_id
+                                ),
+                                project_name=str(
+                                    recorded.get("project_name") or project_name
+                                ),
+                                state=recorded,
+                                input_signature=str(form_sig),
+                                compact_eda=compact,
+                                artifacts=artifacts,
+                                dataset_sha256=dataset.sha256,
+                                note="phase3-approved-single-eda",
+                            )
+                            st.session_state["last_run"] = saved
                         _clear_pending_plan()
                         st.success(
                             "Approved chart plan executed. Reports and charts have been saved."
@@ -849,11 +963,19 @@ if computed is not None:
     form_signature = computed[0]
 
 render_project_phases(recorded_state, inputs_current=inputs_current)
-render_problem_analyst_panel(
+spec_for_eda = render_problem_analyst_panel(
     problem_text,
     settings=settings,
     recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
 )
+# Problem-aware plan runs after foundation sync + analyst so cleared specs cannot linger.
+if bundle is not None and not bundle_rejected:
+    render_problem_aware_eda_panel(
+        bundle,
+        problem_specification=spec_for_eda,
+        column_units_by_dataset=st.session_state.get("eda_bundle_units"),
+        temporal_frequency_by_dataset=st.session_state.get("eda_bundle_frequencies"),
+    )
 render_persistence_panel(
     project_store,
     project_id=project_id,
@@ -865,9 +987,9 @@ render_persistence_panel(
 if recorded_state is not None:
     st.subheader("Latest foundation state")
     st.caption(
-        "Recorded when you initialize the project or change its inputs. "
-        "Analysis has not started. uploaded_files holds dataset provenance only: "
-        "IDs, file names, SHA-256, row and column counts, and profile warnings. "
+        "Recorded when you initialize the project, change inputs, or persist approved EDA. "
+        "uploaded_files holds dataset provenance only (IDs, names, SHA-256, counts, warnings). "
+        "Compact eda_report summaries omit raw rows and forbidden dense fields. "
         "File bytes are not stored here, and no trading strategy is modeled. "
         f"run_id={recorded_state.get('run_id')} · lifecycle={recorded_state.get('lifecycle')}"
     )

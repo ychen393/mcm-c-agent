@@ -168,6 +168,10 @@ def sync_foundation_state(
         from app.problem_analyst_panel import clear_problem_specification_cache
 
         clear_problem_specification_cache()
+        st.session_state.pop("problem_aware_eda_plan", None)
+        st.session_state.pop("integration_preview_confirmation", None)
+        st.session_state.pop("integration_preview_result", None)
+        st.session_state.pop("integration_preview_selection", None)
     except (TypeError, ValueError) as exc:
         st.error(str(exc))
         return False
