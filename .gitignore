@@ -18,3 +18,7 @@ outputs/*
 .DS_Store
 .idea/
 .vscode/
+
+# Phase 1 local project store (runtime)
+data/projects/*
+!data/projects/.gitkeep
