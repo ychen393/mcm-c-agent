@@ -12,12 +12,15 @@ from app.dataset_workspace import (
 )
 from app.foundation_panel import (
     INIT_MESSAGE,
+    compute_form_signature,
     mark_project_initialized,
     render_project_phases,
     sync_foundation_state,
 )
+from app.persistence_panel import get_or_create_store, render_persistence_panel
 from app.relationship_panel import render_relationship_panel
 from core.config import get_settings
+from database.repositories import build_project_store
 from schemas.chart_plan import ChartPlan
 from schemas.eda import EDAReport
 from tools.chart_catalog import fallback_chart_plan
@@ -811,6 +814,8 @@ if "eda_report" in st.session_state and report_matches_selection:
         )
     st.caption(f"Artifacts saved under: {settings.output_dir / project_id / 'eda'}")
 
+project_store = get_or_create_store(lambda: build_project_store(settings))
+llm_revision = int(st.session_state.get(SESSION_REVISION_KEY, 0))
 inputs_current = sync_foundation_state(
     project_id=project_id,
     project_name=project_name,
@@ -820,12 +825,35 @@ inputs_current = sync_foundation_state(
     bundle_rejected=bundle_rejected,
     llm_provider=settings.llm_provider,
     llm_model=settings.llm_model,
-    llm_config_revision=int(st.session_state.get(SESSION_REVISION_KEY, 0)),
+    llm_config_revision=llm_revision,
+    store=project_store,
 )
 recorded_state = (
     st.session_state.get("last_run") if st.session_state.get("foundation_initialized") else None
 )
+form_signature = None
+computed = compute_form_signature(
+    project_id=project_id,
+    project_name=project_name,
+    problem_text=problem_text,
+    upload_payloads=upload_payloads,
+    bundle=bundle,
+    bundle_rejected=bundle_rejected,
+    llm_provider=settings.llm_provider,
+    llm_model=settings.llm_model,
+    llm_config_revision=llm_revision,
+)
+if computed is not None:
+    form_signature = computed[0]
+
 render_project_phases(recorded_state, inputs_current=inputs_current)
+render_persistence_panel(
+    project_store,
+    project_id=project_id,
+    project_name=project_name,
+    recorded_state=recorded_state,
+    input_signature=form_signature,
+)
 
 if recorded_state is not None:
     st.subheader("Latest foundation state")
@@ -833,6 +861,7 @@ if recorded_state is not None:
         "Recorded when you initialize the project or change its inputs. "
         "Analysis has not started. uploaded_files holds dataset provenance only: "
         "IDs, file names, SHA-256, row and column counts, and profile warnings. "
-        "File bytes are not stored here, and no trading strategy is modeled."
+        "File bytes are not stored here, and no trading strategy is modeled. "
+        f"run_id={recorded_state.get('run_id')} · lifecycle={recorded_state.get('lifecycle')}"
     )
     st.json(recorded_state)

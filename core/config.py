@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = None
     database_url: str = 'postgresql+psycopg://mcm:mcm_dev_password@localhost:5432/mcm_research'
     checkpoint_database_url: str | None = None
+    # ``auto`` prefers Postgres and falls back to local; ``local`` / ``postgres`` force a backend.
+    project_store_backend: Literal['auto', 'local', 'postgres'] = 'auto'
     upload_dir: Path = Path('./data/uploads')
     output_dir: Path = Path('./outputs')
     @model_validator(mode='after')

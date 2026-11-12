@@ -12,6 +12,10 @@ import hashlib
 import json
 from typing import Any
 
+from core.lifecycle import (
+    LIFECYCLE_DATASETS_RECORDED,
+    LIFECYCLE_PROJECT_INITIALIZED,
+)
 from core.state import ResearchState, new_research_state
 from tools.dataset_bundle import DatasetBundle, build_bundle_profiles
 
@@ -234,6 +238,9 @@ def build_initialized_state(
     state = new_research_state(project_id, project_name.strip())
     state["problem_text"] = problem_text
     state["analysis_status"] = ANALYSIS_NOT_STARTED
+    state["lifecycle"] = (
+        LIFECYCLE_DATASETS_RECORDED if provenance else LIFECYCLE_PROJECT_INITIALIZED
+    )
     state["uploaded_files"] = sanitize_uploaded_files(provenance)
     limitations: list[str]
     if bundle is not None:

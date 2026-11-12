@@ -19,11 +19,12 @@ from core.foundation import (
     selection_token,
 )
 from core.graph import build_foundation_graph
+from core.project_store import ProjectStore
 from tools.data_loader import safe_project_id
 from tools.dataset_bundle import DatasetBundle
 
 INIT_MESSAGE = "Project initialized — analysis not started."
-UPDATE_MESSAGE = "Project inputs updated — analysis not started."
+UPDATE_MESSAGE = "Project inputs updated — analysis not started. Previous approvals are stale."
 
 INITIALIZED_KEY = "foundation_initialized"
 SIGNATURE_KEY = "foundation_input_signature"
@@ -50,7 +51,7 @@ def _resolved_project_id(project_id: str, bundle: DatasetBundle | None) -> str:
     return safe_project_id(project_id)
 
 
-def sync_foundation_state(
+def compute_form_signature(
     *,
     project_id: str,
     project_name: str,
@@ -61,17 +62,8 @@ def sync_foundation_state(
     llm_provider: str,
     llm_model: str,
     llm_config_revision: int,
-) -> bool:
-    """Store a new foundation state when recorded inputs changed.
-
-    Returns True when the stored state matches the current form.
-    """
-    if not st.session_state.get(INITIALIZED_KEY):
-        return False
-    if len(project_name.strip()) < 3:
-        st.error("Project name must contain at least 3 characters.")
-        st.warning("Foundation state was not updated because the project name is too short.")
-        return False
+) -> tuple[str, DatasetBundle | None, str] | None:
+    """Return (signature, active_bundle, selection_status) or None if the form is invalid."""
     if bundle is not None and not bundle_rejected:
         active_bundle: DatasetBundle | None = bundle
         selection_status = "ready"
@@ -82,7 +74,7 @@ def sync_foundation_state(
         active_bundle = None
         selection_status = "empty"
     try:
-        resolved_project_id = _resolved_project_id(project_id, active_bundle)
+        safe_project_id(project_id) if active_bundle is None else active_bundle.project_id
         token = selection_token(
             upload_payloads,
             fingerprint=active_bundle.fingerprint if active_bundle is not None else None,
@@ -97,10 +89,52 @@ def sync_foundation_state(
             llm_provider=llm_provider,
             llm_model=llm_model,
         )
-    except ValueError as exc:
-        st.error(str(exc))
+    except ValueError:
+        return None
+    return signature, active_bundle, selection_status
+
+
+def sync_foundation_state(
+    *,
+    project_id: str,
+    project_name: str,
+    problem_text: str,
+    upload_payloads: list[tuple[str, bytes]],
+    bundle: DatasetBundle | None,
+    bundle_rejected: bool,
+    llm_provider: str,
+    llm_model: str,
+    llm_config_revision: int,
+    store: ProjectStore | None = None,
+) -> bool:
+    """Store a new foundation state when recorded inputs changed.
+
+    Returns True when the stored state matches the current form. When ``store``
+    is provided, the state is also written to Postgres or the local fallback.
+    """
+    if not st.session_state.get(INITIALIZED_KEY):
+        return False
+    if len(project_name.strip()) < 3:
+        st.error("Project name must contain at least 3 characters.")
+        st.warning("Foundation state was not updated because the project name is too short.")
+        return False
+    computed = compute_form_signature(
+        project_id=project_id,
+        project_name=project_name,
+        problem_text=problem_text,
+        upload_payloads=upload_payloads,
+        bundle=bundle,
+        bundle_rejected=bundle_rejected,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+        llm_config_revision=llm_config_revision,
+    )
+    if computed is None:
+        st.error("Project ID is invalid.")
         st.warning("Foundation state was not updated because the project ID is invalid.")
         return False
+    signature, active_bundle, selection_status = computed
+    resolved_project_id = _resolved_project_id(project_id, active_bundle)
 
     if st.session_state.get(SIGNATURE_KEY) == signature and "last_run" in st.session_state:
         st.session_state.pop(SKIP_NOTICE_KEY, None)
@@ -117,7 +151,18 @@ def sync_foundation_state(
             llm_provider=llm_provider,
             llm_model=llm_model,
         )
-        st.session_state["last_run"] = build_foundation_graph().invoke(state)
+        result = build_foundation_graph().invoke(state)
+        if store is not None:
+            from app.persistence_panel import persist_foundation_state
+
+            result = persist_foundation_state(
+                store,
+                project_id=resolved_project_id,
+                project_name=project_name,
+                state=result,
+                input_signature=signature,
+            )
+        st.session_state["last_run"] = result
     except (TypeError, ValueError) as exc:
         st.error(str(exc))
         return False

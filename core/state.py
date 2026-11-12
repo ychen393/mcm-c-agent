@@ -6,6 +6,8 @@ class ResearchState(TypedDict, total=False):
     project_name: str
     project_status: str
     current_stage: str
+    run_id: str
+    lifecycle: str
     problem_text: str
     uploaded_files: list[dict[str, Any]]
     dataset_metadata: dict[str, Any]
@@ -27,6 +29,7 @@ class ResearchState(TypedDict, total=False):
     ai_usage_logs: list[dict[str, Any]]
     errors: list[dict[str, Any]]
 
+
 def new_research_state(project_id: str, project_name: str) -> ResearchState:
     return {
         "project_id": project_id,
@@ -34,6 +37,7 @@ def new_research_state(project_id: str, project_name: str) -> ResearchState:
         "project_status": "created",
         "current_stage": "intake",
         "analysis_status": "not_started",
+        "lifecycle": "created",
         "uploaded_files": [],
         "disagreement_log": [],
         "model_artifacts": [],
