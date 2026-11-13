@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, MutableMapping
 
 import streamlit as st
+from app.i18n import t
 
 from agents.paper_planner import paper_planner_status, run_paper_planner
 from app.artifact_viewers import (
@@ -88,15 +89,9 @@ def render_paper_h3_panel(
     input_signature: str | None = None,
 ) -> dict[str, Any] | None:
     """Render Paper Planner / LaTeX + human H3 controls."""
-    st.subheader("Paper Planner / LaTeX → H3")
+    st.subheader(t("h3.subheader"))
     status = paper_planner_status(settings)
-    st.caption(
-        "Builds a CI-safe deterministic paper outline for 2022 MCM C grounded in "
-        "ProblemSpecification, evidence, experiments, and validation. Emits "
-        "offline .tex / .bib (PDF compile optional, not required for CI). "
-        "Requires human H2 approval. H3 is never auto-approved. Phase 9 E2E "
-        "stays blocked until H3 is approved. Citations are never invented."
-    )
+    st.caption(t("h3.caption"))
 
     p_gate = paper_generation_gate_status(
         recorded_state if isinstance(recorded_state, dict) else None
@@ -112,7 +107,7 @@ def render_paper_h3_panel(
     if e_gate.e2e_allowed:
         st.info(e_gate.message)
     else:
-        st.caption(f"E2E gate: {e_gate.message}")
+        st.caption(t("h3.e2e_gate", msg=e_gate.message))
 
     st.caption(
         f"prompt={status['prompt_version']} · invented_citations={status['invented_citations']} · "
@@ -121,21 +116,16 @@ def render_paper_h3_panel(
     )
 
     use_llm = st.checkbox(
-        "Attempt LLM paper outline (optional stub)",
+        t("h3.use_llm"),
         value=bool(settings.paper_use_llm),
-        help=(
-            "Default off. Phase 8 LLM path records an unavailable stub note; "
-            "deterministic fixture outline remains authoritative."
-        ),
+        help=t("h3.use_llm_help"),
         key="paper_use_llm_ui",
     )
-    st.caption(
-        f"Paper LLM effective={use_llm} (settings={settings.paper_use_llm})"
-    )
+    st.caption(t("h3.llm_effective", effective=use_llm, settings=settings.paper_use_llm))
     attempt_pdf = st.checkbox(
-        "Attempt PDF compile (optional; soft-fails without TeX)",
+        t("h3.attempt_pdf"),
         value=False,
-        help="Not required for CI green. Soft-fails when pdflatex is missing.",
+        help=t("h3.attempt_pdf_help"),
         key="paper_attempt_pdf_ui",
     )
 
@@ -143,20 +133,20 @@ def render_paper_h3_panel(
 
     run_disabled = not p_gate.paper_allowed
     run = st.button(
-        "Run deterministic paper planner + LaTeX + review",
+        t("h3.run"),
         type="primary",
         key="run_paper_planner",
         disabled=run_disabled,
-        help="Blocked until human H2 is approved on project state.",
+        help=t("h3.blocked"),
     )
 
     if run:
         if not paper_allowed(
             recorded_state if isinstance(recorded_state, dict) else None
         ):
-            st.error("Paper generation refused: need H2 approved.")
+            st.error(t("h3.refused"))
         elif not isinstance(recorded_state, dict):
-            st.error("Initialize the project and approve H2 before paper generation.")
+            st.error(t("h3.init_before"))
         else:
             try:
                 package = run_paper_planner(
@@ -168,9 +158,9 @@ def render_paper_h3_panel(
                     settings=settings,
                 )
             except PermissionError as exc:
-                st.error(f"Paper gate blocked run: {exc}")
+                st.error(t("h3.gate_blocked", err=exc))
             except Exception as exc:
-                st.error(f"Paper planner failed: {type(exc).__name__}: {exc}")
+                st.error(t("h3.failed", err=f"{type(exc).__name__}: {exc}"))
             else:
                 package_dict = package.model_dump(mode="json")
                 st.session_state[PAPER_SESSION_KEY] = package_dict
@@ -185,7 +175,7 @@ def render_paper_h3_panel(
                     st.info(outline.llm_note)
                 if package.latex and package.latex.compile_attempted:
                     if package.latex.compile_ok:
-                        st.success(package.latex.compile_note or "PDF compiled.")
+                        st.success(package.latex.compile_note or t("h3.pdf_compiled"))
                     else:
                         st.warning(
                             package.latex.compile_note
@@ -219,11 +209,11 @@ def render_paper_h3_panel(
 
         gaps = outline.get("citation_gaps") or []
         if gaps:
-            st.warning("Citation gaps (no invented sources): " + ", ".join(gaps))
+            st.warning(t("h3.citation_gaps", gaps=", ".join(gaps)))
 
         bib_entries = outline.get("bib_entries") or []
         if bib_entries:
-            st.markdown("**Bibliography (grounded only)**")
+            st.markdown(t("h3.bibliography"))
             for entry in bib_entries:
                 st.write(
                     f"- `{entry.get('citation_key')}` — {entry.get('title')} "
@@ -260,24 +250,20 @@ def render_paper_h3_panel(
             st.caption(note)
 
         attach = st.button(
-            "Attach paper package into project state",
+            t("h3.attach"),
             key="persist_paper_package",
             disabled=not p_gate.paper_allowed,
-            help=(
-                "Stores sanitized paper_outline / latex_source / review_report via "
-                "Phase 1 persistence and sets H3=pending. Does not approve H3 or "
-                "unlock Phase 9 E2E."
-            ),
+            help=t("h3.attach_help"),
         )
         if attach:
             recorded = st.session_state.get("last_run")
             form_sig = input_signature or st.session_state.get("foundation_input_signature")
             if not isinstance(recorded, dict) or not recorded.get("run_id"):
-                st.error("Initialize the project before attaching the paper package.")
+                st.error(t("h3.init_before_attach"))
             elif not form_sig:
-                st.error("Foundation signature missing; re-initialize the project.")
+                st.error(t("common.sig_missing"))
             elif not paper_allowed(recorded):
-                st.error("Attach refused: need H2 approved.")
+                st.error(t("h3.attach_refused"))
             else:
                 try:
                     store = get_or_create_store(lambda: build_project_store(settings))
@@ -304,12 +290,12 @@ def render_paper_h3_panel(
                         f"{((saved.get('decision_report') or {}).get('e2e_gate') or {}).get('e2e_allowed')}"
                     )
                 except PermissionError as exc:
-                    st.error(f"Paper gate blocked attach: {exc}")
+                    st.error(t("h3.attach_gate_blocked", err=exc))
                 except Exception as exc:
-                    st.error(f"Persist paper failed: {type(exc).__name__}: {exc}")
+                    st.error(t("h3.persist_failed", err=f"{type(exc).__name__}: {exc}"))
 
     # --- Human H3 gate (never auto) ---
-    st.markdown("### Human Approval Gate H3")
+    st.markdown(t("h3.gate_heading"))
     gate_state = (
         recorded_state
         if isinstance(recorded_state, dict)
@@ -322,7 +308,7 @@ def render_paper_h3_panel(
         st.warning(e2e.message)
 
     if not package_dict:
-        st.info("Run and review the paper package before H3.")
+        st.info(t("h3.need_package"))
         return package_dict
 
     h3_status = None
@@ -338,41 +324,41 @@ def render_paper_h3_panel(
     if h3_status == "approved":
         render_approved_banner("H3", outline_title)
         render_h3_approval_card(package_dict)
-        with st.expander("H3 decision details (read-only)", expanded=False):
+        with st.expander(t("h3.decision_details"), expanded=False):
             st.caption(f"h3_status={h3_status}")
         return package_dict
 
-    st.markdown("#### Approval card")
+    st.markdown(t("h3.approval_card"))
     render_h3_approval_card(package_dict)
 
     h3_notes = st.text_area(
-        "H3 reviewer notes",
+        t("h3.notes"),
         value="",
         height=80,
         key="h3_reviewer_notes",
-        help="Required context for Approve / Request-revision decisions.",
+        help=t("h3.notes_help"),
     )
 
     approve_col, revise_col = st.columns(2)
     with approve_col:
         approve_clicked = st.button(
-            "Approve paper (H3)",
+            t("h3.approve"),
             type="primary",
             key="h3_approve",
-            help="Human-only. Never auto-approved. Unlocks the E2E gate flag only.",
+            help=t("h3.approve_help"),
         )
     with revise_col:
         revise_clicked = st.button(
-            "Request revision (H3)",
+            t("h3.revise"),
             key="h3_request_revision",
-            help="Returns paper for revision; Phase 9 E2E remains blocked.",
+            help=t("h3.revise_help"),
         )
 
     if approve_clicked or revise_clicked:
         recorded = st.session_state.get("last_run")
         form_sig = input_signature or st.session_state.get("foundation_input_signature")
         if not isinstance(recorded, dict) or not recorded.get("run_id"):
-            st.error("Initialize the project and attach the paper package before H3.")
+            st.error(t("h3.init_before_decide"))
         elif not form_sig:
             st.error("Foundation signature missing; re-initialize the project.")
         else:
@@ -427,6 +413,6 @@ def render_paper_h3_panel(
                         f"reason={e2e_after.reason}"
                     )
             except Exception as exc:
-                st.error(f"H3 decision failed: {type(exc).__name__}: {exc}")
+                st.error(t("h3.decision_failed", err=f"{type(exc).__name__}: {exc}"))
 
     return package_dict

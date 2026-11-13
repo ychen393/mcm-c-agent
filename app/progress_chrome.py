@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from app.i18n import t
 from modeling.gate import modeling_allowed, read_h1_status
 from paper.gate import e2e_allowed, read_h3_status
 from validation.gate import has_experiment_results, paper_allowed, read_h2_status
@@ -37,6 +38,7 @@ STEP_ORDER: tuple[StepId, ...] = (
     "export",
 )
 
+# English fallbacks kept for imports/tests that still read STEP_LABELS directly.
 STEP_LABELS: dict[StepId, str] = {
     "project": "Project",
     "problem": "Problem",
@@ -48,6 +50,22 @@ STEP_LABELS: dict[StepId, str] = {
     "paper": "Paper / H3",
     "export": "Export",
 }
+
+_STEP_I18N: dict[StepId, str] = {
+    "project": "progress.step.project",
+    "problem": "progress.step.problem",
+    "eda": "progress.step.eda",
+    "literature": "progress.step.literature",
+    "h1": "progress.step.h1",
+    "modeling": "progress.step.modeling",
+    "h2": "progress.step.h2",
+    "paper": "progress.step.paper",
+    "export": "progress.step.export",
+}
+
+
+def step_label(step: StepId) -> str:
+    return t(_STEP_I18N[step])
 
 
 @dataclass(frozen=True)
@@ -190,68 +208,47 @@ def _sidebar_badge(step: StepId, state: dict[str, Any] | None) -> str:
     h2 = read_h2_status(state)
     h3 = read_h3_status(state)
     if step == "project":
-        return "Project · initialize inputs"
+        return t("progress.badge.project")
     if step == "problem":
-        return "Problem · analyze statement"
+        return t("progress.badge.problem")
     if step == "eda":
-        return "EDA · chart plan & approve"
+        return t("progress.badge.eda")
     if step == "literature":
-        return "Literature · attach evidence"
+        return t("progress.badge.literature")
     if step == "h1":
         if h1 == "pending":
-            return "Research / H1 · awaiting approval"
+            return t("progress.badge.h1_pending")
         if h1 == "revision_requested":
-            return "Research / H1 · revision requested"
+            return t("progress.badge.h1_revision")
         if h1 == "rejected":
-            return "Research / H1 · rejected"
+            return t("progress.badge.h1_rejected")
         if _has_research_proposal(state):
-            return "Research / H1 · proposal ready"
-        return "Research / H1 · synthesize candidates"
+            return t("progress.badge.h1_ready")
+        return t("progress.badge.h1_synth")
     if step == "modeling":
         if modeling_allowed(state):
-            return "Modeling · available after H1"
-        return "Modeling · blocked until H1"
+            return t("progress.badge.modeling_ok")
+        return t("progress.badge.modeling_blocked")
     if step == "h2":
         if h2 == "pending":
-            return "Validation / H2 · awaiting approval"
+            return t("progress.badge.h2_pending")
         if h2 == "revision_requested":
-            return "Validation / H2 · revision requested"
-        return "Validation / H2 · run sensitivity"
+            return t("progress.badge.h2_revision")
+        return t("progress.badge.h2_run")
     if step == "paper":
         if h3 == "pending":
-            return "Paper / H3 · awaiting approval"
+            return t("progress.badge.paper_pending")
         if h3 == "revision_requested":
-            return "Paper / H3 · revision requested"
+            return t("progress.badge.paper_revision")
         if paper_allowed(state):
-            return "Paper / H3 · available after H2"
-        return "Paper / H3 · blocked until H2"
-    return "Export · H3 approved"
+            return t("progress.badge.paper_ok")
+        return t("progress.badge.paper_blocked")
+    return t("progress.badge.export")
 
 
 def _caption(step: StepId, state: dict[str, Any] | None) -> str:
-    base = (
-        "Progress follows recorded gates: Project → Problem → EDA → Literature → "
-        "Research/H1 → Modeling → Validation/H2 → Paper/H3 → Export. "
-        "Human H1/H2/H3 never auto-approve."
-    )
-    if step == "project":
-        detail = "Initialize a project to record inputs and dataset provenance."
-    elif step == "problem":
-        detail = "Run Problem Analyst for a validated ProblemSpecification."
-    elif step == "eda":
-        detail = "Approve a chart plan and persist independent EDA artifacts."
-    elif step == "literature":
-        detail = "Run Literature Evidence and attach cards to the recorded run."
-    elif step == "h1":
-        detail = "Synthesize research candidates, critique them, then approve H1 to unlock modeling."
-    elif step == "modeling":
-        detail = "H1 is approved — run Modeling & Experiment when ready (does not auto-start)."
-    elif step == "h2":
-        detail = "Experiment results are attached — run validation/sensitivity, then approve H2."
-    elif step == "paper":
-        detail = "H2 is approved — generate the paper package, then approve H3."
-    else:
-        detail = "H3 is approved — E2E / export may advance; research stays human-gated."
+    base = t("progress.caption.base")
+    detail = t(f"progress.caption.{step}")
     strategy = None
     if state:
         phases = state.get("workspace_phases") or {}
@@ -259,16 +256,16 @@ def _caption(step: StepId, state: dict[str, Any] | None) -> str:
             strategy = phases.get("strategy_modeling")
     strategy_note = ""
     if strategy and strategy != "NOT IMPLEMENTED":
-        strategy_note = f" Strategy modeling phase: {strategy}."
+        strategy_note = t("progress.strategy_phase", strategy=strategy)
     elif step in {"modeling", "h2", "paper", "export"}:
-        strategy_note = " Strategy modeling is available via the Modeling panel after H1."
+        strategy_note = t("progress.strategy_available")
     return f"{base} {detail}{strategy_note}"
 
 
 def _stepper_line(current: StepId, completed: tuple[StepId, ...]) -> str:
     parts: list[str] = []
     for step in STEP_ORDER:
-        label = STEP_LABELS[step]
+        label = step_label(step)
         if step in completed:
             parts.append(f"[x] {label}")
         elif step == current:
@@ -282,7 +279,7 @@ def derive_progress_chrome(state: dict[str, Any] | None) -> ProgressChrome:
     """Build sidebar / metrics chrome from recorded ResearchState (or None)."""
     current = current_step_from_state(state)
     completed = completed_steps_from_state(state)
-    label = STEP_LABELS[current]
+    label = step_label(current)
     total = len(STEP_ORDER)
     done_n = len(completed)
     return ProgressChrome(
@@ -290,7 +287,7 @@ def derive_progress_chrome(state: dict[str, Any] | None) -> ProgressChrome:
         current_label=label,
         sidebar_badge=_sidebar_badge(current, state),
         milestone_metric=label,
-        progress_metric=f"{done_n}/{total} steps",
+        progress_metric=t("progress.metric_steps", done=done_n, total=total),
         caption=_caption(current, state),
         completed_steps=completed,
         stepper_line=_stepper_line(current, completed),

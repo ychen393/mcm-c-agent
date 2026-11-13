@@ -8,6 +8,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from app.i18n import t
 from modeling.fixture_data import PRICE_FIXTURE_ID, load_price_fixture
 
 
@@ -25,12 +26,12 @@ def _candidate_by_id(
 def candidate_display_label(cand: dict[str, Any] | None, *, fallback_id: str = "") -> str:
     """Human label: title first, ID secondary."""
     if not isinstance(cand, dict):
-        return fallback_id or "(unknown)"
+        return fallback_id or t("viewer.unknown")
     title = str(cand.get("title") or "").strip()
     cid = str(cand.get("candidate_id") or fallback_id or "").strip()
     if title and cid:
         return f"{title} ({cid})"
-    return title or cid or "(unknown)"
+    return title or cid or t("viewer.unknown")
 
 
 def render_chip_row(chips: list[str]) -> None:
@@ -48,14 +49,18 @@ def render_h1_approval_card(
 ) -> None:
     """Primary H1 review card: title, summary, why, critique / evidence chips."""
     if not isinstance(candidate, dict):
-        st.info("No candidate selected for review.")
+        st.info(t("viewer.no_candidate"))
         return
-    title = str(candidate.get("title") or candidate.get("candidate_id") or "Candidate")
-    heading = f"**Recommended plan:** {title}" if recommended else f"**Plan:** {title}"
+    title = str(candidate.get("title") or candidate.get("candidate_id") or t("mod.candidate"))
+    heading = t("viewer.recommended_plan", title=title) if recommended else t("viewer.plan", title=title)
     st.markdown(heading)
     st.caption(
-        f"id={candidate.get('candidate_id')} · family={candidate.get('method_family')} · "
-        f"status={candidate.get('status')}"
+        t(
+            "viewer.candidate_meta",
+            id=candidate.get("candidate_id"),
+            family=candidate.get("method_family"),
+            status=candidate.get("status"),
+        )
     )
     summary = candidate.get("summary")
     if summary:
@@ -63,11 +68,11 @@ def render_h1_approval_card(
 
     strengths = [s for s in (candidate.get("strengths") or []) if isinstance(s, str)]
     if strengths:
-        st.markdown("**Why recommended**")
+        st.markdown(t("viewer.why_recommended"))
         for item in strengths[:5]:
             st.write(f"- {item}")
     elif recommended:
-        st.caption("No explicit strength bullets — review summary and hypotheses above.")
+        st.caption(t("viewer.no_strengths"))
 
     evidence_n = len(candidate.get("evidence_card_ids") or [])
     gap_n = len(candidate.get("evidence_gap_ids") or [])
@@ -83,17 +88,17 @@ def render_h1_approval_card(
             )
     render_chip_row(
         [
-            f"Evidence cards: {evidence_n}",
-            f"Evidence gaps: {gap_n}",
-            f"Critique blockers: {blocking}",
+            t("viewer.chip.evidence_cards", n=evidence_n),
+            t("viewer.chip.evidence_gaps", n=gap_n),
+            t("viewer.chip.critique_blockers", n=blocking),
         ]
     )
 
 
 def render_approved_banner(gate: str, summary: str) -> None:
     """Read-only post-approval banner."""
-    st.success(f"Approved: {summary}")
-    st.caption(f"{gate} decision recorded — controls below are read-only.")
+    st.success(t("viewer.approved", summary=summary))
+    st.caption(t("viewer.approved_caption", gate=gate))
 
 
 def render_fixture_vs_uploads_banner(
@@ -105,9 +110,7 @@ def render_fixture_vs_uploads_banner(
     if upload_count <= 0:
         return
     st.warning(
-        f"**Fixture ≠ uploads:** Dataset Explorer has **{upload_count}** uploaded file(s), "
-        f"but this Modeling run uses synthetic price fixture `{fixture_id}` — "
-        "uploaded CSVs are **not** driving the backtest."
+        t("viewer.fixture_banner", count=upload_count, fixture=fixture_id)
     )
 
 
@@ -148,18 +151,18 @@ def render_modeling_artifact_viewers(
     equity_art = next((a for a in arts if a.get("kind") == "equity_curve_summary"), None)
     fixture_art = next((a for a in arts if a.get("kind") == "price_fixture_ref"), None)
 
-    st.markdown("**Result viewers**")
+    st.markdown(t("viewer.result_viewers"))
     if equity_art:
         payload = equity_art.get("payload") or {}
         if isinstance(payload, dict):
             frame = _equity_frame(payload)
             if frame is not None and not frame.empty:
-                st.caption("Equity curve (fixture backtest)")
+                st.caption(t("viewer.equity_curve"))
                 st.line_chart(frame, use_container_width=True)
             else:
-                st.caption("Equity artifact present but no plottable series.")
+                st.caption(t("viewer.equity_no_series"))
     else:
-        st.caption("No equity_curve_summary artifact on this run.")
+        st.caption(t("viewer.no_equity"))
 
     resolved_fixture = fixture_id
     if isinstance(fixture_art, dict):
@@ -181,7 +184,7 @@ def render_modeling_artifact_viewers(
             for bar in bars
         ]
         price_frame = pd.DataFrame(price_rows).set_index("date")
-        st.caption(f"Key price series · fixture `{resolved_fixture}` (synthetic)")
+        st.caption(t("viewer.price_series", fixture=resolved_fixture))
         st.line_chart(price_frame, use_container_width=True)
 
 
@@ -233,9 +236,9 @@ def build_h2_scenario_delta_table(report: dict[str, Any]) -> pd.DataFrame:
 def render_h2_scenario_viewers(report: dict[str, Any]) -> None:
     """Baseline-vs-scenario table + sensitivity chart."""
     frame = build_h2_scenario_delta_table(report)
-    st.markdown("**Sensitivity table**")
+    st.markdown(t("viewer.sensitivity_table"))
     if frame.empty:
-        st.caption("No scenario deltas to display.")
+        st.caption(t("viewer.no_scenario_deltas"))
         return
     display_cols = [
         c
@@ -257,7 +260,7 @@ def render_h2_scenario_viewers(report: dict[str, Any]) -> None:
     chart_src = preferred if not preferred.empty else frame
     chart_src = chart_src.dropna(subset=["absolute_delta"])
     if chart_src.empty:
-        st.caption("No numeric deltas available for chart.")
+        st.caption(t("viewer.no_numeric_deltas"))
         return
     # One bar per scenario for the first preferred metric
     first_metric = chart_src["metric"].iloc[0]
@@ -267,21 +270,25 @@ def render_h2_scenario_viewers(report: dict[str, Any]) -> None:
     plot = subset.set_index("scenario")[["absolute_delta"]].rename(
         columns={"absolute_delta": first_metric or "delta"}
     )
-    st.caption(f"Scenario deltas · {first_metric}")
+    st.caption(t("viewer.scenario_deltas", metric=first_metric))
     st.bar_chart(plot, use_container_width=True)
 
 
 def render_h2_approval_card(report: dict[str, Any]) -> None:
     """Compact H2 review card from validation report."""
-    st.markdown("**Validation package**")
+    st.markdown(t("viewer.validation_package"))
     st.caption(
-        f"report={report.get('report_id')} · baseline={report.get('baseline_run_id')} · "
-        f"candidate={report.get('selected_candidate_id')} · "
-        f"scenarios={len(report.get('scenarios') or [])}"
+        t(
+            "viewer.validation_meta",
+            report=report.get("report_id"),
+            baseline=report.get("baseline_run_id"),
+            candidate=report.get("selected_candidate_id"),
+            n=len(report.get("scenarios") or []),
+        )
     )
     baseline = report.get("baseline_metrics") or []
     if baseline:
-        st.markdown("**Baseline metrics**")
+        st.markdown(t("viewer.baseline_metrics"))
         for metric in baseline[:6]:
             if not isinstance(metric, dict):
                 continue
@@ -297,9 +304,9 @@ def render_h2_approval_card(report: dict[str, Any]) -> None:
     ]
     render_chip_row(
         [
-            f"Scenarios: {len(report.get('scenarios') or [])}",
-            f"High/blocking notes: {len(high)}",
-            f"Total robustness notes: {len(notes)}",
+            t("viewer.chip.scenarios", n=len(report.get("scenarios") or [])),
+            t("viewer.chip.high_notes", n=len(high)),
+            t("viewer.chip.total_notes", n=len(notes)),
         ]
     )
 
@@ -309,16 +316,20 @@ def render_h3_approval_card(package: dict[str, Any]) -> None:
     outline = package.get("outline") or {}
     review = package.get("review") or {}
     latex = package.get("latex") or {}
-    title = str(outline.get("title") or "Paper package")
-    st.markdown(f"**Paper:** {title}")
+    title = str(outline.get("title") or t("viewer.paper_package_fallback"))
+    st.markdown(t("viewer.paper_title", title=title))
     st.caption(
-        f"package={package.get('package_id')} · outline={outline.get('outline_id')} · "
-        f"sections={len(outline.get('sections') or [])} · "
-        f"bib={len(outline.get('bib_entries') or [])}"
+        t(
+            "viewer.paper_meta",
+            package=package.get("package_id"),
+            outline=outline.get("outline_id"),
+            sections=len(outline.get("sections") or []),
+            bib=len(outline.get("bib_entries") or []),
+        )
     )
     sections = outline.get("sections") or []
     if sections:
-        st.markdown("**Outline**")
+        st.markdown(t("viewer.outline"))
         for section in sections:
             if not isinstance(section, dict):
                 continue
@@ -328,7 +339,7 @@ def render_h3_approval_card(package: dict[str, Any]) -> None:
     compile_ok = latex.get("compile_ok") if isinstance(latex, dict) else None
     render_chip_row(
         [
-            f"Review: {review.get('overall_status') or 'n/a'}",
+            t("viewer.chip.review", status=review.get("overall_status") or "n/a"),
             f"structure_ok={review.get('structure_ok')}",
             f"citations_ok={review.get('citations_ok')}",
             f"PDF compile_ok={compile_ok}",
@@ -343,7 +354,7 @@ def render_paper_pdf_preview(package: dict[str, Any]) -> None:
     compile_ok = latex.get("compile_ok") if isinstance(latex, dict) else None
     compile_note = latex.get("compile_note") if isinstance(latex, dict) else None
 
-    st.markdown("**Paper preview**")
+    st.markdown(t("viewer.paper_preview"))
     if pdf_path and compile_ok:
         path = Path(str(pdf_path))
         if path.is_file():
@@ -351,29 +362,25 @@ def render_paper_pdf_preview(package: dict[str, Any]) -> None:
                 st.pdf(str(path))
                 return
             except Exception as exc:
-                st.warning(f"PDF exists but preview failed: {type(exc).__name__}: {exc}")
+                st.warning(t("viewer.pdf_preview_failed", err=f"{type(exc).__name__}: {exc}"))
                 st.download_button(
-                    "Download compiled PDF",
+                    t("viewer.download_pdf"),
                     data=path.read_bytes(),
                     file_name=path.name,
                     mime="application/pdf",
                     key="paper_pdf_download",
                 )
                 return
-        st.warning(
-            f"PDF compile reported ok but file is missing: `{pdf_path}`. "
-            "Showing outline-only view."
-        )
+        st.warning(t("viewer.pdf_missing", path=pdf_path))
     elif latex.get("compile_attempted") and not compile_ok:
         st.info(
-            "Outline-only view — PDF was not compiled. "
-            + (str(compile_note) if compile_note else "TeX tooling may be unavailable.")
+            t(
+                "viewer.outline_only_failed",
+                note=(str(compile_note) if compile_note else "TeX tooling may be unavailable."),
+            )
         )
     else:
-        st.info(
-            "Outline-only view — PDF not compiled. "
-            "Enable “Attempt PDF compile” when generating if a local TeX install is available."
-        )
+        st.info(t("viewer.outline_only"))
 
 
 def resolve_h1_selected_candidate(

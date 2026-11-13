@@ -80,4 +80,6 @@ def test_h1_panel_uses_approval_cards_and_title_selectbox():
     assert "render_h1_approval_card" in source
     assert "candidate_display_label" in source
     assert "render_approved_banner" in source
-    assert "Shows plan titles" in source
+    assert 't("h1.candidate_help")' in source
+    en = (REPO / "locales" / "en.json").read_text(encoding="utf-8")
+    assert "Shows plan titles" in en
