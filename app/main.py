@@ -22,11 +22,19 @@ from app.foundation_panel import (
 from app.literature_panel import render_literature_evidence_panel
 from app.modeling_panel import render_modeling_experiment_panel
 from app.persistence_panel import get_or_create_store, render_persistence_panel
-from app.problem_analyst_panel import render_problem_analyst_panel
+from app.problem_analyst_panel import (
+    render_problem_analyst_panel,
+    resolve_displayed_problem_specification,
+)
 from app.progress_chrome import derive_progress_chrome
 from app.relationship_panel import render_relationship_panel
 from app.research_h1_panel import render_research_h1_panel
 from app.paper_h3_panel import render_paper_h3_panel
+from app.soft_orchestration import (
+    panel_is_unlocked,
+    render_locked_panel_stub,
+    render_next_step_guide,
+)
 from app.validation_h2_panel import render_validation_h2_panel
 from core.config import get_settings
 from database.repositories import build_project_store
@@ -1003,36 +1011,50 @@ st.caption(progress.caption)
 st.caption(progress.stepper_line)
 st.info(t("chrome.independent_profiles_info"))
 
+_state_dict = recorded_state if isinstance(recorded_state, dict) else None
+# UX-D: guided next step + soft locks (never auto-approves H1/H2/H3).
+render_next_step_guide(_state_dict)
+
 render_project_phases(recorded_state, inputs_current=inputs_current)
-spec_for_eda = render_problem_analyst_panel(
-    problem_text,
-    settings=settings,
-    recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
-)
+if panel_is_unlocked("problem", _state_dict):
+    spec_for_eda = render_problem_analyst_panel(
+        problem_text,
+        settings=settings,
+        recorded_state=_state_dict,
+    )
+else:
+    render_locked_panel_stub("problem", _state_dict)
+    spec_for_eda = resolve_displayed_problem_specification(_state_dict)
 # Problem-aware plan runs after foundation sync + analyst so cleared specs cannot linger.
 if bundle is not None and not bundle_rejected:
-    render_problem_aware_eda_panel(
-        bundle,
-        problem_specification=spec_for_eda,
-        column_units_by_dataset=st.session_state.get("eda_bundle_units"),
-        temporal_frequency_by_dataset=st.session_state.get("eda_bundle_frequencies"),
-    )
+    if panel_is_unlocked("eda", _state_dict):
+        render_problem_aware_eda_panel(
+            bundle,
+            problem_specification=spec_for_eda,
+            column_units_by_dataset=st.session_state.get("eda_bundle_units"),
+            temporal_frequency_by_dataset=st.session_state.get("eda_bundle_frequencies"),
+        )
+    else:
+        render_locked_panel_stub("eda", _state_dict)
 eda_plan_for_lit = st.session_state.get("problem_aware_eda_plan")
 eda_report_for_lit = None
 if isinstance(recorded_state, dict):
     maybe_eda = recorded_state.get("eda_report")
     if isinstance(maybe_eda, dict):
         eda_report_for_lit = maybe_eda
-render_literature_evidence_panel(
-    settings=settings,
-    problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
-    eda_plan=eda_plan_for_lit if isinstance(eda_plan_for_lit, dict) else None,
-    eda_report=eda_report_for_lit,
-    recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
-    project_id=project_id,
-    project_name=project_name,
-    input_signature=form_signature,
-)
+if panel_is_unlocked("literature", _state_dict):
+    render_literature_evidence_panel(
+        settings=settings,
+        problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
+        eda_plan=eda_plan_for_lit if isinstance(eda_plan_for_lit, dict) else None,
+        eda_report=eda_report_for_lit,
+        recorded_state=_state_dict,
+        project_id=project_id,
+        project_name=project_name,
+        input_signature=form_signature,
+    )
+else:
+    render_locked_panel_stub("literature", _state_dict)
 evidence_for_h1 = None
 if isinstance(recorded_state, dict):
     maybe_ev = recorded_state.get("evidence_report")
@@ -1042,42 +1064,54 @@ if evidence_for_h1 is None:
     cached_ev = st.session_state.get("literature_evidence_report")
     if isinstance(cached_ev, dict) and cached_ev:
         evidence_for_h1 = cached_ev
-render_research_h1_panel(
-    settings=settings,
-    problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
-    eda_plan=eda_plan_for_lit if isinstance(eda_plan_for_lit, dict) else None,
-    eda_report=eda_report_for_lit,
-    evidence_report=evidence_for_h1,
-    recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
-    project_id=project_id,
-    project_name=project_name,
-    input_signature=form_signature,
-)
-render_modeling_experiment_panel(
-    settings=settings,
-    problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
-    recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
-    project_id=project_id,
-    project_name=project_name,
-    input_signature=form_signature,
-    upload_count=len(uploaded_files),
-)
-render_validation_h2_panel(
-    settings=settings,
-    problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
-    recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
-    project_id=project_id,
-    project_name=project_name,
-    input_signature=form_signature,
-)
-render_paper_h3_panel(
-    settings=settings,
-    problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
-    recorded_state=recorded_state if isinstance(recorded_state, dict) else None,
-    project_id=project_id,
-    project_name=project_name,
-    input_signature=form_signature,
-)
+if panel_is_unlocked("h1", _state_dict):
+    render_research_h1_panel(
+        settings=settings,
+        problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
+        eda_plan=eda_plan_for_lit if isinstance(eda_plan_for_lit, dict) else None,
+        eda_report=eda_report_for_lit,
+        evidence_report=evidence_for_h1,
+        recorded_state=_state_dict,
+        project_id=project_id,
+        project_name=project_name,
+        input_signature=form_signature,
+    )
+else:
+    render_locked_panel_stub("h1", _state_dict)
+if panel_is_unlocked("modeling", _state_dict):
+    render_modeling_experiment_panel(
+        settings=settings,
+        problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
+        recorded_state=_state_dict,
+        project_id=project_id,
+        project_name=project_name,
+        input_signature=form_signature,
+        upload_count=len(uploaded_files),
+    )
+else:
+    render_locked_panel_stub("modeling", _state_dict)
+if panel_is_unlocked("h2", _state_dict):
+    render_validation_h2_panel(
+        settings=settings,
+        problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
+        recorded_state=_state_dict,
+        project_id=project_id,
+        project_name=project_name,
+        input_signature=form_signature,
+    )
+else:
+    render_locked_panel_stub("h2", _state_dict)
+if panel_is_unlocked("paper", _state_dict):
+    render_paper_h3_panel(
+        settings=settings,
+        problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
+        recorded_state=_state_dict,
+        project_id=project_id,
+        project_name=project_name,
+        input_signature=form_signature,
+    )
+else:
+    render_locked_panel_stub("paper", _state_dict)
 render_persistence_panel(
     project_store,
     project_id=project_id,

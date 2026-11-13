@@ -65,13 +65,21 @@ def render_persistence_panel(
     """Render backend info, lifecycle board, history, and reopen/continue actions."""
     info = store.info()
     st.subheader(t("pers.subheader"))
-    st.caption(
-        f"Backend: **{info.backend}** — {info.detail}"
-        + (f" Root: `{info.root}`" if info.root else "")
-    )
+    if info.backend == "local":
+        st.info(t("pers.local_demo_banner"))
+        st.caption(
+            t("pers.backend_local_detail", detail=info.detail)
+            + (f" Root: `{info.root}`" if info.root else "")
+        )
+        st.caption(t("pers.doctor_hint"))
+    else:
+        st.caption(
+            f"Backend: **{info.backend}** — {info.detail}"
+            + (f" Root: `{info.root}`" if info.root else "")
+        )
     if info.backend_changed and info.backend_mismatch_message:
         st.warning(info.backend_mismatch_message)
-    st.info(REUPLOAD_REQUIRED_MESSAGE)
+    st.caption(REUPLOAD_REQUIRED_MESSAGE)
 
     status = distinguish_status(recorded_state)
     st.markdown(t("pers.project_init", v=status["project_init"]))
