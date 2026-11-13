@@ -191,12 +191,22 @@ def test_two_files_are_recorded_only_after_initialize_and_stay_unjoined():
     assert "**Datasets loaded:** yes" in rendered
     assert "**Independent EDA:** ready" in rendered
     assert "**Relationship preview:** ready" in rendered
-    assert "**Joint analysis / strategy modeling:** NOT IMPLEMENTED" in rendered
-    assert "does not join files" in rendered
+    assert "**Joint analysis:** NOT IMPLEMENTED" in rendered
+    assert "**Strategy modeling:** NOT IMPLEMENTED" in rendered
+    assert "Joint analysis / strategy modeling" not in rendered
+    assert "does not auto-join" in rendered or "does not join" in rendered
     assert "Generate chart plan" not in [button.label for button in at.button]
+    assert any(
+        "Developer / foundation state" in str(getattr(exp, "label", "") or getattr(exp, "value", "") or "")
+        for exp in getattr(at, "expander", [])
+    ) or "Developer / foundation state (JSON)" in rendered
     shown = json.dumps(at.json[0].value)
     assert "LBMA-GOLD.csv" in shown and "BCHAIN-MKPRU.csv" in shown
     assert "1324.60" not in shown and "621.65" not in shown
+    # UX-A: no hardcoded Phase 5 / Workflow nodes 2 chrome
+    assert "Phase 5" not in rendered
+    assert "Workflow nodes" not in rendered
+    assert "Phase 6 not started" not in rendered
 
     at.session_state["last_run"]["approval_status"] = {"h1": "approved"}
     at.session_state["last_run"]["research_proposal"] = {"strategy": "momentum"}

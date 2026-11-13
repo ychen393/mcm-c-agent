@@ -22,6 +22,7 @@ from app.literature_panel import render_literature_evidence_panel
 from app.modeling_panel import render_modeling_experiment_panel
 from app.persistence_panel import get_or_create_store, render_persistence_panel
 from app.problem_analyst_panel import render_problem_analyst_panel
+from app.progress_chrome import derive_progress_chrome
 from app.relationship_panel import render_relationship_panel
 from app.research_h1_panel import render_research_h1_panel
 from app.paper_h3_panel import render_paper_h3_panel
@@ -432,8 +433,7 @@ def _render_chart_plan(plan: ChartPlan) -> None:
 
 
 with st.sidebar:
-    st.subheader("Workspace")
-    st.info("Phase 5 · Research Strategy → H1")
+    st.subheader("Environment")
     st.caption(f"Environment: {settings.app_env}")
     st.caption(f"LLM provider: {settings.llm_provider}")
     st.caption(f"LLM model: {settings.llm_model}")
@@ -441,54 +441,38 @@ with st.sidebar:
     st.caption(f"Literature live retrieval: {settings.literature_live_retrieval}")
     st.caption(f"Research Strategy LLM: {settings.research_strategy_use_llm}")
 
-left, right = st.columns([1.3, 1])
-with left:
-    st.subheader("Create a research project")
-    project_name = st.text_input("Project name", value="MCM C Demo Project")
-    project_id = st.text_input(
-        "Project ID for saved artifacts",
-        value="mcm-c-demo",
-        help="Dataset Explorer and the foundation state both use this project ID.",
-    )
-    problem_text = st.text_area(
-        "MCM problem statement / research question",
-        height=180,
-        help=(
-            "Problem Analyst turns this into a validated ProblemSpecification. "
-            "The Visual EDA Planner also uses it for chart relevance."
-        ),
-    )
-    st.caption(
-        "Initialize records this project and any validated datasets already loaded below. "
-        "Problem Analyst can structure the statement without starting joint modeling."
-    )
-    if st.button("Initialize project", type="primary"):
-        if len(project_name.strip()) < 3:
-            st.error("Project name must contain at least 3 characters.")
+st.subheader("Create a research project")
+project_name = st.text_input("Project name", value="MCM C Demo Project")
+project_id = st.text_input(
+    "Project ID for saved artifacts",
+    value="mcm-c-demo",
+    help="Dataset Explorer and the foundation state both use this project ID.",
+)
+problem_text = st.text_area(
+    "MCM problem statement / research question",
+    height=180,
+    help=(
+        "Problem Analyst turns this into a validated ProblemSpecification. "
+        "The Visual EDA Planner also uses it for chart relevance."
+    ),
+)
+st.caption(
+    "Initialize records this project and any validated datasets already loaded below. "
+    "Problem Analyst can structure the statement without starting joint modeling. "
+    "Lab progress (Project → EDA → Literature → H1 → Modeling → H2 → Paper → H3) "
+    "updates from the recorded run after initialize."
+)
+if st.button("Initialize project", type="primary"):
+    if len(project_name.strip()) < 3:
+        st.error("Project name must contain at least 3 characters.")
+    else:
+        try:
+            safe_project_id(project_id)
+        except ValueError as exc:
+            st.error(str(exc))
         else:
-            try:
-                safe_project_id(project_id)
-            except ValueError as exc:
-                st.error(str(exc))
-            else:
-                mark_project_initialized()
-                st.success(INIT_MESSAGE)
-
-with right:
-    st.subheader("System status")
-    st.metric("Milestone", "Phase 5")
-    st.metric("Workflow nodes", "2")
-    st.metric("Configured provider", settings.llm_provider)
-    st.caption(
-        "Foundation initializes the project. Problem Analyst emits ProblemSpecification. "
-        "Phase 3–4 add EDA and literature evidence. Phase 5 synthesizes candidates, "
-        "critiques them, and requires explicit human H1 approval. Modeling stays blocked "
-        "until H1 is approved (Phase 6 not started)."
-    )
-    st.info(
-        "Independent profiles and relationship previews never auto-merge. "
-        "Chart execution still requires explicit approval."
-    )
+            mark_project_initialized()
+            st.success(INIT_MESSAGE)
 
 st.divider()
 st.header("Dataset Explorer")
@@ -971,6 +955,26 @@ computed = compute_form_signature(
 if computed is not None:
     form_signature = computed[0]
 
+progress = derive_progress_chrome(
+    recorded_state if isinstance(recorded_state, dict) else None
+)
+with st.sidebar:
+    st.subheader("Workspace")
+    st.info(progress.sidebar_badge)
+    st.caption(progress.stepper_line)
+
+st.subheader("System status")
+status_cols = st.columns(3)
+status_cols[0].metric("Current stage", progress.milestone_metric)
+status_cols[1].metric("Lab progress", progress.progress_metric)
+status_cols[2].metric("Configured provider", settings.llm_provider)
+st.caption(progress.caption)
+st.caption(progress.stepper_line)
+st.info(
+    "Independent profiles and relationship previews never auto-merge. "
+    "Chart execution still requires explicit approval."
+)
+
 render_project_phases(recorded_state, inputs_current=inputs_current)
 spec_for_eda = render_problem_analyst_panel(
     problem_text,
@@ -1057,9 +1061,12 @@ if recorded_state is not None:
     st.subheader("Latest foundation state")
     st.caption(
         "Recorded when you initialize the project, change inputs, or persist approved EDA. "
-        "uploaded_files holds dataset provenance only (IDs, names, SHA-256, counts, warnings). "
-        "Compact eda_report summaries omit raw rows and forbidden dense fields. "
-        "File bytes are not stored here, and no trading strategy is modeled. "
         f"run_id={recorded_state.get('run_id')} · lifecycle={recorded_state.get('lifecycle')}"
     )
-    st.json(recorded_state)
+    with st.expander("Developer / foundation state (JSON)", expanded=False):
+        st.caption(
+            "uploaded_files holds dataset provenance only (IDs, names, SHA-256, counts, warnings). "
+            "Compact eda_report summaries omit raw rows and forbidden dense fields. "
+            "File bytes are not stored here, and no trading strategy is modeled."
+        )
+        st.json(recorded_state)

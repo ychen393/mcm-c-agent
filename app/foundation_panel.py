@@ -35,6 +35,16 @@ _PHASE_ROWS = (
     ("datasets_loaded", "Datasets loaded"),
     ("independent_eda", "Independent EDA"),
     ("relationship_preview", "Relationship preview"),
+    ("literature_evidence", "Literature evidence"),
+    ("research_strategy", "Research strategy"),
+    ("h1", "H1 gate"),
+    ("joint_analysis", "Joint analysis"),
+    ("strategy_modeling", "Strategy modeling"),
+    ("validation_sensitivity", "Validation / H2"),
+    ("h2", "H2 gate"),
+    ("paper_latex", "Paper / LaTeX"),
+    ("h3", "H3 gate"),
+    ("e2e_acceptance", "E2E / export"),
 )
 
 
@@ -180,11 +190,11 @@ def sync_foundation_state(
 
 
 def render_project_phases(state: dict[str, Any] | None, *, inputs_current: bool) -> None:
-    """Render the phase board. Joint analysis is always not implemented."""
+    """Render the phase board from recorded workspace_phases (no hardcoded lies)."""
     st.subheader("Project phases")
     st.caption(
         "Initialization records the problem and dataset provenance. "
-        "It does not study the assets, join the files, or model a trading strategy."
+        "It does not auto-join files. Strategy modeling unlocks only after human H1."
     )
     if state is None:
         phases = {
@@ -192,8 +202,16 @@ def render_project_phases(state: dict[str, Any] | None, *, inputs_current: bool)
             "datasets_loaded": "no",
             "independent_eda": "not recorded",
             "relationship_preview": "not recorded",
+            "literature_evidence": "not recorded",
+            "research_strategy": "not recorded",
+            "h1": "not recorded",
             "joint_analysis": NOT_IMPLEMENTED,
             "strategy_modeling": NOT_IMPLEMENTED,
+            "validation_sensitivity": "not recorded",
+            "h2": "not recorded",
+            "paper_latex": "not recorded",
+            "h3": "not recorded",
+            "e2e_acceptance": "not recorded",
         }
         st.caption(
             "Any dataset profiles above stay on this page until you initialize the project "
@@ -215,5 +233,18 @@ def render_project_phases(state: dict[str, Any] | None, *, inputs_current: bool)
                 "Preview join, and a preview is not written into this state."
             )
     for key, label in _PHASE_ROWS:
-        st.markdown(f"**{label}:** {phases.get(key, 'unknown')}")
-    st.markdown(f"**Joint analysis / strategy modeling:** {NOT_IMPLEMENTED}")
+        value = phases.get(key)
+        if value is None:
+            # Omit later-stage keys until the run has recorded them, except core rows.
+            if key in {
+                "project_initialized",
+                "datasets_loaded",
+                "independent_eda",
+                "relationship_preview",
+                "joint_analysis",
+                "strategy_modeling",
+            }:
+                value = "unknown"
+            else:
+                continue
+        st.markdown(f"**{label}:** {value}")
