@@ -82,3 +82,13 @@ def test_main_wires_paper_h3_panel():
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     assert "render_paper_h3_panel" in names
+
+
+def test_h3_panel_uses_approval_card_and_pdf_preview():
+    source = (REPO / "app" / "paper_h3_panel.py").read_text(encoding="utf-8")
+    assert "render_h3_approval_card" in source
+    assert "render_paper_pdf_preview" in source
+    assert "render_approved_banner" in source
+    assert "Outline-only" in (REPO / "app" / "artifact_viewers.py").read_text(
+        encoding="utf-8"
+    )

@@ -437,9 +437,40 @@ with st.sidebar:
     st.caption(f"Environment: {settings.app_env}")
     st.caption(f"LLM provider: {settings.llm_provider}")
     st.caption(f"LLM model: {settings.llm_model}")
-    st.caption(f"Problem Analyst LLM: {settings.problem_analyst_use_llm}")
-    st.caption(f"Literature live retrieval: {settings.literature_live_retrieval}")
-    st.caption(f"Research Strategy LLM: {settings.research_strategy_use_llm}")
+    # Effective flags: UI checkbox overrides when present in session (UX-A leftover / UX-B).
+    _eff_pa = st.session_state.get(
+        "problem_analyst_use_llm_ui", settings.problem_analyst_use_llm
+    )
+    _eff_lit = st.session_state.get(
+        "literature_live_retrieval_ui", settings.literature_live_retrieval
+    )
+    _eff_rs = st.session_state.get(
+        "research_strategy_use_llm_ui", settings.research_strategy_use_llm
+    )
+    _eff_val = st.session_state.get(
+        "validation_use_llm_ui", settings.validation_use_llm
+    )
+    _eff_paper = st.session_state.get("paper_use_llm_ui", settings.paper_use_llm)
+    st.caption(
+        f"Problem Analyst LLM (effective): {_eff_pa} "
+        f"(settings={settings.problem_analyst_use_llm})"
+    )
+    st.caption(
+        f"Literature live retrieval (effective): {_eff_lit} "
+        f"(settings={settings.literature_live_retrieval})"
+    )
+    st.caption(
+        f"Research Strategy LLM (effective): {_eff_rs} "
+        f"(settings={settings.research_strategy_use_llm})"
+    )
+    st.caption(
+        f"Validation LLM (effective): {_eff_val} "
+        f"(settings={settings.validation_use_llm})"
+    )
+    st.caption(
+        f"Paper LLM (effective): {_eff_paper} "
+        f"(settings={settings.paper_use_llm})"
+    )
 
 st.subheader("Create a research project")
 project_name = st.text_input("Project name", value="MCM C Demo Project")
@@ -1032,6 +1063,7 @@ render_modeling_experiment_panel(
     project_id=project_id,
     project_name=project_name,
     input_signature=form_signature,
+    upload_count=len(uploaded_files),
 )
 render_validation_h2_panel(
     settings=settings,

@@ -429,11 +429,12 @@ def execute_experiment_run(
 
     Callers must enforce ``assert_modeling_allowed`` before invoking.
     """
-    proposal_model = (
-        proposal
-        if isinstance(proposal, ResearchProposal)
-        else ResearchProposal.model_validate(proposal)
-    )
+    if isinstance(proposal, ResearchProposal):
+        proposal_model = proposal
+    else:
+        from tools.research_persistence import as_research_proposal
+
+        proposal_model = as_research_proposal(proposal)
     candidate = next(
         (c for c in proposal_model.candidates if c.candidate_id == selected_candidate_id),
         None,
@@ -476,6 +477,15 @@ def execute_experiment_run(
     )
 
     meta = fixture_metadata(params.price_fixture_id)
+    bars = load_price_fixture(params.price_fixture_id)
+    equity_series = [
+        {
+            "day_index": bars[i].day_index if i < len(bars) else i,
+            "date": bars[i].date if i < len(bars) else str(i),
+            "equity": equity[i],
+        }
+        for i in range(len(equity))
+    ]
     equity_payload = {
         "n_points": len(equity),
         "first": equity[0] if equity else None,
@@ -484,6 +494,8 @@ def execute_experiment_run(
         "max": max(equity) if equity else None,
         # Cap stored points for persistence safety.
         "sample_points": equity[:: max(1, len(equity) // 8)][:8],
+        # Full short fixture series for UI charts (14 bars max in CI fixture).
+        "series": equity_series[:64],
     }
     trade_payload = {
         "n_trades": len(trades),

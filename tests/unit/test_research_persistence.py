@@ -111,6 +111,59 @@ def test_persist_proposal_sets_h1_pending_and_blocks_modeling(
     assert saved.get("disagreement_log")
 
 
+def test_build_h1_decision_accepts_compact_proposal_dict(proposal_and_critique):
+    """UI reloads persisted proposal dicts that include report_version."""
+    proposal, critique = proposal_and_critique
+    compact = compact_research_proposal(proposal)
+    assert "report_version" in compact
+    decision = build_h1_decision(
+        status="approved",
+        proposal=compact,
+        selected_candidate_id=proposal.recommended_candidate_id,
+        notes="Approve from compact session payload.",
+        critique_id=critique.critique_id,
+    )
+    assert decision.status == "approved"
+    assert decision.auto_approved is False
+
+
+def test_attach_then_approve_h1_uses_persisted_proposal(
+    tmp_path: Path, proposal_and_critique
+):
+    """Attach writes report_version; Approve must re-validate that compact dict."""
+    proposal, critique = proposal_and_critique
+    store = LocalProjectStore(root=tmp_path / "projects")
+    boot = _boot_state(store)
+    pending = persist_research_proposal_into_state(
+        store,
+        project_id="mcm-c-demo",
+        project_name="MCM C Demo Project",
+        state=boot,
+        input_signature="sig-phase5-test",
+        proposal=proposal,
+        critique=critique,
+    )
+    attached = pending["research_proposal"]
+    assert "report_version" in attached
+    decision = build_h1_decision(
+        status="approved",
+        proposal=attached,
+        selected_candidate_id=attached.get("recommended_candidate_id"),
+        notes="Approve after Attach (PREA P1 path).",
+        critique_id=critique.critique_id,
+    )
+    saved = persist_h1_decision_into_state(
+        store,
+        project_id="mcm-c-demo",
+        project_name="MCM C Demo Project",
+        state=pending,
+        input_signature="sig-phase5-test",
+        decision=decision,
+    )
+    assert saved["approval_status"]["h1"] == "approved"
+    assert modeling_allowed(saved) is True
+
+
 def test_human_approve_unlocks_gate_but_not_phase6(
     tmp_path: Path, proposal_and_critique
 ):

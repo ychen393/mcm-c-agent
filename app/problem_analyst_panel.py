@@ -160,8 +160,8 @@ def render_problem_analyst_panel(
         run = st.button("Analyze problem", type="primary", key="run_problem_analyst")
     with col_b:
         st.caption(
-            f"Configured flag PROBLEM_ANALYST_USE_LLM={settings.problem_analyst_use_llm} · "
-            f"UI override use_llm={use_llm}"
+            f"Problem Analyst LLM effective={use_llm} "
+            f"(settings={settings.problem_analyst_use_llm})"
         )
 
     spec_dict = resolve_displayed_problem_specification(recorded_state)

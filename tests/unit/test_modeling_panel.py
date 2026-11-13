@@ -69,6 +69,7 @@ def test_resolve_prefers_recorded_experiment_over_session_cache():
 def test_main_wires_modeling_panel():
     source = (REPO / "app" / "main.py").read_text(encoding="utf-8")
     assert "render_modeling_experiment_panel" in source
+    assert "upload_count=len(uploaded_files)" in source
     tree = ast.parse(source)
     names = {
         node.func.id
@@ -76,3 +77,10 @@ def test_main_wires_modeling_panel():
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     assert "render_modeling_experiment_panel" in names
+
+
+def test_modeling_panel_has_fixture_banner_and_viewers():
+    source = (REPO / "app" / "modeling_panel.py").read_text(encoding="utf-8")
+    assert "render_fixture_vs_uploads_banner" in source
+    assert "render_modeling_artifact_viewers" in source
+    assert "upload_count" in source

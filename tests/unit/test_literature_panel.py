@@ -54,3 +54,15 @@ def test_main_wires_literature_panel():
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     assert "render_literature_evidence_panel" in names
+
+
+def test_literature_panel_folds_gaps_into_expander():
+    source = (REPO / "app" / "literature_panel.py").read_text(encoding="utf-8")
+    assert 'f"All evidence gaps ({len(gaps)})"' in source
+    assert "gaps[:3]" in source
+
+
+def test_main_sidebar_shows_effective_llm_flags():
+    source = (REPO / "app" / "main.py").read_text(encoding="utf-8")
+    assert "Problem Analyst LLM (effective)" in source
+    assert "problem_analyst_use_llm_ui" in source

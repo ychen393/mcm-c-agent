@@ -8,6 +8,12 @@ import streamlit as st
 
 from agents.debate_critic import critique_research_proposal
 from agents.research_strategy import synthesize_research_proposal
+from app.artifact_viewers import (
+    candidate_display_label,
+    render_approved_banner,
+    render_h1_approval_card,
+    resolve_h1_selected_candidate,
+)
 from app.persistence_panel import get_or_create_store
 from core.config import Settings
 from database.repositories import build_project_store
@@ -109,8 +115,8 @@ def render_research_h1_panel(
         critique_btn = st.button("Run Debate / Critic", key="run_debate_critic")
     with col_c:
         st.caption(
-            f"RESEARCH_STRATEGY_USE_LLM={settings.research_strategy_use_llm} · "
-            f"UI override use_llm={use_llm}"
+            f"Research Strategy LLM effective={use_llm} "
+            f"(settings={settings.research_strategy_use_llm})"
         )
 
     proposal_dict = resolve_displayed_proposal(recorded_state)
@@ -348,22 +354,81 @@ def render_research_h1_panel(
         st.info("Synthesize and review a proposal before H1.")
         return proposal_dict
 
-    candidate_ids = [
-        c.get("candidate_id")
+    candidates = [
+        c
         for c in (proposal_dict.get("candidates") or [])
-        if c.get("candidate_id")
+        if isinstance(c, dict) and c.get("candidate_id")
     ]
-    default_idx = 0
+    candidate_ids = [str(c["candidate_id"]) for c in candidates]
+    labels_by_id = {
+        str(c["candidate_id"]): candidate_display_label(c) for c in candidates
+    }
     recommended = proposal_dict.get("recommended_candidate_id")
+
+    h1_status, approved_cand, approved_title = resolve_h1_selected_candidate(
+        gate_state if isinstance(gate_state, dict) else None,
+        proposal_dict,
+    )
+    already_approved = h1_status == "approved"
+
+    if already_approved:
+        render_approved_banner(
+            "H1",
+            approved_title or labels_by_id.get(str(recommended), "research plan"),
+        )
+        render_h1_approval_card(
+            candidate=approved_cand
+            or next((c for c in candidates if c.get("candidate_id") == recommended), None),
+            critique=critique_dict,
+            recommended=True,
+        )
+        with st.expander("H1 decision details (read-only)", expanded=False):
+            st.caption(
+                f"selected_id="
+                f"{((gate_state or {}).get('decision_report') or {}).get('h1', {}).get('selected_candidate_id')}"
+            )
+        return proposal_dict
+
+    # Approval card for the candidate under review (recommended by default).
+    preview_id = recommended if recommended in candidate_ids else (
+        candidate_ids[0] if candidate_ids else None
+    )
+    preview_cand = next(
+        (c for c in candidates if c.get("candidate_id") == preview_id),
+        None,
+    )
+    st.markdown("#### Approval card")
+    render_h1_approval_card(
+        candidate=preview_cand,
+        critique=critique_dict,
+        recommended=bool(preview_id and preview_id == recommended),
+    )
+
+    default_idx = 0
     if recommended in candidate_ids:
         default_idx = candidate_ids.index(recommended)
-
-    selected = st.selectbox(
+    label_options = [labels_by_id[cid] for cid in candidate_ids] or ["(none)"]
+    selected_label = st.selectbox(
         "Candidate to approve (required for Approve)",
-        options=candidate_ids or ["(none)"],
+        options=label_options,
         index=default_idx if candidate_ids else 0,
         key="h1_selected_candidate",
+        help="Shows plan titles — IDs remain secondary.",
     )
+    selected = None
+    if candidate_ids:
+        selected = candidate_ids[label_options.index(selected_label)]
+        selected_cand = next(
+            (c for c in candidates if c.get("candidate_id") == selected), None
+        )
+        if selected != preview_id:
+            st.markdown("#### Selected plan card")
+            render_h1_approval_card(
+                candidate=selected_cand,
+                critique=critique_dict,
+                recommended=selected == recommended,
+            )
+
     h1_notes = st.text_area(
         "H1 reviewer notes",
         value="",
@@ -437,6 +502,8 @@ def render_research_h1_panel(
                 st.session_state["last_run"] = saved
                 gate_after = modeling_gate_status(saved)
                 if status == "approved":
+                    approved_label = labels_by_id.get(str(selected), str(selected))
+                    render_approved_banner("H1", approved_label)
                     st.success(
                         "H1 approved by human. "
                         f"modeling_allowed={gate_after.modeling_allowed}. "
