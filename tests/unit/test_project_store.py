@@ -229,14 +229,23 @@ def test_lifecycle_distinctions():
     board = distinguish_status(empty)
     assert board["project_init"] == "success"
     assert board["data_analysis"] == "not done"
-    assert "NOT COMPLETE" in board["research_task"]
+    assert "joint analysis" not in board["research_task"].lower()
+    assert "not started" in board["research_task"].lower() or "initialize" in board["research_task"].lower()
 
     uploads = [("LBMA-GOLD.csv", GOLD), ("BCHAIN-MKPRU.csv", BITCOIN)]
     with_files, _, _ = _state_for(uploads)
     assert lifecycle_from_state(with_files) == "datasets_recorded"
     board2 = distinguish_status(with_files)
     assert board2["data_analysis"] == "datasets recorded"
-    assert "NOT COMPLETE" in board2["research_task"]
+    assert "joint analysis / strategy modeling not implemented" not in board2["research_task"]
+    assert "in progress" in board2["research_task"].lower() or "h1" in board2["research_task"].lower()
+
+    h1_state = dict(with_files)
+    h1_state["approval_status"] = {"h1": "approved"}
+    h1_state["decision_report"] = {"h1": {"status": "approved"}}
+    board3 = distinguish_status(h1_state)
+    assert "H1 approved" in board3["research_task"]
+    assert "Modeling" in board3["research_task"]
 
 
 def test_open_project_store_falls_back_to_local(tmp_path):
@@ -247,7 +256,7 @@ def test_open_project_store_falls_back_to_local(tmp_path):
     )
     info = store.info()
     assert info.backend == "local"
-    assert "PostgreSQL unavailable" in info.detail or "local" in info.detail.lower()
+    assert "Local demo store" in info.detail or "local" in info.detail.lower()
 
 
 def test_persisted_state_rejects_api_keys(tmp_path):

@@ -235,7 +235,7 @@ class LocalProjectStore(ProjectStore):
         return StoreInfo(
             backend="local",
             detail=(
-                "PostgreSQL unavailable or unreachable; using local project store. "
+                "Local demo store — start Docker Postgres for shared persistence. "
                 "Organize files by project_id/run_id under this root. "
                 + REUPLOAD_REQUIRED_MESSAGE
             ),
