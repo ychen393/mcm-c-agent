@@ -1,0 +1,9 @@
+FIXTURE SNIPPET — synthetic excellent-paper-style reference; NOT a real MCM award paper.
+Outstanding contest write-ups typically open with a one-page summary that states the
+problem restatement, the modeling approach, and the headline numerical result with units.
+The body then separates: (1) assumptions and notation, (2) model formulation with decision
+variables for cash/gold/bitcoin holdings, (3) algorithm or policy for daily trades under
+transaction costs, (4) validation on historical prices with walk-forward splits, and
+(5) sensitivity of final wealth to α and to calendar masks. Figures show equity curves and
+position paths; tables report final wealth, turnover, and stress cases. The conclusion
+restates limitations (past prices only; no lookahead) and does not invent external citations.

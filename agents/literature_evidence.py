@@ -1,8 +1,10 @@
-"""Literature & Evidence Agent (Phase 4).
+"""Literature & Evidence Agent (Phase 4+).
 
-Default path is CI-safe offline retrieval over the fixture corpus. Live
-retrieval is gated behind Settings.literature_live_retrieval / use_live=True
-and remains a non-inventing stub (explicit unavailable note).
+Default path is CI-safe offline retrieval over the fixture corpus. When a
+vector index is available, embedding retrieval is preferred and keyword
+search remains the fallback. Live remote retrieval is gated behind
+Settings.literature_live_retrieval / use_live=True and remains a
+non-inventing stub (explicit unavailable note).
 """
 
 from __future__ import annotations
@@ -23,11 +25,12 @@ from schemas.evidence import (
     SourceMetadata,
 )
 from schemas.problem_specification import ProblemSpecification
+from tools.corpus_vector_store import VectorStore
 from tools.literature_corpus import (
     DEFAULT_CORPUS_PATH,
     load_fixture_corpus,
     read_snippet_text,
-    search_fixture_sources,
+    search_with_embeddings_fallback,
 )
 
 PROMPT_VERSION = "literature_evidence_v1"
@@ -179,8 +182,17 @@ def _build_card(
 ) -> EvidenceCard:
     source = _source_metadata(raw)
     snippet_path = raw.get("snippet_file") or raw.get("local_path")
-    snippet_text = read_snippet_text(snippet_path)
-    locator_status = "fixture_local" if snippet_text else "missing"
+    retrieval = raw.get("_retrieval") if isinstance(raw.get("_retrieval"), dict) else {}
+    chunk_text = retrieval.get("chunk_text") if isinstance(retrieval, dict) else None
+    snippet_text = None
+    if isinstance(chunk_text, str) and chunk_text.strip():
+        snippet_text = chunk_text.strip()
+        locator_status = "fixture_local" if source.source_type == "fixture_stub" else "file_present"
+        locator = str(retrieval.get("chunk_id") or snippet_path or source.source_id)
+    else:
+        snippet_text = read_snippet_text(snippet_path)
+        locator_status = "fixture_local" if snippet_text else "missing"
+        locator = str(snippet_path) if snippet_path else None
     snippets: list[EvidenceSnippet] = []
     if snippet_text:
         # Prefer body after the fixture banner line.
@@ -192,7 +204,7 @@ def _build_card(
             EvidenceSnippet(
                 snippet_id=f"sn_{source.source_id}"[:64],
                 text=body[:2000],
-                locator=str(snippet_path),
+                locator=locator,
                 is_verbatim_quote=True,
             )
         )
@@ -360,6 +372,7 @@ def gather_literature_evidence(
     settings: Settings | None = None,
     corpus_path: str | None = None,
     limit: int = 8,
+    vector_store: VectorStore | None = None,
 ) -> LiteratureEvidenceReport:
     """Build a typed evidence report grounded to the problem (and EDA when present)."""
     runtime = settings or get_settings()
@@ -374,12 +387,13 @@ def gather_literature_evidence(
     corpus = load_fixture_corpus(corpus_file)
     path = str(corpus_file)
 
-    matches = search_fixture_sources(
+    matches, retrieval_backend = search_with_embeddings_fallback(
         query_text=query,
         research_question_ids=rq_ids,
         problem_id=spec.problem_id if spec else None,
         limit=limit,
         corpus=corpus,
+        store=vector_store,
     )
     cards = [
         _build_card(raw, targets=targets, rq_ids=rq_ids)
@@ -395,8 +409,17 @@ def gather_literature_evidence(
     gaps = _build_gaps(targets, cards)
     notes = [
         f"Fixture corpus: {corpus.get('corpus_id', 'unknown')} @ {path}",
-        "All cards are corpus-backed fixture stubs; not peer-reviewed publications.",
+        "All cards are corpus-backed; synthetic fixtures are not peer-reviewed publications.",
+        f"Retrieval backend: {retrieval_backend}",
     ]
+    if retrieval_backend == "fixture_embeddings":
+        notes.append(
+            "Embedding retrieval returned ranked chunks; keyword fixture search was not needed."
+        )
+    else:
+        notes.append(
+            "Embedding index unavailable or empty — fell back to fixture keyword search."
+        )
     if not spec:
         notes.append("ProblemSpecification missing — grounding is incomplete.")
     if plan is not None or eda_report:
@@ -404,10 +427,11 @@ def gather_literature_evidence(
     if live_attempted:
         notes.append(live_note or LIVE_UNAVAILABLE_NOTE)
 
+    strategy = "hybrid" if live_attempted or retrieval_backend == "fixture_embeddings" else "deterministic_fixture"
     report = LiteratureEvidenceReport(
         problem_id=spec.problem_id if spec else None,
-        strategy="hybrid" if live_attempted else "deterministic_fixture",
-        retrieval_backend="fixture_corpus",
+        strategy=strategy,
+        retrieval_backend=retrieval_backend,
         live_retrieval_enabled=live,
         live_retrieval_attempted=live_attempted,
         live_retrieval_note=live_note,
