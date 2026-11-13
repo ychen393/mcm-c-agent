@@ -15,6 +15,11 @@ from agents.validation_sensitivity import (
     run_validation_sensitivity,
     validation_sensitivity_status,
 )
+from app.artifact_viewers import (
+    render_approved_banner,
+    render_h2_approval_card,
+    render_h2_scenario_viewers,
+)
 from app.persistence_panel import get_or_create_store
 from core.config import Settings
 from database.repositories import build_project_store
@@ -113,6 +118,9 @@ def render_validation_h2_panel(
         ),
         key="validation_use_llm_ui",
     )
+    st.caption(
+        f"Validation LLM effective={use_llm} (settings={settings.validation_use_llm})"
+    )
 
     report_dict = resolve_displayed_validation_report(recorded_state)
 
@@ -172,14 +180,7 @@ def render_validation_h2_panel(
             f"**Scenarios:** {len(scenarios)}"
         )
 
-        baseline_metrics = report_dict.get("baseline_metrics") or []
-        if baseline_metrics:
-            st.markdown("**Baseline metrics**")
-            for metric in baseline_metrics:
-                st.write(
-                    f"- {metric.get('label')}: **{metric.get('value')}** "
-                    f"{metric.get('unit') or ''}".rstrip()
-                )
+        render_h2_scenario_viewers(report_dict)
 
         for scn in scenarios:
             with st.expander(
@@ -282,6 +283,25 @@ def render_validation_h2_panel(
         st.info("Run and review validation / sensitivity before H2.")
         return report_dict
 
+    h2_status = None
+    if isinstance(gate_state, dict):
+        h2_status = ((gate_state.get("decision_report") or {}).get("h2") or {}).get(
+            "status"
+        ) or (gate_state.get("approval_status") or {}).get("h2")
+    if h2_status == "approved":
+        package_label = (
+            f"validation {report_dict.get('report_id') or ''} · "
+            f"{len(report_dict.get('scenarios') or [])} scenarios"
+        ).strip()
+        render_approved_banner("H2", package_label)
+        render_h2_approval_card(report_dict)
+        with st.expander("H2 decision details (read-only)", expanded=False):
+            st.caption(f"h2_status={h2_status}")
+        return report_dict
+
+    st.markdown("#### Approval card")
+    render_h2_approval_card(report_dict)
+
     h2_notes = st.text_area(
         "H2 reviewer notes",
         value="",
@@ -350,6 +370,10 @@ def render_validation_h2_panel(
                 st.session_state["last_run"] = saved
                 paper_after = paper_gate_status(saved)
                 if status_value == "approved":
+                    render_approved_banner(
+                        "H2",
+                        f"validation {report_dict.get('report_id') or 'package'}",
+                    )
                     st.success(
                         "H2 approved by human. "
                         f"paper_allowed={paper_after.paper_allowed}. "

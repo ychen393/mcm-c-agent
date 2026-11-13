@@ -75,8 +75,8 @@ def render_literature_evidence_panel(
         run = st.button("Gather evidence", type="primary", key="run_literature_evidence")
     with col_b:
         st.caption(
-            f"LITERATURE_LIVE_RETRIEVAL={settings.literature_live_retrieval} · "
-            f"UI override use_live={use_live}"
+            f"Literature live retrieval effective={use_live} "
+            f"(settings={settings.literature_live_retrieval})"
         )
 
     report_dict = resolve_displayed_evidence_report(recorded_state)
@@ -154,12 +154,29 @@ def render_literature_evidence_panel(
                             f"({link.get('strength')}): {link.get('relevance')}"
                         )
         if gaps:
-            st.markdown("**Evidence gaps (explicit)**")
-            for gap in gaps:
+            # UX-A leftover / UX-B fold: badge + collapsed list; at most 3 always-on.
+            always_on = gaps[:3]
+            remainder = gaps[3:]
+            st.markdown(f"**Evidence gaps:** `{len(gaps)}`")
+            for gap in always_on:
                 st.warning(
                     f"`{gap.get('gap_id')}` · {gap.get('sufficiency')} · "
                     f"{gap.get('statement')}"
                 )
+            with st.expander(
+                f"All evidence gaps ({len(gaps)})",
+                expanded=False,
+            ):
+                for gap in gaps:
+                    st.warning(
+                        f"`{gap.get('gap_id')}` · {gap.get('sufficiency')} · "
+                        f"{gap.get('statement')}"
+                    )
+                if remainder:
+                    st.caption(
+                        f"Showing all {len(gaps)} gaps in this expander; "
+                        f"{len(always_on)} previewed above."
+                    )
 
         attach = st.button(
             "Attach evidence cards into project state",

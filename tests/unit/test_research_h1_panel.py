@@ -73,3 +73,11 @@ def test_main_wires_research_h1_panel():
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     assert "render_research_h1_panel" in names
+
+
+def test_h1_panel_uses_approval_cards_and_title_selectbox():
+    source = (REPO / "app" / "research_h1_panel.py").read_text(encoding="utf-8")
+    assert "render_h1_approval_card" in source
+    assert "candidate_display_label" in source
+    assert "render_approved_banner" in source
+    assert "Shows plan titles" in source

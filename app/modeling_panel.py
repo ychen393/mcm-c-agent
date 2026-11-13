@@ -15,9 +15,14 @@ from agents.modeling_experiment import (
     modeling_experiment_status,
     run_modeling_experiment,
 )
+from app.artifact_viewers import (
+    render_fixture_vs_uploads_banner,
+    render_modeling_artifact_viewers,
+)
 from app.persistence_panel import get_or_create_store
 from core.config import Settings
 from database.repositories import build_project_store
+from modeling.fixture_data import PRICE_FIXTURE_ID
 from modeling.gate import modeling_allowed, modeling_gate_status
 from tools.experiment_persistence import persist_experiment_into_state
 
@@ -84,6 +89,7 @@ def render_modeling_experiment_panel(
     project_id: str | None = None,
     project_name: str | None = None,
     input_signature: str | None = None,
+    upload_count: int = 0,
 ) -> dict[str, Any] | None:
     """Render Modeling & Experiment controls. Returns latest report dict if any."""
     st.subheader("Modeling & Experiment")
@@ -93,6 +99,11 @@ def render_modeling_experiment_panel(
         "price fixture (not live market data). Requires human H1 approval in project "
         "state. Optional sandboxed Python does not execute arbitrary code in this slice. "
         "After attach, Validation / H2 is available in Phase 7."
+    )
+
+    render_fixture_vs_uploads_banner(
+        upload_count=int(upload_count or 0),
+        fixture_id=PRICE_FIXTURE_ID,
     )
 
     gate = modeling_gate_status(recorded_state if isinstance(recorded_state, dict) else None)
@@ -250,7 +261,16 @@ def render_modeling_experiment_panel(
             )
         artifacts = latest.get("artifacts") or []
         if artifacts:
-            st.markdown("**Artifacts**")
+            fixture_id = PRICE_FIXTURE_ID
+            params = latest.get("params") or {}
+            if isinstance(params, dict) and params.get("price_fixture_id"):
+                fixture_id = str(params["price_fixture_id"])
+            else:
+                for ref in latest.get("code_refs") or []:
+                    if isinstance(ref, dict) and ref.get("kind") == "fixture_id":
+                        fixture_id = str(ref.get("value") or fixture_id)
+            render_modeling_artifact_viewers(artifacts, fixture_id=fixture_id)
+            st.markdown("**Artifacts (raw)**")
             for art in artifacts:
                 with st.expander(
                     f"{art.get('artifact_id')} · {art.get('kind')}",

@@ -12,6 +12,11 @@ from typing import Any, MutableMapping
 import streamlit as st
 
 from agents.paper_planner import paper_planner_status, run_paper_planner
+from app.artifact_viewers import (
+    render_approved_banner,
+    render_h3_approval_card,
+    render_paper_pdf_preview,
+)
 from app.persistence_panel import get_or_create_store
 from core.config import Settings
 from database.repositories import build_project_store
@@ -124,6 +129,9 @@ def render_paper_h3_panel(
         ),
         key="paper_use_llm_ui",
     )
+    st.caption(
+        f"Paper LLM effective={use_llm} (settings={settings.paper_use_llm})"
+    )
     attempt_pdf = st.checkbox(
         "Attempt PDF compile (optional; soft-fails without TeX)",
         value=False,
@@ -195,6 +203,8 @@ def render_paper_h3_panel(
             f"**Sections:** {len(outline.get('sections') or [])} · "
             f"**Bib entries:** {len(outline.get('bib_entries') or [])}"
         )
+
+        render_paper_pdf_preview(package_dict)
 
         for section in outline.get("sections") or []:
             with st.expander(
@@ -315,6 +325,26 @@ def render_paper_h3_panel(
         st.info("Run and review the paper package before H3.")
         return package_dict
 
+    h3_status = None
+    if isinstance(gate_state, dict):
+        h3_status = ((gate_state.get("decision_report") or {}).get("h3") or {}).get(
+            "status"
+        ) or (gate_state.get("approval_status") or {}).get("h3")
+    outline_title = str(
+        ((package_dict.get("outline") or {}).get("title"))
+        or package_dict.get("package_id")
+        or "paper package"
+    )
+    if h3_status == "approved":
+        render_approved_banner("H3", outline_title)
+        render_h3_approval_card(package_dict)
+        with st.expander("H3 decision details (read-only)", expanded=False):
+            st.caption(f"h3_status={h3_status}")
+        return package_dict
+
+    st.markdown("#### Approval card")
+    render_h3_approval_card(package_dict)
+
     h3_notes = st.text_area(
         "H3 reviewer notes",
         value="",
@@ -385,6 +415,7 @@ def render_paper_h3_panel(
                 st.session_state["last_run"] = saved
                 e2e_after = e2e_gate_status(saved)
                 if status_value == "approved":
+                    render_approved_banner("H3", outline_title)
                     st.success(
                         "H3 approved by human. "
                         f"e2e_allowed={e2e_after.e2e_allowed}. "

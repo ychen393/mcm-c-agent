@@ -77,3 +77,10 @@ def test_main_wires_validation_h2_panel():
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     assert "render_validation_h2_panel" in names
+
+
+def test_h2_panel_uses_approval_card_and_scenario_viewers():
+    source = (REPO / "app" / "validation_h2_panel.py").read_text(encoding="utf-8")
+    assert "render_h2_approval_card" in source
+    assert "render_h2_scenario_viewers" in source
+    assert "render_approved_banner" in source
