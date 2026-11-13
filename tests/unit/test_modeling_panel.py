@@ -62,8 +62,15 @@ def test_resolve_prefers_recorded_experiment_over_session_cache():
         resolve_displayed_experiment_report(recorded, session)["report_id"]
         == "recorded"
     )
-    assert resolve_displayed_experiment_report({"decision_report": {}}, session) is None
+    # Empty recorded run still surfaces the unattached draft so Attach works.
+    assert (
+        resolve_displayed_experiment_report({"decision_report": {}}, session)[
+            "report_id"
+        ]
+        == "cached"
+    )
     assert resolve_displayed_experiment_report(None, session)["report_id"] == "cached"
+    assert resolve_displayed_experiment_report({"decision_report": {}}, {}) is None
 
 
 def test_main_wires_modeling_panel():

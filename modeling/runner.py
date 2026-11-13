@@ -429,11 +429,12 @@ def execute_experiment_run(
 
     Callers must enforce ``assert_modeling_allowed`` before invoking.
     """
-    proposal_model = (
-        proposal
-        if isinstance(proposal, ResearchProposal)
-        else ResearchProposal.model_validate(proposal)
-    )
+    if isinstance(proposal, ResearchProposal):
+        proposal_model = proposal
+    else:
+        from tools.research_persistence import as_research_proposal
+
+        proposal_model = as_research_proposal(proposal)
     candidate = next(
         (c for c in proposal_model.candidates if c.candidate_id == selected_candidate_id),
         None,

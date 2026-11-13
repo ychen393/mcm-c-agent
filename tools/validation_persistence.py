@@ -29,12 +29,16 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def as_validation_report(report: ValidationReport | dict[str, Any]) -> ValidationReport:
+    if isinstance(report, ValidationReport):
+        return report
+    from tools.research_persistence import strip_persistence_only
+
+    return ValidationReport.model_validate(strip_persistence_only(report))
+
+
 def validation_sha256(report: ValidationReport | dict[str, Any]) -> str:
-    model = (
-        report
-        if isinstance(report, ValidationReport)
-        else ValidationReport.model_validate(report)
-    )
+    model = as_validation_report(report)
     payload = model.model_dump(mode="json")
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -44,11 +48,7 @@ def compact_validation_report(
     report: ValidationReport | dict[str, Any],
 ) -> dict[str, Any]:
     """Return a persistence-safe dump of the validation report."""
-    model = (
-        report
-        if isinstance(report, ValidationReport)
-        else ValidationReport.model_validate(report)
-    )
+    model = as_validation_report(report)
     if model.invented_results or model.live_trading_api_used:
         raise ValueError("Refusing to persist unsafe validation report.")
     if not model.h1_approved or not model.validation_allowed:
@@ -142,11 +142,7 @@ def build_h2_decision(
     notes: str = "",
 ) -> H2Decision:
     """Construct a human H2 decision. Never sets auto_approved."""
-    model = (
-        report
-        if isinstance(report, ValidationReport)
-        else ValidationReport.model_validate(report)
-    )
+    model = as_validation_report(report)
     digest = hashlib.sha256(
         f"{model.report_id}|{status}|{notes}".encode("utf-8")
     ).hexdigest()[:10]

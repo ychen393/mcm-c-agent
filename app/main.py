@@ -953,9 +953,15 @@ inputs_current = sync_foundation_state(
     llm_config_revision=llm_revision,
     store=project_store,
 )
-recorded_state = (
-    st.session_state.get("last_run") if st.session_state.get("foundation_initialized") else None
-)
+def _recorded_state_from_session() -> dict | None:
+    """Prefer the latest session run so later panels see same-click gate updates."""
+    if not st.session_state.get("foundation_initialized"):
+        return None
+    latest = st.session_state.get("last_run")
+    return latest if isinstance(latest, dict) else None
+
+
+recorded_state = _recorded_state_from_session()
 form_signature = None
 computed = compute_form_signature(
     project_id=project_id,
@@ -986,6 +992,7 @@ if bundle is not None and not bundle_rejected:
         temporal_frequency_by_dataset=st.session_state.get("eda_bundle_frequencies"),
     )
 eda_plan_for_lit = st.session_state.get("problem_aware_eda_plan")
+recorded_state = _recorded_state_from_session()
 eda_report_for_lit = None
 if isinstance(recorded_state, dict):
     maybe_eda = recorded_state.get("eda_report")
@@ -1001,6 +1008,7 @@ render_literature_evidence_panel(
     project_name=project_name,
     input_signature=form_signature,
 )
+recorded_state = _recorded_state_from_session()
 evidence_for_h1 = None
 if isinstance(recorded_state, dict):
     maybe_ev = recorded_state.get("evidence_report")
@@ -1021,6 +1029,8 @@ render_research_h1_panel(
     project_name=project_name,
     input_signature=form_signature,
 )
+# H1 / attach actions update last_run mid-script; refresh before downstream gates.
+recorded_state = _recorded_state_from_session()
 render_modeling_experiment_panel(
     settings=settings,
     problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
@@ -1029,6 +1039,7 @@ render_modeling_experiment_panel(
     project_name=project_name,
     input_signature=form_signature,
 )
+recorded_state = _recorded_state_from_session()
 render_validation_h2_panel(
     settings=settings,
     problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
@@ -1037,6 +1048,7 @@ render_validation_h2_panel(
     project_name=project_name,
     input_signature=form_signature,
 )
+recorded_state = _recorded_state_from_session()
 render_paper_h3_panel(
     settings=settings,
     problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
@@ -1045,6 +1057,7 @@ render_paper_h3_panel(
     project_name=project_name,
     input_signature=form_signature,
 )
+recorded_state = _recorded_state_from_session()
 render_persistence_panel(
     project_store,
     project_id=project_id,

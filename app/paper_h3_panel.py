@@ -66,7 +66,7 @@ def resolve_displayed_paper_package(
                 else None,
                 "review": review if isinstance(review, dict) and review else None,
             }
-        return None
+        # Fall through: keep unattached session package visible for Attach.
     cached = state.get(PAPER_SESSION_KEY)
     if isinstance(cached, dict) and cached:
         return cached
