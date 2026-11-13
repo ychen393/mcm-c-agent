@@ -46,7 +46,9 @@ def _as_proposal(
     if isinstance(proposal, ResearchProposal):
         return proposal
     if isinstance(proposal, dict) and proposal:
-        return ResearchProposal.model_validate(proposal)
+        from tools.research_persistence import as_research_proposal
+
+        return as_research_proposal(proposal)
     return None
 
 

@@ -137,6 +137,20 @@ def test_persist_sets_h2_pending_and_blocks_paper(validation_bundle):
     ) is False
 
 
+def test_build_h2_decision_accepts_compact_report_dict(validation_bundle):
+    """Attach persists report_version; Approve must re-validate that compact dict."""
+    _store, _state, report = validation_bundle
+    compact = compact_validation_report(report)
+    assert "report_version" in compact
+    decision = build_h2_decision(
+        status="approved",
+        report=compact,
+        notes="Approve from compact validation payload.",
+    )
+    assert decision.status == "approved"
+    assert decision.auto_approved is False
+
+
 def test_h2_approve_sets_paper_gate_flag_only(validation_bundle):
     store, state, report = validation_bundle
     saved = persist_validation_into_state(
@@ -149,7 +163,7 @@ def test_h2_approve_sets_paper_gate_flag_only(validation_bundle):
     )
     decision = build_h2_decision(
         status="approved",
-        report=report,
+        report=saved["validation_report"],
         notes="Human H2 approve for test",
     )
     after = persist_h2_decision_into_state(

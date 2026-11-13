@@ -30,10 +30,16 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def as_paper_package(package: PaperPackage | dict[str, Any]) -> PaperPackage:
+    if isinstance(package, PaperPackage):
+        return package
+    from tools.research_persistence import strip_persistence_only
+
+    return PaperPackage.model_validate(strip_persistence_only(package))
+
+
 def package_sha256(package: PaperPackage | dict[str, Any]) -> str:
-    model = (
-        package if isinstance(package, PaperPackage) else PaperPackage.model_validate(package)
-    )
+    model = as_paper_package(package)
     payload = model.model_dump(mode="json")
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -43,9 +49,7 @@ def compact_paper_package(
     package: PaperPackage | dict[str, Any],
 ) -> dict[str, Any]:
     """Return a persistence-safe dump of the paper package."""
-    model = (
-        package if isinstance(package, PaperPackage) else PaperPackage.model_validate(package)
-    )
+    model = as_paper_package(package)
     if model.invented_citations or model.outline.invented_citations:
         raise ValueError("Refusing to persist paper package with invented citations.")
     if not model.h2_approved or not model.paper_allowed:
@@ -156,9 +160,7 @@ def build_h3_decision(
     notes: str = "",
 ) -> H3Decision:
     """Construct a human H3 decision. Never sets auto_approved."""
-    model = (
-        package if isinstance(package, PaperPackage) else PaperPackage.model_validate(package)
-    )
+    model = as_paper_package(package)
     digest = hashlib.sha256(
         f"{model.package_id}|{status}|{notes}".encode("utf-8")
     ).hexdigest()[:10]

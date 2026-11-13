@@ -137,6 +137,20 @@ def test_persist_sets_h3_pending_and_blocks_e2e(paper_bundle):
     ) is False
 
 
+def test_build_h3_decision_accepts_compact_package_dict(paper_bundle):
+    """Attach persists report_version; Approve must re-validate that compact dict."""
+    _store, _state, package = paper_bundle
+    compact = compact_paper_package(package)
+    assert "report_version" in compact
+    decision = build_h3_decision(
+        status="approved",
+        package=compact,
+        notes="Approve from compact paper payload.",
+    )
+    assert decision.status == "approved"
+    assert decision.auto_approved is False
+
+
 def test_h3_approve_unlocks_e2e_flag_without_phase9(paper_bundle):
     store, state, package = paper_bundle
     saved = persist_paper_into_state(
@@ -149,7 +163,7 @@ def test_h3_approve_unlocks_e2e_flag_without_phase9(paper_bundle):
     )
     decision = build_h3_decision(
         status="approved",
-        package=package,
+        package=(saved.get("decision_report") or {}).get("paper") or package,
         notes="Human H3 approve for tests",
     )
     assert decision.auto_approved is False
