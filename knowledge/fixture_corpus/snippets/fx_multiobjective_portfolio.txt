@@ -1,0 +1,8 @@
+FIXTURE SNIPPET — synthetic excellent-paper-style reference; NOT a real MCM award paper.
+Method excerpt (structure only): multi-objective portfolio framing treats terminal wealth,
+drawdown, and turnover as competing criteria under proportional trading frictions. A common
+excellent-paper pattern is to optimize an expected terminal-wealth objective subject to
+soft penalties on turnover and hard constraints that gold trades only on open days while
+bitcoin may trade daily. Pareto fronts across wealth versus turnover help the trader memo
+communicate trade-offs without claiming a unique optimum. All objectives are estimated from
+the past price stream available at each decision day.

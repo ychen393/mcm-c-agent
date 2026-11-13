@@ -22,3 +22,12 @@ outputs/*
 # Phase 1 local project store (runtime)
 data/projects/*
 !data/projects/.gitkeep
+
+# Owner-provided / licensed corpus texts (never commit award PDFs)
+data/corpus_private/*
+!data/corpus_private/.gitkeep
+!data/corpus_private/README.md
+
+# Local embedding index cache (optional offline store)
+data/corpus_index/*
+!data/corpus_index/.gitkeep
