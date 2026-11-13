@@ -19,17 +19,35 @@ from schemas.research import DebateCritique, H1Decision, ResearchProposal
 PROPOSAL_REPORT_VERSION = "research_proposal_1.0"
 DECISION_REPORT_VERSION = "h1_decision_1.0"
 
+# Persistence wrappers add this key; Pydantic research models forbid extras.
+PERSISTENCE_ONLY_KEYS = frozenset({"report_version"})
+
+
+def strip_persistence_only(payload: dict[str, Any]) -> dict[str, Any]:
+    """Drop persistence wrapper keys before validating strict Pydantic contracts."""
+    return {k: v for k, v in payload.items() if k not in PERSISTENCE_ONLY_KEYS}
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def as_research_proposal(proposal: ResearchProposal | dict[str, Any]) -> ResearchProposal:
+    """Validate a proposal, ignoring persistence-only wrapper keys like report_version."""
+    if isinstance(proposal, ResearchProposal):
+        return proposal
+    return ResearchProposal.model_validate(strip_persistence_only(proposal))
+
+
+def as_debate_critique(critique: DebateCritique | dict[str, Any]) -> DebateCritique:
+    """Validate a critique, ignoring persistence-only wrapper keys like report_version."""
+    if isinstance(critique, DebateCritique):
+        return critique
+    return DebateCritique.model_validate(strip_persistence_only(critique))
+
+
 def proposal_sha256(proposal: ResearchProposal | dict[str, Any]) -> str:
-    model = (
-        proposal
-        if isinstance(proposal, ResearchProposal)
-        else ResearchProposal.model_validate(proposal)
-    )
+    model = as_research_proposal(proposal)
     payload = model.model_dump(mode="json")
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -39,11 +57,7 @@ def compact_research_proposal(
     proposal: ResearchProposal | dict[str, Any],
 ) -> dict[str, Any]:
     """Return a persistence-safe dump of the research proposal."""
-    model = (
-        proposal
-        if isinstance(proposal, ResearchProposal)
-        else ResearchProposal.model_validate(proposal)
-    )
+    model = as_research_proposal(proposal)
     if model.invented_sources or any(c.invented_sources for c in model.candidates):
         raise ValueError("Refusing to persist invented research sources.")
     payload = model.model_dump(mode="json")
@@ -57,11 +71,7 @@ def compact_debate_critique(
     critique: DebateCritique | dict[str, Any],
 ) -> dict[str, Any]:
     """Return a persistence-safe dump of the debate critique."""
-    model = (
-        critique
-        if isinstance(critique, DebateCritique)
-        else DebateCritique.model_validate(critique)
-    )
+    model = as_debate_critique(critique)
     if model.invented_sources or any(f.invented_source for f in model.findings):
         raise ValueError("Refusing to persist invented critique sources.")
     payload = model.model_dump(mode="json")
@@ -75,11 +85,7 @@ def disagreement_log_from_critique(
     critique: DebateCritique | dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Compact disagreement_log entries from critique findings."""
-    model = (
-        critique
-        if isinstance(critique, DebateCritique)
-        else DebateCritique.model_validate(critique)
-    )
+    model = as_debate_critique(critique)
     entries: list[dict[str, Any]] = []
     for finding in model.findings:
         entry = {
@@ -228,11 +234,7 @@ def build_h1_decision(
     critique_id: str | None = None,
 ) -> H1Decision:
     """Construct a human H1 decision. Never sets auto_approved."""
-    model = (
-        proposal
-        if isinstance(proposal, ResearchProposal)
-        else ResearchProposal.model_validate(proposal)
-    )
+    model = as_research_proposal(proposal)
     if status == "approved":
         selected = selected_candidate_id or model.recommended_candidate_id
         if not selected:

@@ -337,7 +337,9 @@ def render_research_h1_panel(
 
     # --- Human H1 gate (never auto) ---
     st.markdown("### Human Approval Gate H1")
-    gate_state = recorded_state if isinstance(recorded_state, dict) else st.session_state.get("last_run")
+    # Prefer last_run so a same-click H1 approval is visible in this panel's gate banner.
+    latest_run = st.session_state.get("last_run")
+    gate_state = latest_run if isinstance(latest_run, dict) else recorded_state
     gate = modeling_gate_status(gate_state if isinstance(gate_state, dict) else None)
     if gate.modeling_allowed:
         st.success(gate.message)

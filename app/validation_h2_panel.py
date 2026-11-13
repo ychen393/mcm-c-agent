@@ -44,7 +44,7 @@ def resolve_displayed_validation_report(
     recorded_state: dict[str, Any] | None,
     session_state: MutableMapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """Prefer recorded validation_report over an orphan session cache."""
+    """Prefer recorded validation; keep session cache until attach persists it."""
     state = st.session_state if session_state is None else session_state
     if recorded_state is not None:
         existing = recorded_state.get("validation_report")
@@ -55,7 +55,6 @@ def resolve_displayed_validation_report(
             nested = decision.get("validation")
             if isinstance(nested, dict) and nested:
                 return nested
-        return None
     cached = state.get(VALIDATION_SESSION_KEY)
     if isinstance(cached, dict) and cached:
         return cached

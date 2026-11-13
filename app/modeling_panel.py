@@ -45,7 +45,11 @@ def resolve_displayed_experiment_report(
     recorded_state: dict[str, Any] | None,
     session_state: MutableMapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """Prefer recorded decision_report.experiment over an orphan session cache."""
+    """Prefer recorded experiment; keep session cache until attach persists it.
+
+    Without the session fallback, a just-completed run disappears on the next
+    click (Attach), because recorded_state exists but has no experiment yet.
+    """
     state = st.session_state if session_state is None else session_state
     if recorded_state is not None:
         decision = recorded_state.get("decision_report") or {}
@@ -53,7 +57,6 @@ def resolve_displayed_experiment_report(
             experiment = decision.get("experiment")
             if isinstance(experiment, dict) and experiment:
                 return experiment
-        return None
     cached = state.get(EXPERIMENT_SESSION_KEY)
     if isinstance(cached, dict) and cached:
         return cached

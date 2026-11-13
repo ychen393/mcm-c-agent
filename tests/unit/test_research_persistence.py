@@ -111,6 +111,22 @@ def test_persist_proposal_sets_h1_pending_and_blocks_modeling(
     assert saved.get("disagreement_log")
 
 
+def test_build_h1_decision_accepts_compact_proposal_dict(proposal_and_critique):
+    """UI reloads persisted proposal dicts that include report_version."""
+    proposal, critique = proposal_and_critique
+    compact = compact_research_proposal(proposal)
+    assert "report_version" in compact
+    decision = build_h1_decision(
+        status="approved",
+        proposal=compact,
+        selected_candidate_id=proposal.recommended_candidate_id,
+        notes="Approve from compact session payload.",
+        critique_id=critique.critique_id,
+    )
+    assert decision.status == "approved"
+    assert decision.auto_approved is False
+
+
 def test_human_approve_unlocks_gate_but_not_phase6(
     tmp_path: Path, proposal_and_critique
 ):

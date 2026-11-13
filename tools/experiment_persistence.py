@@ -17,8 +17,24 @@ EXPERIMENT_REPORT_VERSION = "experiment_report_1.0"
 EXPERIMENT_LOG_VERSION = "experiment_log_1.0"
 
 
+def as_experiment_run(run: ExperimentRun | dict[str, Any]) -> ExperimentRun:
+    if isinstance(run, ExperimentRun):
+        return run
+    from tools.research_persistence import strip_persistence_only
+
+    return ExperimentRun.model_validate(strip_persistence_only(run))
+
+
+def as_experiment_report(report: ExperimentReport | dict[str, Any]) -> ExperimentReport:
+    if isinstance(report, ExperimentReport):
+        return report
+    from tools.research_persistence import strip_persistence_only
+
+    return ExperimentReport.model_validate(strip_persistence_only(report))
+
+
 def compact_experiment_run(run: ExperimentRun | dict[str, Any]) -> dict[str, Any]:
-    model = run if isinstance(run, ExperimentRun) else ExperimentRun.model_validate(run)
+    model = as_experiment_run(run)
     if model.invented_results:
         raise ValueError("Refusing to persist invented experiment results.")
     if model.live_trading_api_used:
@@ -36,11 +52,7 @@ def compact_experiment_run(run: ExperimentRun | dict[str, Any]) -> dict[str, Any
 def compact_experiment_report(
     report: ExperimentReport | dict[str, Any],
 ) -> dict[str, Any]:
-    model = (
-        report
-        if isinstance(report, ExperimentReport)
-        else ExperimentReport.model_validate(report)
-    )
+    model = as_experiment_report(report)
     if model.invented_results or model.live_trading_api_used:
         raise ValueError("Refusing to persist unsafe experiment report.")
     if not model.h1_approved or not model.modeling_allowed:
@@ -56,7 +68,7 @@ def compact_experiment_report(
 def model_artifact_entries_from_run(
     run: ExperimentRun | dict[str, Any],
 ) -> list[dict[str, Any]]:
-    model = run if isinstance(run, ExperimentRun) else ExperimentRun.model_validate(run)
+    model = as_experiment_run(run)
     entries: list[dict[str, Any]] = []
     for artifact in model.artifacts:
         entry = {
@@ -119,11 +131,7 @@ def persist_experiment_into_state(
 ) -> dict[str, Any]:
     """Attach sanitized experiment report into project state. Requires H1 approved."""
     assert_modeling_allowed(state)
-    model = (
-        report
-        if isinstance(report, ExperimentReport)
-        else ExperimentReport.model_validate(report)
-    )
+    model = as_experiment_report(report)
     if not model.runs:
         raise ValueError("Experiment report has no runs to persist.")
 
