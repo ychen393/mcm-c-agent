@@ -1,6 +1,7 @@
 import json
 
 import streamlit as st
+from app.i18n import render_language_toggle, t
 
 from agents.visual_eda_agent import plan_visual_eda
 from app.api_settings import SESSION_REVISION_KEY, build_runtime_settings, render_api_settings
@@ -52,17 +53,30 @@ from tools.relationship_profiler import profile_relationships
 
 base_settings = get_settings()
 st.set_page_config(page_title=base_settings.app_name, page_icon="🧮", layout="wide")
+# Language toggle early so all subsequent t() calls see the active locale.
+render_language_toggle(location="sidebar")
 settings = build_runtime_settings(
     base_settings, st.session_state.get("llm_session_config")
 )
-page = st.sidebar.radio("Navigation", ["Research Lab", "API Settings"], key="workspace_navigation")
-if page == "API Settings":
+# Stable English option values (AppTest / session_state); format_func translates.
+_NAV_LAB = "Research Lab"
+_NAV_API = "API Settings"
+page = st.sidebar.radio(
+    t("nav.navigation"),
+    [_NAV_LAB, _NAV_API],
+    format_func=lambda v: (
+        t("nav.research_lab") if v == _NAV_LAB else t("nav.api_settings")
+    ),
+    key="workspace_navigation",
+)
+if page == _NAV_API:
     render_api_settings(base_settings)
     st.stop()
 
-st.title("MCM C Research Lab")
-st.caption("A semi-autonomous research workspace for MCM Problem C")
+st.title(t("chrome.title"))
+st.caption(t("chrome.caption"))
 
+# Stable English values; labels via format_func so startswith("Not specified") stays valid.
 FREQUENCY_OPTIONS = [
     "Not specified — estimate from dates",
     "Business-day daily",
@@ -73,6 +87,21 @@ FREQUENCY_OPTIONS = [
     "Annual",
     "Irregular",
 ]
+_FREQUENCY_I18N = {
+    "Not specified — estimate from dates": "dataset.freq.not_specified",
+    "Business-day daily": "dataset.freq.business_daily",
+    "Daily": "dataset.freq.daily",
+    "Weekly": "dataset.freq.weekly",
+    "Monthly": "dataset.freq.monthly",
+    "Quarterly": "dataset.freq.quarterly",
+    "Annual": "dataset.freq.annual",
+    "Irregular": "dataset.freq.irregular",
+}
+
+
+def _frequency_label(value: str) -> str:
+    key = _FREQUENCY_I18N.get(value)
+    return t(key) if key else value
 
 
 PENDING_KEYS = (
@@ -188,11 +217,11 @@ def _drop_stale_approval(current_identity: str | None) -> None:
     )
     if plan_is_stale:
         _clear_pending_plan()
-        st.info("The uploaded dataset changed. The previous unapproved chart plan was cleared.")
+        st.info(t("dataset.upload_changed_plan"))
     if report_is_stale:
         _clear_saved_report()
         if not plan_is_stale:
-            st.info("The uploaded dataset changed. The previous saved report was cleared.")
+            st.info(t("dataset.upload_changed_report"))
 
 
 def _numeric_stat(column: dict, key: str):
@@ -213,7 +242,7 @@ def _render_independent_profile(view: dict, preview) -> None:
     st.caption(f"SHA-256: {view['sha256']}")
     st.caption(f"File: {view['file_name']} · Display name: {view['display_name']}")
     st.dataframe(preview, use_container_width=True)
-    st.subheader("Column profiles")
+    st.subheader(t("dataset.column_profiles"))
     st.dataframe(
         [
             {
@@ -234,7 +263,7 @@ def _render_independent_profile(view: dict, preview) -> None:
         use_container_width=True,
     )
     if view["warnings"]:
-        st.subheader("Data quality warnings")
+        st.subheader(t("dataset.quality_warnings"))
         for warning in view["warnings"]:
             st.warning(warning)
     context_cols = st.columns(4)
@@ -292,8 +321,9 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
                 key=f"eda_source_{ref.dataset_id}",
             )
             frequency_choice = st.selectbox(
-                "Data frequency",
+                t("dataset.frequency"),
                 FREQUENCY_OPTIONS,
+                format_func=_frequency_label,
                 key=f"eda_frequency_{ref.dataset_id}",
             )
             frequencies[ref.dataset_id] = (
@@ -387,7 +417,7 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
 
 
 def _render_chart_plan(plan: ChartPlan) -> None:
-    st.subheader("Proposed chart plan")
+    st.subheader(t("dataset.proposed_plan"))
     if plan.strategy == "agent":
         st.success(
             f"AI plan · {plan.planner_provider} / {plan.planner_model} · "
@@ -433,10 +463,10 @@ def _render_chart_plan(plan: ChartPlan) -> None:
 
 
 with st.sidebar:
-    st.subheader("Environment")
-    st.caption(f"Environment: {settings.app_env}")
-    st.caption(f"LLM provider: {settings.llm_provider}")
-    st.caption(f"LLM model: {settings.llm_model}")
+    st.subheader(t("chrome.environment"))
+    st.caption(t("chrome.env_label", value=settings.app_env))
+    st.caption(t("chrome.llm_provider", value=settings.llm_provider))
+    st.caption(t("chrome.llm_model", value=settings.llm_model))
     # Effective flags: UI checkbox overrides when present in session (UX-A leftover / UX-B).
     _eff_pa = st.session_state.get(
         "problem_analyst_use_llm_ui", settings.problem_analyst_use_llm
@@ -452,50 +482,37 @@ with st.sidebar:
     )
     _eff_paper = st.session_state.get("paper_use_llm_ui", settings.paper_use_llm)
     st.caption(
-        f"Problem Analyst LLM (effective): {_eff_pa} "
-        f"(settings={settings.problem_analyst_use_llm})"
+        t("chrome.pa_llm_effective", effective=_eff_pa, settings=settings.problem_analyst_use_llm)
     )
     st.caption(
-        f"Literature live retrieval (effective): {_eff_lit} "
-        f"(settings={settings.literature_live_retrieval})"
+        t("chrome.lit_live_effective", effective=_eff_lit, settings=settings.literature_live_retrieval)
     )
     st.caption(
-        f"Research Strategy LLM (effective): {_eff_rs} "
-        f"(settings={settings.research_strategy_use_llm})"
+        t("chrome.rs_llm_effective", effective=_eff_rs, settings=settings.research_strategy_use_llm)
     )
     st.caption(
-        f"Validation LLM (effective): {_eff_val} "
-        f"(settings={settings.validation_use_llm})"
+        t("chrome.val_llm_effective", effective=_eff_val, settings=settings.validation_use_llm)
     )
     st.caption(
-        f"Paper LLM (effective): {_eff_paper} "
-        f"(settings={settings.paper_use_llm})"
+        t("chrome.paper_llm_effective", effective=_eff_paper, settings=settings.paper_use_llm)
     )
 
-st.subheader("Create a research project")
-project_name = st.text_input("Project name", value="MCM C Demo Project")
+st.subheader(t("project.create_header"))
+project_name = st.text_input(t("project.name"), value="MCM C Demo Project")
 project_id = st.text_input(
-    "Project ID for saved artifacts",
+    t("project.id"),
     value="mcm-c-demo",
-    help="Dataset Explorer and the foundation state both use this project ID.",
+    help=t("project.id_help"),
 )
 problem_text = st.text_area(
-    "MCM problem statement / research question",
+    t("project.problem"),
     height=180,
-    help=(
-        "Problem Analyst turns this into a validated ProblemSpecification. "
-        "The Visual EDA Planner also uses it for chart relevance."
-    ),
+    help=t("project.problem_help"),
 )
-st.caption(
-    "Initialize records this project and any validated datasets already loaded below. "
-    "Problem Analyst can structure the statement without starting joint modeling. "
-    "Lab progress (Project → EDA → Literature → H1 → Modeling → H2 → Paper → H3) "
-    "updates from the recorded run after initialize."
-)
-if st.button("Initialize project", type="primary"):
+st.caption(t("project.init_caption"))
+if st.button(t("project.init_button"), type="primary"):
     if len(project_name.strip()) < 3:
-        st.error("Project name must contain at least 3 characters.")
+        st.error(t("project.name_too_short"))
     else:
         try:
             safe_project_id(project_id)
@@ -503,20 +520,16 @@ if st.button("Initialize project", type="primary"):
             st.error(str(exc))
         else:
             mark_project_initialized()
-            st.success(INIT_MESSAGE)
+            st.success(t("project.init_ok"))
 
 st.divider()
-st.header("Dataset Explorer")
-st.write(
-    "Upload 1 to 5 CSV or XLSX files. Each file is profiled on its own with a stable dataset ID. "
-    "A single file can still prepare a chart plan. Multiple files are not joined. "
-    "Saved artifacts use the project ID from the form above."
-)
+st.header(t("dataset.header"))
+st.write(t("dataset.intro"))
 uploaded_files = st.file_uploader(
-    "Choose 1 to 5 datasets",
+    t("dataset.uploader"),
     type=["csv", "xlsx"],
     accept_multiple_files=True,
-    help="CSV or XLSX. Up to 5 files, 20 MB each, 50 MB combined. Files are not joined.",
+    help=t("dataset.uploader_help"),
     key="dataset_uploader",
 )
 uploaded_files = list(uploaded_files or [])
@@ -579,45 +592,37 @@ else:
                 + ", ".join(dataset_ref.qualified_column_names)
             )
 
-            with st.expander("Dataset context (optional)", expanded=False):
+            with st.expander(t("dataset.context_optional"), expanded=False):
                 _restore_dataset_context()
                 data_source = st.text_input(
-                    "Data source",
+                    t("dataset.data_source"),
                     placeholder="e.g., LBMA Gold Price PM / official source URL",
                     key="eda_data_source",
                 )
                 frequency_choice = st.selectbox(
-                    "Data frequency",
+                    t("dataset.frequency"),
                     FREQUENCY_OPTIONS,
+                    format_func=_frequency_label,
                     key="eda_frequency",
                 )
                 units_text = st.text_area(
-                    "Column units (one per line: column_name = unit)",
+                    t("dataset.units"),
                     placeholder="price = USD per troy ounce",
                     key="eda_column_units",
                     height=80,
                 )
 
             use_ai_planner = st.checkbox(
-                "Use AI Visual EDA Planner",
+                t("dataset.ai_planner"),
                 value=False,
-                help=(
-                    "When enabled, the problem statement and compact dataset profile "
-                    "are sent to the configured LLM provider."
-                ),
+                help=t("dataset.ai_planner_help"),
             )
             if use_ai_planner:
-                st.warning(
-                    "External model processing is enabled. The planner sends the problem statement "
-                    "and compact column/statistical profile, not the full raw CSV/XLSX rows."
-                )
+                st.warning(t("dataset.ai_warning"))
             else:
-                st.caption(
-                    "AI planning is off. A deterministic generic chart plan "
-                    "will be prepared locally."
-                )
+                st.caption(t("dataset.ai_off"))
 
-            if st.button("Generate chart plan", type="primary", key="generate_chart_plan"):
+            if st.button(t("dataset.generate_plan"), type="primary", key="generate_chart_plan"):
                 _clear_pending_plan()
                 _clear_saved_report()
                 try:
@@ -666,11 +671,11 @@ else:
                         settings.llm_model,
                         st.session_state.get(SESSION_REVISION_KEY, 0),
                     )
-                    st.success("Chart plan generated. Review it below before approving execution.")
+                    st.success(t("dataset.plan_generated"))
                 except ValueError as exc:
                     st.error(str(exc))
                 except Exception as exc:
-                    st.error(f"Chart planning failed: {type(exc).__name__}: {exc}")
+                    st.error(t("dataset.planning_failed", err=f"{type(exc).__name__}: {exc}"))
 
             if "eda_pending_plan" in st.session_state and pending_plan_matches(
                 st.session_state.get("eda_pending_dataset_sha"),
@@ -708,21 +713,18 @@ else:
                 _render_chart_plan(pending_plan)
 
                 if context_changed:
-                    st.warning(
-                        "The problem statement or dataset metadata changed after "
-                        "this plan was created. Generate a new plan before approving it."
-                    )
+                    st.warning(t("dataset.context_changed"))
 
                 approve_col, discard_col = st.columns(2)
                 with approve_col:
                     approve_clicked = st.button(
-                        "Approve plan & generate charts",
+                        t("dataset.approve_plan"),
                         type="primary",
                         disabled=context_changed,
                         key="approve_chart_plan",
                     )
                 with discard_col:
-                    discard_clicked = st.button("Discard plan", key="discard_chart_plan")
+                    discard_clicked = st.button(t("dataset.discard_plan"), key="discard_chart_plan")
 
                 if discard_clicked:
                     _clear_pending_plan()
@@ -776,12 +778,10 @@ else:
                             )
                             st.session_state["last_run"] = saved
                         _clear_pending_plan()
-                        st.success(
-                            "Approved chart plan executed. Reports and charts have been saved."
-                        )
+                        st.success(t("dataset.plan_executed"))
                         st.rerun()
                     except Exception as exc:
-                        st.error(f"Chart execution failed: {type(exc).__name__}: {exc}")
+                        st.error(t("dataset.execution_failed", err=f"{type(exc).__name__}: {exc}"))
         else:
             _render_multi_dataset_eda(bundle)
 
@@ -931,28 +931,28 @@ if "eda_report" in st.session_state and report_matches_selection:
                     f"Source columns: {', '.join(meta.get('source_columns', [spec['x']]))} · "
                     f"Dataset SHA-256: {meta['source_sha256'][:12]}…"
                 )
-                with st.expander("Technical metrics (JSON)"):
+                with st.expander(t("dataset.technical_metrics")):
                     st.json(meta["metrics"])
             else:
                 st.image(chart_path, caption=chart_path.split("/")[-1], use_container_width=True)
     else:
-        st.info("No charts were generated for the approved plan.")
+        st.info(t("dataset.no_charts_generated"))
 
     with open(artifacts["report_markdown_path"], "rb") as report_file:
         st.download_button(
-            "Download EDA Markdown Report",
+            t("dataset.download_md"),
             data=report_file,
             file_name="eda_report.md",
             mime="text/markdown",
         )
     with open(artifacts["report_json_path"], "rb") as report_file:
         st.download_button(
-            "Download EDA JSON",
+            t("dataset.download_json"),
             data=report_file,
             file_name="eda_report.json",
             mime="application/json",
         )
-    st.caption(f"Artifacts saved under: {settings.output_dir / project_id / 'eda'}")
+    st.caption(t("dataset.artifacts_under", path=settings.output_dir / project_id / "eda"))
 
 project_store = get_or_create_store(lambda: build_project_store(settings))
 llm_revision = int(st.session_state.get(SESSION_REVISION_KEY, 0))
@@ -990,21 +990,18 @@ progress = derive_progress_chrome(
     recorded_state if isinstance(recorded_state, dict) else None
 )
 with st.sidebar:
-    st.subheader("Workspace")
+    st.subheader(t("chrome.workspace"))
     st.info(progress.sidebar_badge)
     st.caption(progress.stepper_line)
 
-st.subheader("System status")
+st.subheader(t("chrome.system_status"))
 status_cols = st.columns(3)
-status_cols[0].metric("Current stage", progress.milestone_metric)
-status_cols[1].metric("Lab progress", progress.progress_metric)
-status_cols[2].metric("Configured provider", settings.llm_provider)
+status_cols[0].metric(t("chrome.metric.current_stage"), progress.milestone_metric)
+status_cols[1].metric(t("chrome.metric.lab_progress"), progress.progress_metric)
+status_cols[2].metric(t("chrome.metric.provider"), settings.llm_provider)
 st.caption(progress.caption)
 st.caption(progress.stepper_line)
-st.info(
-    "Independent profiles and relationship previews never auto-merge. "
-    "Chart execution still requires explicit approval."
-)
+st.info(t("chrome.independent_profiles_info"))
 
 render_project_phases(recorded_state, inputs_current=inputs_current)
 spec_for_eda = render_problem_analyst_panel(
@@ -1090,15 +1087,14 @@ render_persistence_panel(
 )
 
 if recorded_state is not None:
-    st.subheader("Latest foundation state")
+    st.subheader(t("chrome.foundation_state"))
     st.caption(
-        "Recorded when you initialize the project, change inputs, or persist approved EDA. "
-        f"run_id={recorded_state.get('run_id')} · lifecycle={recorded_state.get('lifecycle')}"
-    )
-    with st.expander("Developer / foundation state (JSON)", expanded=False):
-        st.caption(
-            "uploaded_files holds dataset provenance only (IDs, names, SHA-256, counts, warnings). "
-            "Compact eda_report summaries omit raw rows and forbidden dense fields. "
-            "File bytes are not stored here, and no trading strategy is modeled."
+        t(
+            "chrome.foundation_state_caption",
+            run_id=recorded_state.get("run_id"),
+            lifecycle=recorded_state.get("lifecycle"),
         )
+    )
+    with st.expander(t("chrome.foundation_json_expander"), expanded=False):
+        st.caption(t("chrome.foundation_json_caption"))
         st.json(recorded_state)

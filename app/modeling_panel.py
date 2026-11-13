@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, MutableMapping
 
 import streamlit as st
+from app.i18n import t
 
 from agents.modeling_experiment import (
     modeling_experiment_status,
@@ -29,7 +30,7 @@ from tools.experiment_persistence import persist_experiment_into_state
 EXPERIMENT_SESSION_KEY = "modeling_experiment_draft"
 
 STRATEGY_OPTIONS = [
-    ("auto (from candidate method_family)", None),
+    (t("mod.strategy_auto"), None),
     ("cash_hold", "cash_hold"),
     ("buy_hold_bitcoin", "buy_hold_bitcoin"),
     ("buy_hold_gold", "buy_hold_gold"),
@@ -92,14 +93,9 @@ def render_modeling_experiment_panel(
     upload_count: int = 0,
 ) -> dict[str, Any] | None:
     """Render Modeling & Experiment controls. Returns latest report dict if any."""
-    st.subheader("Modeling & Experiment")
+    st.subheader(t("mod.subheader"))
     status = modeling_experiment_status(settings)
-    st.caption(
-        "Runs a CI-safe deterministic trading experiment on a synthetic 2022 MCM C "
-        "price fixture (not live market data). Requires human H1 approval in project "
-        "state. Optional sandboxed Python does not execute arbitrary code in this slice. "
-        "After attach, Validation / H2 is available in Phase 7."
-    )
+    st.caption(t("mod.caption"))
 
     render_fixture_vs_uploads_banner(
         upload_count=int(upload_count or 0),
@@ -142,7 +138,7 @@ def render_modeling_experiment_panel(
             if default_candidate in ids:
                 index = ids.index(default_candidate)
             selected_label = st.selectbox(
-                "Candidate",
+                t("mod.candidate"),
                 options=labels,
                 index=index,
                 key="modeling_candidate_select",
@@ -150,12 +146,12 @@ def render_modeling_experiment_panel(
             selected_candidate_id = ids[labels.index(selected_label)]
         else:
             selected_candidate_id = None
-            st.info("Attach an H1-approved research proposal before modeling.")
+            st.info(t("mod.need_proposal"))
     with col_cfg_b:
         strategy_labels = [item[0] for item in STRATEGY_OPTIONS]
         strategy_values = [item[1] for item in STRATEGY_OPTIONS]
         strategy_label = st.selectbox(
-            "Strategy stub",
+            t("mod.strategy"),
             options=strategy_labels,
             index=0,
             key="modeling_strategy_select",
@@ -163,14 +159,14 @@ def render_modeling_experiment_panel(
         strategy_id = strategy_values[strategy_labels.index(strategy_label)]
     with col_cfg_c:
         lookback = st.number_input(
-            "Lookback days (trend)",
+            t("mod.lookback"),
             min_value=1,
             max_value=10,
             value=3,
             key="modeling_lookback",
         )
         rebalance_every = st.number_input(
-            "Rebalance every N days",
+            t("mod.rebalance"),
             min_value=1,
             max_value=10,
             value=5,
@@ -178,12 +174,9 @@ def render_modeling_experiment_panel(
         )
 
     allow_sandbox = st.checkbox(
-        "Attempt sandboxed Python (optional stub)",
+        t("mod.sandbox"),
         value=bool(settings.modeling_allow_sandboxed_python),
-        help=(
-            "Default off. Even when enabled, Phase 6 records an unavailable stub note "
-            "and keeps the deterministic fixture runner authoritative."
-        ),
+        help=t("mod.sandbox_help"),
         key="modeling_allow_sandbox_ui",
     )
 
@@ -191,18 +184,18 @@ def render_modeling_experiment_panel(
 
     run_disabled = not gate.modeling_allowed or not proposal or not selected_candidate_id
     run = st.button(
-        "Run deterministic experiment",
+        t("mod.run"),
         type="primary",
         key="run_modeling_experiment",
         disabled=run_disabled,
-        help="Blocked until human H1 is approved and a proposal/candidate is available.",
+        help=t("mod.blocked"),
     )
 
     if run:
         if not modeling_allowed(recorded_state if isinstance(recorded_state, dict) else None):
-            st.error("Modeling refused: H1 is not approved in project state.")
+            st.error(t("mod.refused_h1"))
         elif not isinstance(recorded_state, dict):
-            st.error("Initialize the project and approve H1 before modeling.")
+            st.error(t("mod.init_before"))
         else:
             try:
                 report = run_modeling_experiment(
@@ -218,9 +211,9 @@ def render_modeling_experiment_panel(
                     settings=settings,
                 )
             except PermissionError as exc:
-                st.error(f"H1 gate blocked modeling: {exc}")
+                st.error(t("mod.gate_blocked", err=exc))
             except Exception as exc:
-                st.error(f"Modeling experiment failed: {type(exc).__name__}: {exc}")
+                st.error(t("mod.failed", err=f"{type(exc).__name__}: {exc}"))
             else:
                 report_dict = report.model_dump(mode="json")
                 st.session_state[EXPERIMENT_SESSION_KEY] = report_dict
@@ -242,7 +235,7 @@ def render_modeling_experiment_panel(
         )
         metrics = latest.get("metrics") or []
         if metrics:
-            st.markdown("**Metrics**")
+            st.markdown(t("mod.metrics"))
             for metric in metrics:
                 st.write(
                     f"- {metric.get('label')}: **{metric.get('value')}** "
@@ -250,7 +243,7 @@ def render_modeling_experiment_panel(
                 )
         constraints = latest.get("constraints") or {}
         if constraints:
-            st.markdown("**Constraints applied**")
+            st.markdown(t("mod.constraints"))
             st.write(
                 f"- initial_cash={constraints.get('initial_cash')} · "
                 f"αgold={constraints.get('alpha_gold')} · "
@@ -270,7 +263,7 @@ def render_modeling_experiment_panel(
                     if isinstance(ref, dict) and ref.get("kind") == "fixture_id":
                         fixture_id = str(ref.get("value") or fixture_id)
             render_modeling_artifact_viewers(artifacts, fixture_id=fixture_id)
-            st.markdown("**Artifacts (raw)**")
+            st.markdown(t("mod.artifacts_raw"))
             for art in artifacts:
                 with st.expander(
                     f"{art.get('artifact_id')} · {art.get('kind')}",
@@ -280,31 +273,27 @@ def render_modeling_experiment_panel(
                     st.json(art.get("payload") or {})
         code_refs = latest.get("code_refs") or []
         if code_refs:
-            st.markdown("**Code refs**")
+            st.markdown(t("mod.code_refs"))
             for ref in code_refs:
                 st.caption(f"{ref.get('kind')}: `{ref.get('value')}`")
         for note in report_dict.get("analysis_notes") or []:
             st.caption(note)
 
         attach = st.button(
-            "Attach experiment results into project state",
+            t("mod.attach"),
             key="persist_modeling_experiment",
             disabled=not gate.modeling_allowed,
-            help=(
-                "Stores sanitized experiment_logs + model_artifacts via Phase 1 "
-                "persistence. Refused unless H1 is approved. Does not approve H2 "
-                "or start Paper / LaTeX."
-            ),
+            help=t("mod.attach_help"),
         )
         if attach:
             recorded = st.session_state.get("last_run")
             form_sig = input_signature or st.session_state.get("foundation_input_signature")
             if not isinstance(recorded, dict) or not recorded.get("run_id"):
-                st.error("Initialize the project before attaching experiment results.")
+                st.error(t("mod.init_before_attach"))
             elif not form_sig:
-                st.error("Foundation signature missing; re-initialize the project.")
+                st.error(t("common.sig_missing"))
             elif not modeling_allowed(recorded):
-                st.error("Attach refused: H1 is not approved in project state.")
+                st.error(t("mod.attach_refused_h1"))
             else:
                 try:
                     store = get_or_create_store(lambda: build_project_store(settings))
@@ -332,8 +321,8 @@ def render_modeling_experiment_panel(
                         f"phase={((saved.get('workspace_phases') or {}).get('strategy_modeling'))}"
                     )
                 except PermissionError as exc:
-                    st.error(f"H1 gate blocked attach: {exc}")
+                    st.error(t("mod.attach_gate_blocked", err=exc))
                 except Exception as exc:
-                    st.error(f"Persist experiment failed: {type(exc).__name__}: {exc}")
+                    st.error(t("mod.persist_failed", err=f"{type(exc).__name__}: {exc}"))
 
     return report_dict

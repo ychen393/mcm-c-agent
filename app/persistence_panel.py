@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import streamlit as st
+from app.i18n import t
 
 from app.session_caches import clear_derived_session_caches
 from core.lifecycle import RECOMPUTE_PROMPT, distinguish_status
@@ -63,7 +64,7 @@ def render_persistence_panel(
 ) -> None:
     """Render backend info, lifecycle board, history, and reopen/continue actions."""
     info = store.info()
-    st.subheader("Project persistence")
+    st.subheader(t("pers.subheader"))
     st.caption(
         f"Backend: **{info.backend}** — {info.detail}"
         + (f" Root: `{info.root}`" if info.root else "")
@@ -73,9 +74,9 @@ def render_persistence_panel(
     st.info(REUPLOAD_REQUIRED_MESSAGE)
 
     status = distinguish_status(recorded_state)
-    st.markdown(f"**Project init:** {status['project_init']}")
-    st.markdown(f"**Data analysis:** {status['data_analysis']}")
-    st.markdown(f"**Research task:** {status['research_task']}")
+    st.markdown(t("pers.project_init", v=status["project_init"]))
+    st.markdown(t("pers.data_analysis", v=status["data_analysis"]))
+    st.markdown(t("pers.research_task", v=status["research_task"]))
     if recorded_state is not None:
         st.markdown(
             f"**Data resume:** `{recorded_state.get('data_resume', 'reupload_required')}` "
@@ -92,9 +93,9 @@ def render_persistence_panel(
 
     col_a, col_b, col_c = st.columns(3)
     with col_a:
-        if st.button("Save project now", disabled=recorded_state is None):
+        if st.button(t("pers.save"), disabled=recorded_state is None):
             if recorded_state is None or not input_signature:
-                st.error("Initialize the project before saving.")
+                st.error(t("pers.init_before_save"))
             else:
                 saved = persist_foundation_state(
                     store,
@@ -107,10 +108,10 @@ def render_persistence_panel(
                 st.session_state["last_run"] = saved
                 st.success(f"Saved run {saved.get('run_id')} (lifecycle={saved.get('lifecycle')}).")
     with col_b:
-        if st.button("Reopen active run", disabled=not project_id.strip()):
+        if st.button(t("pers.reopen"), disabled=not project_id.strip()):
             loaded = store.load_active_state(project_id)
             if loaded is None:
-                st.error("No saved active run for this project ID.")
+                st.error(t("pers.no_active"))
             else:
                 st.session_state["last_run"] = loaded
                 st.session_state["foundation_initialized"] = True
@@ -123,10 +124,10 @@ def render_persistence_panel(
                 )
                 st.rerun()
     with col_c:
-        if st.button("Continue active run", disabled=not project_id.strip()):
+        if st.button(t("pers.continue"), disabled=not project_id.strip()):
             loaded = store.continue_run(project_id)
             if loaded is None:
-                st.error("Nothing to continue for this project ID.")
+                st.error(t("pers.nothing_continue"))
             else:
                 st.session_state["last_run"] = loaded
                 st.session_state["foundation_initialized"] = True
@@ -144,7 +145,7 @@ def render_persistence_panel(
 
     history = store.history(project_id) if project_id.strip() else []
     if history:
-        st.markdown("**Run history / versions**")
+        st.markdown(t("pers.history"))
         st.dataframe(
             [
                 {
@@ -162,12 +163,12 @@ def render_persistence_panel(
             hide_index=True,
         )
         choices = {f"v{entry.version} · {entry.run_id} · {entry.status}": entry.run_id for entry in history}
-        selected_label = st.selectbox("View historical run", options=list(choices.keys()))
-        if st.button("Load selected history version"):
+        selected_label = st.selectbox(t("pers.view_history"), options=list(choices.keys()))
+        if st.button(t("pers.load_history")):
             run_id = choices[selected_label]
             loaded = store.continue_run(project_id, run_id)
             if loaded is None:
-                st.error("Could not load that run.")
+                st.error(t("pers.could_not_load"))
             else:
                 st.session_state["last_run"] = loaded
                 st.session_state["foundation_initialized"] = True

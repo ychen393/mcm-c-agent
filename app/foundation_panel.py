@@ -12,6 +12,7 @@ from typing import Any
 
 import streamlit as st
 
+from app.i18n import t
 from core.foundation import (
     NOT_IMPLEMENTED,
     build_initialized_state,
@@ -23,6 +24,7 @@ from core.project_store import ProjectStore
 from tools.data_loader import safe_project_id
 from tools.dataset_bundle import DatasetBundle
 
+# English identity strings kept for AppTest assertions; display uses t().
 INIT_MESSAGE = "Project initialized — analysis not started."
 UPDATE_MESSAGE = "Project inputs updated — analysis not started. Previous approvals are stale."
 
@@ -31,20 +33,20 @@ SIGNATURE_KEY = "foundation_input_signature"
 SKIP_NOTICE_KEY = "foundation_skip_update_notice"
 
 _PHASE_ROWS = (
-    ("project_initialized", "Project initialized"),
-    ("datasets_loaded", "Datasets loaded"),
-    ("independent_eda", "Independent EDA"),
-    ("relationship_preview", "Relationship preview"),
-    ("literature_evidence", "Literature evidence"),
-    ("research_strategy", "Research strategy"),
-    ("h1", "H1 gate"),
-    ("joint_analysis", "Joint analysis"),
-    ("strategy_modeling", "Strategy modeling"),
-    ("validation_sensitivity", "Validation / H2"),
-    ("h2", "H2 gate"),
-    ("paper_latex", "Paper / LaTeX"),
-    ("h3", "H3 gate"),
-    ("e2e_acceptance", "E2E / export"),
+    ("project_initialized", "foundation.phase.project_initialized"),
+    ("datasets_loaded", "foundation.phase.datasets_loaded"),
+    ("independent_eda", "foundation.phase.independent_eda"),
+    ("relationship_preview", "foundation.phase.relationship_preview"),
+    ("literature_evidence", "foundation.phase.literature_evidence"),
+    ("research_strategy", "foundation.phase.research_strategy"),
+    ("h1", "foundation.phase.h1"),
+    ("joint_analysis", "foundation.phase.joint_analysis"),
+    ("strategy_modeling", "foundation.phase.strategy_modeling"),
+    ("validation_sensitivity", "foundation.phase.validation_sensitivity"),
+    ("h2", "foundation.phase.h2"),
+    ("paper_latex", "foundation.phase.paper_latex"),
+    ("h3", "foundation.phase.h3"),
+    ("e2e_acceptance", "foundation.phase.e2e_acceptance"),
 )
 
 
@@ -125,8 +127,8 @@ def sync_foundation_state(
     if not st.session_state.get(INITIALIZED_KEY):
         return False
     if len(project_name.strip()) < 3:
-        st.error("Project name must contain at least 3 characters.")
-        st.warning("Foundation state was not updated because the project name is too short.")
+        st.error(t("project.name_too_short"))
+        st.warning(t("foundation.name_short_warn"))
         return False
     computed = compute_form_signature(
         project_id=project_id,
@@ -140,8 +142,8 @@ def sync_foundation_state(
         llm_config_revision=llm_config_revision,
     )
     if computed is None:
-        st.error("Project ID is invalid.")
-        st.warning("Foundation state was not updated because the project ID is invalid.")
+        st.error(t("foundation.id_invalid"))
+        st.warning(t("foundation.id_invalid_warn"))
         return False
     signature, active_bundle, selection_status = computed
     resolved_project_id = _resolved_project_id(project_id, active_bundle)
@@ -185,17 +187,14 @@ def sync_foundation_state(
     st.session_state[SIGNATURE_KEY] = signature
     if st.session_state.pop(SKIP_NOTICE_KEY, False):
         return True
-    st.info(UPDATE_MESSAGE)
+    st.info(t("project.inputs_updated"))
     return True
 
 
 def render_project_phases(state: dict[str, Any] | None, *, inputs_current: bool) -> None:
     """Render the phase board from recorded workspace_phases (no hardcoded lies)."""
-    st.subheader("Project phases")
-    st.caption(
-        "Initialization records the problem and dataset provenance. "
-        "It does not auto-join files. Strategy modeling unlocks only after human H1."
-    )
+    st.subheader(t("foundation.phases_header"))
+    st.caption(t("foundation.phases_caption"))
     if state is None:
         phases = {
             "project_initialized": "no",
@@ -213,26 +212,17 @@ def render_project_phases(state: dict[str, Any] | None, *, inputs_current: bool)
             "h3": "not recorded",
             "e2e_acceptance": "not recorded",
         }
-        st.caption(
-            "Any dataset profiles above stay on this page until you initialize the project "
-            "or update its inputs. They are not in the project state yet."
-        )
+        st.caption(t("foundation.profiles_pending"))
     else:
         phases = dict(state.get("workspace_phases") or {})
         if not inputs_current:
-            st.warning("The foundation state does not match the current project inputs.")
+            st.warning(t("foundation.mismatch"))
         metadata = state.get("dataset_metadata") or {}
         if metadata.get("selection_status") == "rejected":
-            st.warning(
-                "The current file selection is not recorded. "
-                "Fix the files and the project state will update."
-            )
+            st.warning(t("foundation.selection_rejected"))
         if phases.get("relationship_preview") == "ready":
-            st.caption(
-                "Relationship preview is available. Nothing is joined until you press "
-                "Preview join, and a preview is not written into this state."
-            )
-    for key, label in _PHASE_ROWS:
+            st.caption(t("foundation.relationship_ready"))
+    for key, label_key in _PHASE_ROWS:
         value = phases.get(key)
         if value is None:
             # Omit later-stage keys until the run has recorded them, except core rows.
@@ -247,4 +237,4 @@ def render_project_phases(state: dict[str, Any] | None, *, inputs_current: bool)
                 value = "unknown"
             else:
                 continue
-        st.markdown(f"**{label}:** {value}")
+        st.markdown(f"**{t(label_key)}:** {value}")

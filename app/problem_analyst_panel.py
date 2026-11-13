@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, MutableMapping
 
 import streamlit as st
+from app.i18n import t
 
 from agents.problem_analyst import analyze_problem
 from core.config import Settings
@@ -29,8 +30,8 @@ def _item_statements(items: Any, *, limit: int = 5) -> list[str]:
 
 def render_problem_specification_summary(spec_dict: dict[str, Any]) -> None:
     """Human-first summary cards; full JSON stays behind an expander."""
-    st.markdown("**Problem specification**")
-    title = str(spec_dict.get("title") or "Untitled problem")
+    st.markdown(t("pa.spec_heading"))
+    title = str(spec_dict.get("title") or t("pa.untitled"))
     problem_id = str(spec_dict.get("problem_id") or "unknown")
     strategy = str(spec_dict.get("strategy") or "unknown")
     st.markdown(f"**{title}**")
@@ -45,26 +46,26 @@ def render_problem_specification_summary(spec_dict: dict[str, Any]) -> None:
 
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("**Research questions**")
+        st.markdown(t("pa.research_questions"))
         if questions:
             for q in questions:
                 st.write(f"- {q}")
         else:
-            st.caption("None recorded.")
-        st.markdown("**Objectives**")
+            st.caption(t("pa.none_recorded"))
+        st.markdown(t("pa.objectives"))
         if objectives:
             for item in objectives:
                 st.write(f"- {item}")
         else:
-            st.caption("None recorded.")
-        st.markdown("**Constraints**")
+            st.caption(t("pa.none_recorded"))
+        st.markdown(t("pa.constraints"))
         if constraints:
             for item in constraints:
                 st.write(f"- {item}")
         else:
-            st.caption("None recorded.")
+            st.caption(t("pa.none_recorded"))
     with c2:
-        st.markdown("**Supplied datasets**")
+        st.markdown(t("pa.datasets"))
         if datasets:
             for item in datasets:
                 st.write(f"- {item}")
@@ -79,21 +80,21 @@ def render_problem_specification_summary(spec_dict: dict[str, Any]) -> None:
                 for name in dataset_files[:5]:
                     st.write(f"- {name}")
             else:
-                st.caption("None recorded.")
-        st.markdown("**Subproblems**")
+                st.caption(t("pa.none_recorded"))
+        st.markdown(t("pa.subproblems"))
         if subproblems:
             for item in subproblems:
                 st.write(f"- {item}")
         else:
-            st.caption("None recorded.")
-        st.markdown("**Unknowns / risks**")
+            st.caption(t("pa.none_recorded"))
+        st.markdown(t("pa.unknowns"))
         if risks:
             for item in risks:
                 st.write(f"- {item}")
         else:
-            st.caption("None recorded.")
+            st.caption(t("pa.none_recorded"))
 
-    with st.expander("Developer / ProblemSpecification (JSON)", expanded=False):
+    with st.expander(t("pa.json_expander"), expanded=False):
         st.json(spec_dict)
 
 
@@ -136,39 +137,29 @@ def render_problem_analyst_panel(
     recorded_state: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Render analyst controls. Returns the latest spec dict if one is available."""
-    st.subheader("Problem Analyst")
-    st.caption(
-        "Produces a validated ProblemSpecification (Pydantic). "
-        "CI uses the deterministic 2022 MCM C fixture path; "
-        "optional LLM extraction is off unless PROBLEM_ANALYST_USE_LLM is enabled. "
-        "Displayed specs follow the recorded run; the session cache is cleared when "
-        "inputs rebuild or a run is reopened/continued."
-    )
+    st.subheader(t("pa.subheader"))
+    st.caption(t("pa.caption"))
 
     use_llm = st.checkbox(
-        "Use LLM analyst (optional)",
+        t("pa.use_llm"),
         value=bool(settings.problem_analyst_use_llm),
-        help=(
-            "Default off. When on, output still must pass ProblemSpecification "
-            "validation with one repair attempt."
-        ),
+        help=t("pa.use_llm_help"),
         key="problem_analyst_use_llm_ui",
     )
 
     col_a, col_b = st.columns([1, 2])
     with col_a:
-        run = st.button("Analyze problem", type="primary", key="run_problem_analyst")
+        run = st.button(t("pa.analyze"), type="primary", key="run_problem_analyst")
     with col_b:
         st.caption(
-            f"Problem Analyst LLM effective={use_llm} "
-            f"(settings={settings.problem_analyst_use_llm})"
+            t("pa.llm_effective", effective=use_llm, settings=settings.problem_analyst_use_llm)
         )
 
     spec_dict = resolve_displayed_problem_specification(recorded_state)
 
     if run:
         if not problem_text.strip():
-            st.error("Paste an MCM problem statement before running the Problem Analyst.")
+            st.error(t("pa.need_statement"))
         else:
             try:
                 spec = analyze_problem(
@@ -177,7 +168,7 @@ def render_problem_analyst_panel(
                     settings=settings,
                 )
             except Exception as exc:
-                st.error(f"Problem Analyst failed: {type(exc).__name__}: {exc}")
+                st.error(t("pa.failed", err=f"{type(exc).__name__}: {exc}"))
             else:
                 spec_dict = spec.model_dump(mode="json")
                 st.session_state[PROBLEM_SPEC_SESSION_KEY] = spec_dict
@@ -197,11 +188,11 @@ def render_problem_analyst_panel(
                             "2022 C acceptance checklist incomplete: " + ", ".join(failed)
                         )
                     else:
-                        st.info("2022 C acceptance checklist: all required facts present.")
+                        st.info(t("pa.checklist_ok"))
 
     if spec_dict:
         render_problem_specification_summary(spec_dict)
     else:
-        st.info("No ProblemSpecification yet. Analyze the problem statement to generate one.")
+        st.info(t("pa.none_yet"))
 
     return spec_dict

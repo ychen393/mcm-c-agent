@@ -89,6 +89,7 @@ def test_h3_panel_uses_approval_card_and_pdf_preview():
     assert "render_h3_approval_card" in source
     assert "render_paper_pdf_preview" in source
     assert "render_approved_banner" in source
-    assert "Outline-only" in (REPO / "app" / "artifact_viewers.py").read_text(
-        encoding="utf-8"
-    )
+    viewers = (REPO / "app" / "artifact_viewers.py").read_text(encoding="utf-8")
+    assert 't("viewer.outline_only")' in viewers or 't("viewer.outline_only_failed")' in viewers
+    en = (REPO / "locales" / "en.json").read_text(encoding="utf-8")
+    assert "Outline-only" in en

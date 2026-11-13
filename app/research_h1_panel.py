@@ -6,6 +6,8 @@ from typing import Any, MutableMapping
 
 import streamlit as st
 
+from app.i18n import t
+
 from agents.debate_critic import critique_research_proposal
 from agents.research_strategy import synthesize_research_proposal
 from app.artifact_viewers import (
@@ -86,37 +88,32 @@ def render_research_h1_panel(
     input_signature: str | None = None,
 ) -> dict[str, Any] | None:
     """Render Research Strategy + Critique + human H1 controls."""
-    st.subheader("Research Strategy → H1")
-    st.caption(
-        "Synthesizes candidate methods from ProblemSpecification (+ EDA / Evidence when "
-        "present), critiques them for contradictions / weak assumptions / evidence gaps, "
-        "and requires explicit human Approve or Request-revision. H1 is never auto-approved. "
-        "Modeling stays blocked until H1 is approved."
-    )
+    st.subheader(t("h1.subheader"))
+    st.caption(t("h1.caption"))
 
     use_llm = st.checkbox(
-        "Attempt LLM synthesis / critique (optional)",
+        t("h1.use_llm"),
         value=bool(settings.research_strategy_use_llm),
-        help=(
-            "Default off. Phase 5 LLM path is a non-inventing stub that records "
-            "unavailability; deterministic rules remain authoritative."
-        ),
+        help=t("h1.use_llm_help"),
         key="research_strategy_use_llm_ui",
     )
 
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         synthesize = st.button(
-            "Synthesize research proposal",
+            t("h1.synthesize"),
             type="primary",
             key="run_research_strategy",
         )
     with col_b:
-        critique_btn = st.button("Run Debate / Critic", key="run_debate_critic")
+        critique_btn = st.button(t("h1.critique"), key="run_debate_critic")
     with col_c:
         st.caption(
-            f"Research Strategy LLM effective={use_llm} "
-            f"(settings={settings.research_strategy_use_llm})"
+            t(
+                "h1.llm_effective",
+                effective=use_llm,
+                settings=settings.research_strategy_use_llm,
+            )
         )
 
     proposal_dict = resolve_displayed_proposal(recorded_state)
@@ -133,7 +130,7 @@ def render_research_h1_panel(
                 settings=settings,
             )
         except Exception as exc:
-            st.error(f"Research Strategy failed: {type(exc).__name__}: {exc}")
+            st.error(t("h1.strategy_failed", err=f"{type(exc).__name__}: {exc}"))
         else:
             proposal_dict = proposal.model_dump(mode="json")
             st.session_state[PROPOSAL_SESSION_KEY] = proposal_dict
@@ -148,16 +145,19 @@ def render_research_h1_panel(
                 updated["approval_status"] = approval
                 st.session_state["last_run"] = updated
             st.success(
-                f"Proposal ready · candidates={len(proposal.candidates)} · "
-                f"recommended={proposal.recommended_candidate_id} · "
-                f"strategy={proposal.strategy}"
+                t(
+                    "h1.proposal_ready",
+                    n=len(proposal.candidates),
+                    rec=proposal.recommended_candidate_id,
+                    strategy=proposal.strategy,
+                )
             )
             if proposal.llm_attempted and proposal.llm_note:
                 st.info(proposal.llm_note)
 
     if critique_btn:
         if not proposal_dict:
-            st.warning("Synthesize a research proposal before running Debate / Critic.")
+            st.warning(t("h1.synth_before_critique"))
         else:
             try:
                 critique = critique_research_proposal(
@@ -168,13 +168,16 @@ def render_research_h1_panel(
                     settings=settings,
                 )
             except Exception as exc:
-                st.error(f"Debate / Critic failed: {type(exc).__name__}: {exc}")
+                st.error(t("h1.critique_failed", err=f"{type(exc).__name__}: {exc}"))
             else:
                 critique_dict = critique.model_dump(mode="json")
                 st.session_state[CRITIQUE_SESSION_KEY] = critique_dict
                 st.success(
-                    f"Critique ready · findings={len(critique.findings)} · "
-                    f"blocking={critique.blocking_count}"
+                    t(
+                        "h1.critique_ready",
+                        n=len(critique.findings),
+                        b=critique.blocking_count,
+                    )
                 )
                 if critique.llm_attempted and critique.llm_note:
                     st.info(critique.llm_note)
@@ -182,17 +185,20 @@ def render_research_h1_panel(
     if proposal_dict:
         candidates = proposal_dict.get("candidates") or []
         st.markdown(
-            f"**Proposal:** `{proposal_dict.get('proposal_id')}` · "
-            f"**Candidates:** {len(candidates)} · "
-            f"**Recommended:** `{proposal_dict.get('recommended_candidate_id')}` · "
-            f"**Spec:** {'yes' if proposal_dict.get('problem_specification_present') else 'no'} · "
-            f"**EDA:** {'yes' if proposal_dict.get('eda_context_present') else 'no'} · "
-            f"**Evidence:** {'yes' if proposal_dict.get('evidence_present') else 'no'}"
+            t(
+                "h1.proposal_summary",
+                id=proposal_dict.get("proposal_id"),
+                n=len(candidates),
+                rec=proposal_dict.get("recommended_candidate_id"),
+                spec=("yes" if proposal_dict.get("problem_specification_present") else "no"),
+                eda=("yes" if proposal_dict.get("eda_context_present") else "no"),
+                ev=("yes" if proposal_dict.get("evidence_present") else "no"),
+            )
         )
         for note in proposal_dict.get("consensus_notes") or []:
             st.write(f"- {note}")
         if proposal_dict.get("open_questions"):
-            st.markdown("**Open questions**")
+            st.markdown(t("h1.open_questions"))
             for q in proposal_dict["open_questions"]:
                 st.warning(q)
         for cand in candidates:
@@ -207,40 +213,37 @@ def render_research_h1_panel(
                     f"gaps={len(cand.get('evidence_gap_ids') or [])}"
                 )
                 if cand.get("hypotheses"):
-                    st.markdown("**Hypotheses**")
+                    st.markdown(t("h1.hypotheses"))
                     for hyp in cand["hypotheses"]:
                         st.write(f"- {hyp.get('statement')}")
                 if cand.get("data_needs"):
-                    st.markdown("**Data needs**")
+                    st.markdown(t("h1.data_needs"))
                     for need in cand["data_needs"]:
                         st.write(
                             f"- {need.get('description')} "
                             f"(satisfied={need.get('satisfied')})"
                         )
                 if cand.get("validation_plan"):
-                    st.markdown("**Validation plan**")
+                    st.markdown(t("h1.validation_plan"))
                     for plan in cand["validation_plan"]:
                         st.write(f"- [{plan.get('method')}] {plan.get('description')}")
                 if cand.get("strengths"):
-                    st.markdown("**Strengths:** " + "; ".join(cand["strengths"]))
+                    st.markdown(t("h1.strengths", text="; ".join(cand["strengths"])))
                 if cand.get("weaknesses"):
-                    st.markdown("**Weaknesses:** " + "; ".join(cand["weaknesses"]))
+                    st.markdown(t("h1.weaknesses", text="; ".join(cand["weaknesses"])))
 
         attach = st.button(
-            "Attach proposal into project state",
+            t("h1.attach_proposal"),
             key="persist_research_proposal",
-            help=(
-                "Stores a sanitized research_proposal via Phase 1 persistence and sets "
-                "H1=pending. Does not approve H1 or unlock modeling."
-            ),
+            help=t("h1.attach_proposal_help"),
         )
         if attach:
             recorded = st.session_state.get("last_run")
             form_sig = input_signature or st.session_state.get("foundation_input_signature")
             if not isinstance(recorded, dict) or not recorded.get("run_id"):
-                st.error("Initialize the project before attaching a research proposal.")
+                st.error(t("h1.init_before_attach"))
             elif not form_sig:
-                st.error("Foundation signature missing; re-initialize the project.")
+                st.error(t("common.sig_missing"))
             else:
                 try:
                     store = get_or_create_store(lambda: build_project_store(settings))
@@ -261,20 +264,19 @@ def render_research_h1_panel(
                     )
                     st.session_state["last_run"] = saved
                     st.session_state[PROPOSAL_SESSION_KEY] = saved.get("research_proposal")
-                    st.success(
-                        "Proposal attached with H1=pending. "
-                        f"modeling_allowed="
-                        f"{((saved.get('decision_report') or {}).get('modeling_gate') or {}).get('modeling_allowed')}"
-                    )
+                    st.success(t("h1.proposal_attached"))
                 except Exception as exc:
-                    st.error(f"Persist proposal failed: {type(exc).__name__}: {exc}")
+                    st.error(t("h1.persist_proposal_failed", err=f"{type(exc).__name__}: {exc}"))
 
     if critique_dict:
         findings = critique_dict.get("findings") or []
         st.markdown(
-            f"**Critique:** `{critique_dict.get('critique_id')}` · "
-            f"**Findings:** {len(findings)} · "
-            f"**Blocking:** {critique_dict.get('blocking_count', 0)}"
+            t(
+                "h1.critique_summary",
+                id=critique_dict.get("critique_id"),
+                n=len(findings),
+                b=critique_dict.get("blocking_count", 0),
+            )
         )
         for finding in findings:
             level = finding.get("severity")
@@ -289,15 +291,15 @@ def render_research_h1_panel(
             else:
                 st.info(text)
         if proposal_dict and st.button(
-            "Attach critique into project state",
+            t("h1.attach_critique"),
             key="persist_debate_critique",
         ):
             recorded = st.session_state.get("last_run")
             form_sig = input_signature or st.session_state.get("foundation_input_signature")
             if not isinstance(recorded, dict) or not recorded.get("run_id"):
-                st.error("Initialize the project before attaching critique.")
+                st.error(t("h1.init_before_critique"))
             elif not form_sig:
-                st.error("Foundation signature missing; re-initialize the project.")
+                st.error(t("common.sig_missing"))
             else:
                 try:
                     store = get_or_create_store(lambda: build_project_store(settings))
@@ -337,12 +339,12 @@ def render_research_h1_panel(
                     st.session_state[CRITIQUE_SESSION_KEY] = (
                         (recorded.get("decision_report") or {}).get("critique")
                     )
-                    st.success("Critique attached to decision_report / disagreement_log.")
+                    st.success(t("h1.critique_attached"))
                 except Exception as exc:
-                    st.error(f"Persist critique failed: {type(exc).__name__}: {exc}")
+                    st.error(t("h1.persist_critique_failed", err=f"{type(exc).__name__}: {exc}"))
 
     # --- Human H1 gate (never auto) ---
-    st.markdown("### Human Approval Gate H1")
+    st.markdown(t("h1.gate_heading"))
     gate_state = recorded_state if isinstance(recorded_state, dict) else st.session_state.get("last_run")
     gate = modeling_gate_status(gate_state if isinstance(gate_state, dict) else None)
     if gate.modeling_allowed:
@@ -351,7 +353,7 @@ def render_research_h1_panel(
         st.warning(gate.message)
 
     if not proposal_dict:
-        st.info("Synthesize and review a proposal before H1.")
+        st.info(t("h1.need_proposal"))
         return proposal_dict
 
     candidates = [
@@ -374,7 +376,7 @@ def render_research_h1_panel(
     if already_approved:
         render_approved_banner(
             "H1",
-            approved_title or labels_by_id.get(str(recommended), "research plan"),
+            approved_title or labels_by_id.get(str(recommended), t("viewer.research_plan")),
         )
         render_h1_approval_card(
             candidate=approved_cand
@@ -382,7 +384,7 @@ def render_research_h1_panel(
             critique=critique_dict,
             recommended=True,
         )
-        with st.expander("H1 decision details (read-only)", expanded=False):
+        with st.expander(t("h1.decision_details"), expanded=False):
             st.caption(
                 f"selected_id="
                 f"{((gate_state or {}).get('decision_report') or {}).get('h1', {}).get('selected_candidate_id')}"
@@ -397,7 +399,7 @@ def render_research_h1_panel(
         (c for c in candidates if c.get("candidate_id") == preview_id),
         None,
     )
-    st.markdown("#### Approval card")
+    st.markdown(t("h1.approval_card"))
     render_h1_approval_card(
         candidate=preview_cand,
         critique=critique_dict,
@@ -407,13 +409,13 @@ def render_research_h1_panel(
     default_idx = 0
     if recommended in candidate_ids:
         default_idx = candidate_ids.index(recommended)
-    label_options = [labels_by_id[cid] for cid in candidate_ids] or ["(none)"]
+    label_options = [labels_by_id[cid] for cid in candidate_ids] or [t("viewer.none")]
     selected_label = st.selectbox(
-        "Candidate to approve (required for Approve)",
+        t("h1.candidate_select"),
         options=label_options,
         index=default_idx if candidate_ids else 0,
         key="h1_selected_candidate",
-        help="Shows plan titles — IDs remain secondary.",
+        help=t("h1.candidate_help"),
     )
     selected = None
     if candidate_ids:
@@ -422,7 +424,7 @@ def render_research_h1_panel(
             (c for c in candidates if c.get("candidate_id") == selected), None
         )
         if selected != preview_id:
-            st.markdown("#### Selected plan card")
+            st.markdown(t("h1.selected_card"))
             render_h1_approval_card(
                 candidate=selected_cand,
                 critique=critique_dict,
@@ -430,37 +432,37 @@ def render_research_h1_panel(
             )
 
     h1_notes = st.text_area(
-        "H1 reviewer notes",
+        t("h1.notes"),
         value="",
         height=80,
         key="h1_reviewer_notes",
-        help="Required context for Approve / Request-revision decisions.",
+        help=t("h1.notes_help"),
     )
 
     approve_col, revise_col = st.columns(2)
     with approve_col:
         approve_clicked = st.button(
-            "Approve research plan (H1)",
+            t("h1.approve"),
             type="primary",
             key="h1_approve",
-            help="Human-only. Never auto-approved. Unlocks the modeling gate flag only.",
+            help=t("h1.approve_help"),
         )
     with revise_col:
         revise_clicked = st.button(
-            "Request revision (H1)",
+            t("h1.revise"),
             key="h1_request_revision",
-            help="Returns the proposal for revision; modeling remains blocked.",
+            help=t("h1.revise_help"),
         )
 
     if approve_clicked or revise_clicked:
         recorded = st.session_state.get("last_run")
         form_sig = input_signature or st.session_state.get("foundation_input_signature")
         if not isinstance(recorded, dict) or not recorded.get("run_id"):
-            st.error("Initialize the project and attach the proposal before H1.")
+            st.error(t("h1.init_before_decide"))
         elif not form_sig:
-            st.error("Foundation signature missing; re-initialize the project.")
+            st.error(t("common.sig_missing"))
         elif not candidate_ids:
-            st.error("Proposal has no candidates to decide on.")
+            st.error(t("h1.no_candidates"))
         else:
             status = "approved" if approve_clicked else "revision_requested"
             try:
@@ -505,16 +507,16 @@ def render_research_h1_panel(
                     approved_label = labels_by_id.get(str(selected), str(selected))
                     render_approved_banner("H1", approved_label)
                     st.success(
-                        "H1 approved by human. "
-                        f"modeling_allowed={gate_after.modeling_allowed}. "
-                        "Phase 6 Modeling is not started by this action."
+                        t(
+                            "h1.approved_msg",
+                            allowed=gate_after.modeling_allowed,
+                        )
                     )
                 else:
                     st.warning(
-                        "H1 revision requested. Modeling remains blocked. "
-                        f"reason={gate_after.reason}"
+                        t("h1.revision_msg", reason=gate_after.reason)
                     )
             except Exception as exc:
-                st.error(f"H1 decision failed: {type(exc).__name__}: {exc}")
+                st.error(t("h1.decision_failed", err=f"{type(exc).__name__}: {exc}"))
 
     return proposal_dict

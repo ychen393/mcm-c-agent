@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, MutableMapping
 
 import streamlit as st
+from app.i18n import t
 
 from agents.validation_sensitivity import (
     run_validation_sensitivity,
@@ -77,15 +78,9 @@ def render_validation_h2_panel(
     input_signature: str | None = None,
 ) -> dict[str, Any] | None:
     """Render Validation / Sensitivity + human H2 controls."""
-    st.subheader("Validation / Sensitivity → H2")
+    st.subheader(t("h2.subheader"))
     status = validation_sensitivity_status(settings)
-    st.caption(
-        "Runs CI-safe deterministic sensitivity on Phase 6 fixture experiment "
-        "outputs (perturb costs / lookback / rebalance windows). Requires human "
-        "H1 approval and attached experiment results. Optional LLM critique does "
-        "not call live models in this slice. H2 is never auto-approved. Paper / "
-        "LaTeX stays blocked until H2 is approved."
-    )
+    st.caption(t("h2.caption"))
 
     v_gate = validation_gate_status(
         recorded_state if isinstance(recorded_state, dict) else None
@@ -101,50 +96,45 @@ def render_validation_h2_panel(
     if p_gate.paper_allowed:
         st.info(p_gate.message)
     else:
-        st.caption(f"Paper gate: {p_gate.message}")
+        st.caption(t("h2.paper_gate", msg=p_gate.message))
 
     st.caption(
-        f"prompt={status['prompt_version']} · live_trading_apis={status['live_trading_apis']} · "
-        f"h2_auto_approve={status['h2_auto_approve']} · "
-        f"requires_experiment_results={status['requires_experiment_results']}"
+        t(
+            "h2.gate_detail",
+            live=status["live_trading_apis"],
+            auto=status["h2_auto_approve"],
+            req=status["requires_experiment_results"],
+        )
     )
 
     use_llm = st.checkbox(
-        "Attempt LLM validation critique (optional stub)",
+        t("h2.use_llm"),
         value=bool(settings.validation_use_llm),
-        help=(
-            "Default off. Phase 7 LLM path records an unavailable stub note; "
-            "deterministic sensitivity remains authoritative."
-        ),
+        help=t("h2.use_llm_help"),
         key="validation_use_llm_ui",
     )
     st.caption(
-        f"Validation LLM effective={use_llm} (settings={settings.validation_use_llm})"
+        t("h2.llm_effective", effective=use_llm, settings=settings.validation_use_llm)
     )
 
     report_dict = resolve_displayed_validation_report(recorded_state)
 
     run_disabled = not v_gate.validation_allowed
     run = st.button(
-        "Run deterministic validation / sensitivity",
+        t("h2.run"),
         type="primary",
         key="run_validation_sensitivity",
         disabled=run_disabled,
-        help=(
-            "Blocked until human H1 is approved and Phase 6 experiment results "
-            "are available on project state."
-        ),
+        help=t("h2.blocked"),
     )
 
     if run:
         if not validation_allowed(
             recorded_state if isinstance(recorded_state, dict) else None
         ):
-            st.error(
-                "Validation refused: need H1 approved and available experiment results."
-            )
+            st.error(t("h2.refused"))
         elif not isinstance(recorded_state, dict):
-            st.error("Initialize the project, approve H1, and attach experiments first.")
+            st.error(t("h2.init_before"))
         else:
             try:
                 report = run_validation_sensitivity(
@@ -156,16 +146,19 @@ def render_validation_h2_panel(
                     settings=settings,
                 )
             except PermissionError as exc:
-                st.error(f"Validation gate blocked run: {exc}")
+                st.error(t("h2.gate_blocked", err=exc))
             except Exception as exc:
-                st.error(f"Validation failed: {type(exc).__name__}: {exc}")
+                st.error(t("h2.failed", err=f"{type(exc).__name__}: {exc}"))
             else:
                 report_dict = report.model_dump(mode="json")
                 st.session_state[VALIDATION_SESSION_KEY] = report_dict
                 st.success(
-                    f"Validation complete · report={report.report_id} · "
-                    f"scenarios={len(report.scenarios)} · "
-                    f"baseline={report.baseline_run_id}"
+                    t(
+                        "h2.complete",
+                        id=report.report_id,
+                        n=len(report.scenarios),
+                        base=report.baseline_run_id,
+                    )
                 )
                 if report.llm_attempted and report.llm_note:
                     st.info(report.llm_note)
@@ -204,7 +197,7 @@ def render_validation_h2_panel(
 
         notes = report_dict.get("robustness_notes") or []
         if notes:
-            st.markdown("**Robustness notes**")
+            st.markdown(t("h2.robustness"))
             for note in notes:
                 text = f"`{note.get('note_id')}` · {note.get('severity')} · {note.get('summary')}"
                 sev = note.get("severity")
@@ -217,25 +210,20 @@ def render_validation_h2_panel(
             st.caption(note)
 
         attach = st.button(
-            "Attach validation report into project state",
+            t("h2.attach"),
             key="persist_validation_report",
             disabled=not v_gate.validation_allowed,
-            help=(
-                "Stores sanitized validation_report via Phase 1 persistence and sets "
-                "H2=pending. Does not approve H2 or unlock Paper / LaTeX."
-            ),
+            help=t("h2.attach_help"),
         )
         if attach:
             recorded = st.session_state.get("last_run")
             form_sig = input_signature or st.session_state.get("foundation_input_signature")
             if not isinstance(recorded, dict) or not recorded.get("run_id"):
-                st.error("Initialize the project before attaching validation.")
+                st.error(t("h2.init_before_attach"))
             elif not form_sig:
-                st.error("Foundation signature missing; re-initialize the project.")
+                st.error(t("common.sig_missing"))
             elif not validation_allowed(recorded):
-                st.error(
-                    "Attach refused: need H1 approved and available experiment results."
-                )
+                st.error(t("h2.attach_refused"))
             else:
                 try:
                     store = get_or_create_store(lambda: build_project_store(settings))
@@ -256,18 +244,14 @@ def render_validation_h2_panel(
                     st.session_state["last_run"] = saved
                     attached = saved.get("validation_report") or report_dict
                     st.session_state[VALIDATION_SESSION_KEY] = attached
-                    st.success(
-                        "Validation attached with H2=pending. "
-                        f"paper_allowed="
-                        f"{((saved.get('decision_report') or {}).get('paper_gate') or {}).get('paper_allowed')}"
-                    )
+                    st.success(t("h2.attached"))
                 except PermissionError as exc:
-                    st.error(f"Validation gate blocked attach: {exc}")
+                    st.error(t("h2.attach_gate_blocked", err=exc))
                 except Exception as exc:
-                    st.error(f"Persist validation failed: {type(exc).__name__}: {exc}")
+                    st.error(t("h2.persist_failed", err=f"{type(exc).__name__}: {exc}"))
 
     # --- Human H2 gate (never auto) ---
-    st.markdown("### Human Approval Gate H2")
+    st.markdown(t("h2.gate_heading"))
     gate_state = (
         recorded_state
         if isinstance(recorded_state, dict)
@@ -280,7 +264,7 @@ def render_validation_h2_panel(
         st.warning(paper.message)
 
     if not report_dict:
-        st.info("Run and review validation / sensitivity before H2.")
+        st.info(t("h2.need_report"))
         return report_dict
 
     h2_status = None
@@ -295,43 +279,43 @@ def render_validation_h2_panel(
         ).strip()
         render_approved_banner("H2", package_label)
         render_h2_approval_card(report_dict)
-        with st.expander("H2 decision details (read-only)", expanded=False):
+        with st.expander(t("h2.decision_details"), expanded=False):
             st.caption(f"h2_status={h2_status}")
         return report_dict
 
-    st.markdown("#### Approval card")
+    st.markdown(t("h2.approval_card"))
     render_h2_approval_card(report_dict)
 
     h2_notes = st.text_area(
-        "H2 reviewer notes",
+        t("h2.notes"),
         value="",
         height=80,
         key="h2_reviewer_notes",
-        help="Required context for Approve / Request-revision decisions.",
+        help=t("h2.notes_help"),
     )
 
     approve_col, revise_col = st.columns(2)
     with approve_col:
         approve_clicked = st.button(
-            "Approve validation (H2)",
+            t("h2.approve"),
             type="primary",
             key="h2_approve",
-            help="Human-only. Never auto-approved. Unlocks the paper gate flag only.",
+            help=t("h2.approve_help"),
         )
     with revise_col:
         revise_clicked = st.button(
-            "Request revision (H2)",
+            t("h2.revise"),
             key="h2_request_revision",
-            help="Returns validation for revision; Paper / LaTeX remains blocked.",
+            help=t("h2.revise_help"),
         )
 
     if approve_clicked or revise_clicked:
         recorded = st.session_state.get("last_run")
         form_sig = input_signature or st.session_state.get("foundation_input_signature")
         if not isinstance(recorded, dict) or not recorded.get("run_id"):
-            st.error("Initialize the project and attach validation before H2.")
+            st.error(t("h2.init_before_decide"))
         elif not form_sig:
-            st.error("Foundation signature missing; re-initialize the project.")
+            st.error(t("common.sig_missing"))
         else:
             status_value = "approved" if approve_clicked else "revision_requested"
             try:
@@ -374,17 +358,10 @@ def render_validation_h2_panel(
                         "H2",
                         f"validation {report_dict.get('report_id') or 'package'}",
                     )
-                    st.success(
-                        "H2 approved by human. "
-                        f"paper_allowed={paper_after.paper_allowed}. "
-                        "Phase 8 Paper / LaTeX is not started by this action."
-                    )
+                    st.success(t("h2.approved_msg", allowed=paper_after.paper_allowed))
                 else:
-                    st.warning(
-                        "H2 revision requested. Paper / LaTeX remains blocked. "
-                        f"reason={paper_after.reason}"
-                    )
+                    st.warning(t("h2.revision_msg", reason=paper_after.reason))
             except Exception as exc:
-                st.error(f"H2 decision failed: {type(exc).__name__}: {exc}")
+                st.error(t("h2.decision_failed", err=f"{type(exc).__name__}: {exc}"))
 
     return report_dict
