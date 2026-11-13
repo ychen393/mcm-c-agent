@@ -56,8 +56,10 @@ def test_resolve_prefers_recorded_paper_over_session_cache():
     assert (
         resolve_displayed_paper_package(recorded, session)["package_id"] == "recorded"
     )
-    assert resolve_displayed_paper_package({}, session) is None
+    # Empty recorded run still surfaces the unattached draft so Attach works.
+    assert resolve_displayed_paper_package({}, session)["package_id"] == "cached"
     assert resolve_displayed_paper_package(None, session)["package_id"] == "cached"
+    assert resolve_displayed_paper_package({}, {}) is None
 
 
 def test_resolve_falls_back_to_paper_outline_fields():

@@ -53,8 +53,10 @@ def test_resolve_prefers_recorded_validation_over_session_cache():
         resolve_displayed_validation_report(recorded, session)["report_id"]
         == "recorded"
     )
-    assert resolve_displayed_validation_report({}, session) is None
+    # Empty recorded run still surfaces the unattached draft so Attach works.
+    assert resolve_displayed_validation_report({}, session)["report_id"] == "cached"
     assert resolve_displayed_validation_report(None, session)["report_id"] == "cached"
+    assert resolve_displayed_validation_report({}, {}) is None
 
 
 def test_resolve_falls_back_to_decision_report_validation():
