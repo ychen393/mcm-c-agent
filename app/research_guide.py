@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import streamlit as st
 
 from app.i18n import get_locale
-from app.progress_chrome import derive_progress_chrome
+from app.progress_chrome import derive_progress_chrome, completed_steps_from_state
 
 
 @dataclass(frozen=True)
@@ -43,12 +43,29 @@ def stage_index(step: str) -> int:
     return STEP_TO_STAGE.get(step, 0)
 
 
+def completed_stage_indices(state: dict | None) -> set[int]:
+    """A stage is complete only when all required underlying nodes are recorded.
+
+    Literature is optional for H1, so stage 3 completion is driven by H1.
+    A finished paper still requires the H3 human gate; export is separate.
+    """
+    done = set(completed_steps_from_state(state))
+    return {
+        i for i, required in enumerate(
+            (("project", "problem"), ("eda",), ("h1",),
+             ("modeling",), ("h2",), ("paper", "export"))
+        )
+        if all(step in done for step in required)
+    }
+
+
 def render_research_guide(state: dict | None) -> None:
     """Read-only stage browser. Existing panels remain the execution authority."""
     zh = get_locale() == "zh"
     stages = STAGES if zh else EN_STAGES
     progress = derive_progress_chrome(state)
     active = stage_index(progress.current_step)
+    completed = completed_stage_indices(state)
     st.subheader("研究路线 · 你现在在哪里？" if zh else "Research roadmap · Where are you?")
     st.caption(
         "六个用户阶段对应九个底层研究节点。查看阶段不会启动模型或批准闸门。"
@@ -58,7 +75,7 @@ def render_research_guide(state: dict | None) -> None:
     with st.sidebar:
         st.markdown("### 研究路线" if zh else "### Research roadmap")
         for i, stage in enumerate(stages):
-            marker = "▶" if i == active else ("✓" if i < active else "○")
+            marker = "✓" if i in completed else ("▶" if i == active else "○")
             st.caption(f"{marker} {i+1}. {stage.title}")
 
     selected = st.selectbox(
