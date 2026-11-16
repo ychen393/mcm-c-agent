@@ -16,7 +16,7 @@ def test_guided_stage_switch_changes_visible_research_panel_without_approvals():
     )
     assert len(guide.options) == 6
 
-    app = guide.select(3).run()
+    app = guide.select(guide.options[3]).run()
     assert not app.exception
     headings = [str(x.value) for x in app.subheader]
     assert not any("Problem Analyst" == h for h in headings)
