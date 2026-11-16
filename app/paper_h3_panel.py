@@ -194,6 +194,10 @@ def render_paper_h3_panel(
             f"**Bib entries:** {len(outline.get('bib_entries') or [])}"
         )
 
+        if outline.get("strategy") == "deterministic_uploaded_csv":
+            st.success("论文草稿已关联真实 CSV 实验与敏感性结果（仍需人工核对论证与参考文献）。")
+        else:
+            st.warning("本论文大纲基于合成测试数据，只能作为结构示例，不能作为正式竞赛成果。")
         render_paper_pdf_preview(package_dict)
 
         for section in outline.get("sections") or []:
@@ -240,6 +244,21 @@ def render_paper_h3_panel(
                     st.info(text)
 
         if latex and latex.get("tex_source"):
+            st.download_button(
+                "下载 LaTeX 草稿 / Download .tex",
+                data=latex["tex_source"].encode("utf-8"),
+                file_name="mcm_c_paper_draft.tex",
+                mime="text/plain",
+                key="paper_download_tex",
+            )
+            if latex.get("bib_source"):
+                st.download_button(
+                    "下载参考文献 / Download .bib",
+                    data=latex["bib_source"].encode("utf-8"),
+                    file_name="mcm_c_references.bib",
+                    mime="text/plain",
+                    key="paper_download_bib",
+                )
             with st.expander("LaTeX source (.tex)", expanded=False):
                 st.code(latex.get("tex_source"), language="latex")
             if latex.get("bib_source"):
