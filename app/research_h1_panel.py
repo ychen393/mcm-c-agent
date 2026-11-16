@@ -330,11 +330,24 @@ def render_research_h1_panel(
             st.markdown(t("h1.open_questions"))
             for q in proposal_dict["open_questions"]:
                 st.warning(q)
+        method_explanations_zh = {
+            "portfolio_optimization": "通过历史波动与资产权重设计组合，重点核对收益与回撤之间的取舍。必须加入交易费用和黄金开市约束。",
+            "trend_following": "使用过去可获得的趋势信号制定交易规则，需要特别防范手续费侵蚀与样本内过拟合。",
+            "cost_aware_trading": "把黄金 1% 与比特币 2% 手续费纳入调仓门槛，研究何时不交易反而更有利。",
+            "risk_management": "优先控制极端回撤和仓位暴露，不应仅以期末资产金额评价策略。",
+            "simulation_backtest": "通过历史复现与基线比较验证候选策略，不应把回测表现直接称为全局最优。",
+            "mean_reversion": "研究价格偏离后回归的可能性，须用实际数据验证信号和参数稳定性。",
+            "forecasting": "预测必须采用滚动历史窗口，不能使用未来价格或未来训练信息。",
+        }
         for cand in candidates:
             with st.expander(
                 f"{cand.get('candidate_id')} · {cand.get('title')} · {cand.get('status')}",
                 expanded=cand.get("status") == "recommended",
             ):
+                if zh:
+                    method_note = method_explanations_zh.get(str(cand.get("method_family") or ""))
+                    if method_note:
+                        st.info("研究方向中文解读（非原文直译）： " + method_note)
                 st.write(cand.get("summary") or "")
                 st.caption(
                     f"family={cand.get('method_family')} · "
