@@ -141,12 +141,9 @@ def render_research_h1_panel(
             "deterministic baselines; verify the approved method matches the executed strategy."
         )
 
-    use_llm = st.checkbox(
-        t("h1.use_llm"),
-        value=bool(settings.research_strategy_use_llm),
-        help=t("h1.use_llm_help"),
-        key="research_strategy_use_llm_ui",
-    )
+    # Offline specialist tools do not use the legacy unimplemented LLM stub.
+    # Live AI advice is controlled exclusively by the explicit two-call opt-in.
+    use_llm = False
 
     team_run = st.button(
         ("运行研究协作：策略 Agent → 独立 Critic" if zh
@@ -181,11 +178,9 @@ def render_research_h1_panel(
         critique_btn = st.button(t("h1.critique"), key="run_debate_critic")
     with col_c:
         st.caption(
-            t(
-                "h1.llm_effective",
-                effective=use_llm,
-                settings=settings.research_strategy_use_llm,
-            )
+            "离线规则 Agent：免费；真实 LLM 仅在上方单独勾选后调用。"
+            if zh else
+            "Offline rule agents: free; real LLM requires explicit opt-in above."
         )
 
     proposal_dict = resolve_displayed_proposal(recorded_state)
