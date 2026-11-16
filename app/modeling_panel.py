@@ -123,9 +123,19 @@ def render_modeling_experiment_panel(
             st.error(f"真实 CSV 不可用于回测 / Invalid historical input: {exc}")
         else:
             st.success(
-                f"真实数据已校验：{len(prepared.bars)} 天 · "
+                f"上传 CSV 的结构已校验：{len(prepared.bars)} 天 · "
                 f"{prepared.bars[0].date} → {prepared.bars[-1].date} · "
                 "黄金休市日不执行黄金交易，不使用未来价格。"
+            )
+            if (prepared.bars[0].date != "2016-09-11"
+                    or prepared.bars[-1].date != "2021-09-10"):
+                st.warning(
+                    "上传数据覆盖区间与 2022 MCM C 赛题要求的 "
+                    "2016-09-11 → 2021-09-10 不一致。"
+                    "系统可计算该区间，但结果不能直接作为原赛题完整回测。"
+                )
+            st.caption(
+                "CSV 来源真实性未联网核实；请核对是否为比赛官方原始文件。"
             )
             st.caption(
                 f"Gold SHA-256: {prepared.gold_sha256} · "
