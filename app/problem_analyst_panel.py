@@ -6,8 +6,6 @@ from typing import Any, MutableMapping
 import streamlit as st
 from app.i18n import get_locale, t
 from app.problem_narrative import render_trading_problem_brief
-from app.persistence_panel import get_or_create_store
-from database.repositories import build_project_store
 
 from agents.problem_analyst import analyze_problem
 from core.config import Settings
@@ -212,6 +210,9 @@ def render_problem_analyst_panel(
                     signature = st.session_state.get("foundation_input_signature")
                     if signature:
                         try:
+                            # Deferred imports avoid the UI cache/persistence import cycle.
+                            from app.persistence_panel import get_or_create_store
+                            from database.repositories import build_project_store
                             store = get_or_create_store(
                                 lambda: build_project_store(settings)
                             )
