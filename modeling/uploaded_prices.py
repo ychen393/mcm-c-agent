@@ -51,6 +51,8 @@ def prepare_uploaded_2022_prices(gold_csv: bytes, bitcoin_csv: bytes) -> Prepare
     btc = _parse_prices(bitcoin_csv, price_column="Value", name="BCHAIN-MKPRU")
     if btc.empty or gold.empty:
         raise ValueError("Both datasets must contain rows")
+    if gold["USD (PM)"].notna().sum() == 0:
+        raise ValueError("Gold has no observed price")
     if btc["Value"].isna().any():
         raise ValueError("Bitcoin prices must be present for each provided date")
     if btc["Date"].min() < gold.loc[gold["USD (PM)"].notna(), "Date"].min():
