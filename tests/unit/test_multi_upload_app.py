@@ -15,6 +15,11 @@ def _app() -> AppTest:
     return AppTest.from_file(APP_PATH, default_timeout=60).run()
 
 
+def _show_eda(at: AppTest) -> AppTest:
+    guide = next(box for box in at.selectbox if "Explore a stage" in box.label)
+    return guide.select(guide.options[1]).run()
+
+
 def _button_labels(at: AppTest) -> list[str]:
     return [button.label for button in at.button]
 
@@ -78,7 +83,8 @@ def test_two_and_three_uploads_render_independent_profiles():
         ]
     ).run()
     assert not at.exception
-    registry = at.dataframe[0].value
+    at = _show_eda(at)
+    registry = next(df.value for df in at.dataframe if "Qualified columns" in df.value.columns)
     qualified = " ".join(registry["Qualified columns"].astype(str))
     assert "ds_sales_" in qualified and "ds_weather_" in qualified
     assert "ds_sales_" in qualified and ".value" in qualified
@@ -110,9 +116,11 @@ def test_two_and_three_uploads_render_independent_profiles():
             ("outcomes.csv", OUTCOMES, "text/csv"),
         ]
     ).run()
-    names = set(at.dataframe[0].value["File"])
+    at = _show_eda(at)
+    registry = next(df.value for df in at.dataframe if "Dataset ID" in df.value.columns)
+    names = set(registry["File"])
     assert names == {"sales.csv", "weather.csv", "outcomes.csv"}
-    assert len(set(at.dataframe[0].value["Dataset ID"])) == 3
+    assert len(set(registry["Dataset ID"])) == 3
 
 
 def test_single_file_plan_is_cleared_when_the_upload_changes():
@@ -155,7 +163,8 @@ def test_invalid_duplicate_and_oversized_selections_are_rejected_in_the_ui():
             ("data.csv", b"id,value\n1,99\n", "text/csv"),
         ]
     ).run()
-    display_names = list(at.dataframe[0].value["Display name"])
+    at = _show_eda(at)
+    display_names = list(next(df.value for df in at.dataframe if "Display name" in df.value.columns)["Display name"])
     assert len(display_names) == 2
     assert display_names[0] != display_names[1]
     assert all(name.startswith("data.csv#") for name in display_names)
@@ -226,6 +235,7 @@ def test_single_to_multi_and_back_keeps_single_file_provenance(monkeypatch):
         ]
     ).run()
     _assert_saved_report_hidden(at)
+    at = _show_eda(at)
     text = _messages(at)
     assert "does not join files" in text
     assert "Generate chart plan" not in _button_labels(at)
