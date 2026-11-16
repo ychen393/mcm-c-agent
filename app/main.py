@@ -1,7 +1,7 @@
 import json
 
 import streamlit as st
-from app.i18n import render_language_toggle, t
+from app.i18n import get_locale, render_language_toggle, t
 
 from agents.visual_eda_agent import plan_visual_eda
 from app.api_settings import SESSION_REVISION_KEY, build_runtime_settings, render_api_settings
@@ -30,6 +30,7 @@ from app.progress_chrome import derive_progress_chrome
 from app.research_guide import render_research_guide, stage_index
 from app.relationship_panel import render_relationship_panel
 from app.joint_eda_panel import render_joint_eda_panel
+from app.eda_interpretation import render_explainable_eda
 from app.research_h1_panel import render_research_h1_panel
 from app.paper_h3_panel import render_paper_h3_panel
 from app.soft_orchestration import (
@@ -376,7 +377,8 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
     )
     render_joint_eda_panel(bundle)
     if st.button(
-        "Record independent EDA summaries into project state",
+        ("完成 EDA · 保存并继续研究方案" if get_locale() == "zh"
+         else "Finish EDA · Save and continue to research plan"),
         key="persist_multi_eda_summaries",
         help=(
             "Stores sanitized per-dataset summaries and relationship metadata. "
@@ -406,6 +408,10 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
                     ),
                     mode="independent_multi",
                 )
+                insight = st.session_state.get("eda_insights")
+                if (isinstance(insight, dict)
+                        and insight.get("bundle_fingerprint") == bundle.fingerprint):
+                    compact["interpreted_findings"] = insight
                 form_sig = st.session_state.get("foundation_input_signature")
                 if not form_sig:
                     st.error("Foundation signature missing; re-initialize the project.")
@@ -424,9 +430,11 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
                     )
                     st.session_state["last_run"] = saved
                     st.success(
-                        "Independent EDA summaries recorded. "
-                        f"lifecycle={saved.get('lifecycle')} · joined=false"
+                        "EDA findings recorded with source fingerprints. "
+                        "No original file bytes or merged rows saved."
                     )
+                    st.session_state["guided_stage_preview"] = 2
+                    st.rerun()
             except Exception as exc:
                 st.error(f"Failed to record EDA state: {type(exc).__name__}: {exc}")
 
@@ -802,7 +810,10 @@ with st.expander(
                         except Exception as exc:
                             st.error(t("dataset.execution_failed", err=f"{type(exc).__name__}: {exc}"))
             else:
-                _render_multi_dataset_eda(bundle)
+                st.info(
+                    "两份数据已加载。请打开「探索数据 / Explore data」阶段，"
+                    "查看图表、解释、日期关系和保存按钮。"
+                )
 
 report_matches_selection = _saved_report_matches_current(accepted_identity, project_id)
 saved_project_id = st.session_state.get("eda_report_project_id")
@@ -1049,6 +1060,9 @@ else:
     spec_for_eda = resolve_displayed_problem_specification(_state_dict)
 # Problem-aware plan runs after foundation sync + analyst so cleared specs cannot linger.
 if selected_stage == 1 and bundle is not None and not bundle_rejected:
+    st.session_state["eda_insights"] = render_explainable_eda(bundle)
+    if len(bundle.datasets) >= 2:
+        _render_multi_dataset_eda(bundle)
     if panel_is_unlocked("eda", _state_dict):
         render_problem_aware_eda_panel(
             bundle,
@@ -1066,6 +1080,14 @@ if isinstance(recorded_state, dict):
     maybe_eda = recorded_state.get("eda_report")
     if isinstance(maybe_eda, dict):
         eda_report_for_lit = maybe_eda
+if isinstance(eda_report_for_lit, dict):
+    eda_report_for_lit = dict(eda_report_for_lit)
+if bundle is not None:
+    fresh = st.session_state.get("eda_insights")
+    if isinstance(fresh, dict) and fresh.get("bundle_fingerprint") == bundle.fingerprint:
+        if not isinstance(eda_report_for_lit, dict):
+            eda_report_for_lit = {}
+        eda_report_for_lit["interpreted_findings"] = fresh
 if selected_stage == 2 and panel_is_unlocked("literature", _state_dict):
     render_literature_evidence_panel(
         settings=settings,
