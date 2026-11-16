@@ -90,14 +90,20 @@ def persist_validation_into_state(
     assert_validation_allowed(state)
     compact = compact_validation_report(report)
     updated = dict(state)
+    # A new validation package requires a fresh H2 and H3 approval.
+    for key in ("paper_outline", "latex_source", "review_report"):
+        updated.pop(key, None)
     updated["validation_report"] = compact
 
     # Reset H2 when a new validation report is attached — never inherit silent approval.
     approval_status = dict(updated.get("approval_status") or {})
     approval_status["h2"] = "pending"
+    approval_status["h3"] = "pending"
     updated["approval_status"] = approval_status
 
     decision_report = dict(updated.get("decision_report") or {})
+    for key in ("paper", "h3", "e2e_gate"):
+        decision_report.pop(key, None)
     decision_report["validation"] = compact
     decision_report["h2"] = {
         "status": "pending",
@@ -117,6 +123,7 @@ def persist_validation_into_state(
     phases["validation_sensitivity"] = "recorded"
     phases["h2"] = "pending"
     phases["paper_latex"] = "blocked_until_h2"
+    phases["h3"] = "pending"
     updated["workspace_phases"] = phases
 
     # Do not mark research_task_complete or start Phase 8 paper / LaTeX.
