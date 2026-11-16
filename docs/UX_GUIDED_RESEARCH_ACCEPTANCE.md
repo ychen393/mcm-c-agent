@@ -28,6 +28,18 @@ python -m streamlit run app/main.py --server.port 8502
 
 Open http://localhost:8502 in a browser after the server is ready.
 
+## User-feedback regression (Nov 16, 2026)
+
+The following specific UX failures must be verified separately:
+
+- **Problem Analyst:** after initialization, choose offline analysis or explicitly enable the configured LLM. Confirm the in-depth 2022 C explanation, task work packages, model families and risks are readable in both Chinese and English. The English raw schema remains under an advanced expander and must never be mistaken for a translated answer.
+- **EDA:** select Stage 2 with Previous/Next buttons. Two uploaded historical datasets should each show price, quote-return distribution, drawdown and rolling-volatility charts, with explanations of **what the chart means for modeling**. Inspect missing/duplicate dates. Charts derive from observed rows and are not automatically translated into investment claims.
+- **Data handoff:** use the Stage 2 action to record compact EDA findings and move to Stage 3. Confirm model candidate notes cite observed volatility/drawdown and per-file SHA-256 provenance; no raw data rows are saved in ResearchState.
+- **Research collaboration:** Stage 3 must expose the workflow Problem Analyst → EDA Specialist → Research Strategist → independent Debate Critic → manual H1. Click the team button and read both the proposed route and critical findings; literature is helpful but not a hard prerequisite once EDA is recorded.
+- **Optional actual LLM collaboration:** the extra live Strategist/Critic checkbox is **OFF by default**. It will make **two provider API calls** only if the user explicitly opts in and clicks Run; do not activate for free/offline acceptance. The live text is advisory and never auto-approves H1.
+- **Navigation:** Previous/Next browses stages, but cannot fake a completed EDA or bypass H1/H2/H3. Re-running problem analysis invalidates stale downstream approvals and should persist the new specification for the following stage.
+- **Human boundary:** a recommended candidate method may be a research hypothesis rather than runnable code. Validate its actual strategy implementation before accepting modeling conclusions.
+
 ## Research workflow acceptance — 2022 MCM Problem C
 
 1. **Understand the problem:** create a new project ID; paste the problem statement and initialize. The first user stage should describe the problem specification.
