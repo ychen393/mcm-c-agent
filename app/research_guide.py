@@ -59,6 +59,11 @@ def completed_stage_indices(state: dict | None) -> set[int]:
     }
 
 
+def _navigate_to_stage(index: int) -> None:
+    """Move visible workspace only; never mutate research state or approvals."""
+    st.session_state["guided_stage_preview"] = max(0, min(5, int(index)))
+
+
 def render_research_guide(state: dict | None) -> None:
     """Read-only stage browser. Existing panels remain the execution authority."""
     zh = get_locale() == "zh"
@@ -93,6 +98,34 @@ def render_research_guide(state: dict | None) -> None:
         ),
         key="guided_stage_preview",
     )
+    left, right = st.columns(2)
+    with left:
+        st.button(
+            "← 上一阶段" if zh else "← Previous stage",
+            disabled=selected == 0,
+            on_click=_navigate_to_stage,
+            args=(selected - 1,),
+            key="guided_previous_stage",
+            width="stretch",
+        )
+    with right:
+        st.button(
+            "下一阶段 →" if zh else "Next stage →",
+            disabled=selected == len(stages) - 1,
+            on_click=_navigate_to_stage,
+            args=(selected + 1,),
+            key="guided_next_stage",
+            type="primary",
+            width="stretch",
+        )
+    if selected > active:
+        st.info(
+            "你正在预览后续阶段。进入页面不会跳过 EDA 或 H1/H2/H3 人工审批；"
+            "若条件不足，会说明必须先完成哪项工作。"
+            if zh else
+            "You are previewing a future stage. Hard approvals and prerequisites "
+            "are never bypassed; the panel will explain missing requirements."
+        )
     stage = stages[selected]
     with st.container(border=True):
         st.markdown(f"#### {('第 ' + str(selected+1) + ' 阶段') if zh else ('Stage ' + str(selected+1))} · {stage.title}")
