@@ -212,8 +212,10 @@ def render_problem_analyst_panel(
                                 "review_report"):
                         updated.pop(key, None)
                     approval = dict(updated.get("approval_status") or {})
-                    for gate in ("h1", "h2", "h3"):
-                        approval[gate] = "pending"
+                    # These gates are not even pending until their own research
+                    # artifacts exist. Otherwise progress jumps straight to H1.
+                    for gate in ("h1", "h2", "h3", "chart_plan"):
+                        approval.pop(gate, None)
                     updated["approval_status"] = approval
                     decision = dict(updated.get("decision_report") or {})
                     for key in ("h1", "h2", "h3", "experiment", "validation",
