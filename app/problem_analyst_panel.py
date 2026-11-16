@@ -305,7 +305,7 @@ def render_problem_analyst_panel(
             if not isinstance(st.session_state.get("last_run"), dict):
                 st.warning("Please initialize and save the project first.")
             else:
-                st.session_state["guided_stage_preview"] = 1
+                st.session_state["guided_stage_target"] = 1
                 st.rerun()
     else:
         st.info(t("pa.none_yet"))
