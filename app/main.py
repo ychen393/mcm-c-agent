@@ -1024,8 +1024,10 @@ st.caption(progress.stepper_line)
 st.info(t("chrome.independent_profiles_info"))
 
 _state_dict = recorded_state if isinstance(recorded_state, dict) else None
-# The six-stage guide replaces the redundant action card.
-# Hard gates continue to be enforced by each panel.
+# Preserve the legacy expert guide and soft-override behind a collapsed control.
+# Hard H1/H2/H3 gates are never bypassed by the expert soft-override.
+with st.expander("高级导航与面板解锁 / Expert workflow controls", expanded=False):
+    render_next_step_guide(_state_dict)
 
 with st.expander("技术状态 / Advanced research state", expanded=False):
     render_project_phases(recorded_state, inputs_current=inputs_current)
