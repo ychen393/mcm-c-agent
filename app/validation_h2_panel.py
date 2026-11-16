@@ -22,6 +22,7 @@ from app.artifact_viewers import (
     render_h2_scenario_viewers,
 )
 from app.persistence_panel import get_or_create_store
+from modeling.uploaded_prices import prepare_uploaded_2022_prices
 from core.config import Settings
 from database.repositories import build_project_store
 from tools.validation_persistence import (
@@ -76,6 +77,7 @@ def render_validation_h2_panel(
     project_id: str | None = None,
     project_name: str | None = None,
     input_signature: str | None = None,
+    upload_payloads: list[tuple[str, bytes]] | None = None,
 ) -> dict[str, Any] | None:
     """Render Validation / Sensitivity + human H2 controls."""
     st.subheader(t("h2.subheader"))
@@ -119,7 +121,30 @@ def render_validation_h2_panel(
 
     report_dict = resolve_displayed_validation_report(recorded_state)
 
-    run_disabled = not v_gate.validation_allowed
+    baseline_experiment = (
+        ((recorded_state or {}).get("decision_report") or {}).get("experiment") or {}
+    )
+    baseline_real = baseline_experiment.get("strategy") == "deterministic_uploaded_csv"
+    prepared = None
+    if baseline_real:
+        files = {name.casefold(): data for name, data in (upload_payloads or [])}
+        if "lbma-gold.csv" not in files or "bchain-mkpru.csv" not in files:
+            st.warning(
+                "真实数据验证要求重新上传原始 LBMA-GOLD.csv 和 BCHAIN-MKPRU.csv "
+                "（项目持久化不保存原始数据字节）。"
+            )
+        else:
+            try:
+                prepared = prepare_uploaded_2022_prices(
+                    files["lbma-gold.csv"], files["bchain-mkpru.csv"]
+                )
+            except (ValueError, OSError) as exc:
+                st.error(f"历史 CSV 不能用于验证：{exc}")
+            else:
+                st.info("真实 CSV 敏感性分析：必须与建模阶段的两份文件 SHA-256 完全一致。")
+    else:
+        st.warning("当前基线是合成测试数据；敏感性分析仅用于演示。")
+    run_disabled = not v_gate.validation_allowed or (baseline_real and prepared is None)
     run = st.button(
         t("h2.run"),
         type="primary",
@@ -144,6 +169,9 @@ def render_validation_h2_panel(
                     proposal=recorded_state.get("research_proposal"),
                     use_llm=use_llm,
                     settings=settings,
+                    price_bars=(list(prepared.bars) if prepared is not None else None),
+                    price_sha256=({"gold": prepared.gold_sha256, "bitcoin": prepared.bitcoin_sha256}
+                                  if prepared is not None else None),
                 )
             except PermissionError as exc:
                 st.error(t("h2.gate_blocked", err=exc))
@@ -164,6 +192,10 @@ def render_validation_h2_panel(
                     st.info(report.llm_note)
 
     if report_dict:
+        if report_dict.get("strategy") == "deterministic_uploaded_csv":
+            st.success("已验证的真实 CSV 敏感性结果（仅限样本内）")
+        else:
+            st.warning("合成测试数据敏感性结果 / Synthetic fixture validation")
         scenarios = report_dict.get("scenarios") or []
         st.markdown(
             f"**Report:** `{report_dict.get('report_id')}` · "
