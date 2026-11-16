@@ -27,7 +27,7 @@ from app.problem_analyst_panel import (
     resolve_displayed_problem_specification,
 )
 from app.progress_chrome import derive_progress_chrome
-from app.research_guide import render_research_guide
+from app.research_guide import render_research_guide, stage_index
 from app.relationship_panel import render_relationship_panel
 from app.research_h1_panel import render_research_h1_panel
 from app.paper_h3_panel import render_paper_h3_panel
@@ -510,293 +510,297 @@ with st.sidebar:
         t("chrome.paper_llm_effective", effective=_eff_paper, settings=settings.paper_use_llm)
     )
 
-st.subheader(t("project.create_header"))
-project_name = st.text_input(t("project.name"), value="MCM C Demo Project")
-project_id = st.text_input(
-    t("project.id"),
-    value="mcm-c-demo",
-    help=t("project.id_help"),
-)
-problem_text = st.text_area(
-    t("project.problem"),
-    height=180,
-    help=t("project.problem_help"),
-)
-st.caption(t("project.init_caption"))
-if st.button(t("project.init_button"), type="primary"):
-    if len(project_name.strip()) < 3:
-        st.error(t("project.name_too_short"))
-    else:
-        try:
-            safe_project_id(project_id)
-        except ValueError as exc:
-            st.error(str(exc))
-        else:
-            mark_project_initialized()
-            st.success(t("project.init_ok"))
-
-st.divider()
-st.header(t("dataset.header"))
-st.write(t("dataset.intro"))
-uploaded_files = st.file_uploader(
-    t("dataset.uploader"),
-    type=["csv", "xlsx"],
-    accept_multiple_files=True,
-    help=t("dataset.uploader_help"),
-    key="dataset_uploader",
-)
-uploaded_files = list(uploaded_files or [])
-upload_payloads = [(uploaded.name, uploaded.getvalue()) for uploaded in uploaded_files]
-accepted_identity: str | None = None
-bundle: DatasetBundle | None = None
-bundle_rejected = False
-_remember_dataset_context()
-
-if len(uploaded_files) > ABSOLUTE_MAX_DATASETS:
-    bundle_rejected = True
-    st.error(
-        f"Dataset bundle accepts at most {ABSOLUTE_MAX_DATASETS} files; "
-        f"received {len(uploaded_files)}."
+with st.expander(
+    "① 项目与数据设置 / Project & dataset setup",
+    expanded=not bool(st.session_state.get("foundation_initialized")),
+):
+    st.subheader(t("project.create_header"))
+    project_name = st.text_input(t("project.name"), value="MCM C Demo Project")
+    project_id = st.text_input(
+        t("project.id"),
+        value="mcm-c-demo",
+        help=t("project.id_help"),
     )
-    for message in format_intake_error_messages(
-        classify_upload_errors(upload_payloads)
-    ):
-        st.error(message)
-    _drop_stale_approval(None)
-elif not uploaded_files:
-    _drop_stale_approval(None)
-else:
-    try:
-        bundle = build_dataset_bundle(upload_payloads, project_id=project_id)
-    except ValueError as exc:
+    problem_text = st.text_area(
+        t("project.problem"),
+        height=180,
+        help=t("project.problem_help"),
+    )
+    st.caption(t("project.init_caption"))
+    if st.button(t("project.init_button"), type="primary"):
+        if len(project_name.strip()) < 3:
+            st.error(t("project.name_too_short"))
+        else:
+            try:
+                safe_project_id(project_id)
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                mark_project_initialized()
+                st.success(t("project.init_ok"))
+
+    st.divider()
+    st.header(t("dataset.header"))
+    st.write(t("dataset.intro"))
+    uploaded_files = st.file_uploader(
+        t("dataset.uploader"),
+        type=["csv", "xlsx"],
+        accept_multiple_files=True,
+        help=t("dataset.uploader_help"),
+        key="dataset_uploader",
+    )
+    uploaded_files = list(uploaded_files or [])
+    upload_payloads = [(uploaded.name, uploaded.getvalue()) for uploaded in uploaded_files]
+    accepted_identity: str | None = None
+    bundle: DatasetBundle | None = None
+    bundle_rejected = False
+    _remember_dataset_context()
+
+    if len(uploaded_files) > ABSOLUTE_MAX_DATASETS:
         bundle_rejected = True
-        st.error(str(exc))
-        for message in format_intake_error_messages(
-            classify_upload_errors(upload_payloads)
-        ):
-            if message != str(exc):
-                st.error(message)
-        _drop_stale_approval(None)
-    except Exception as exc:
-        bundle_rejected = True
-        st.error(f"Dataset processing failed: {type(exc).__name__}: {exc}")
+        st.error(
+            f"Dataset bundle accepts at most {ABSOLUTE_MAX_DATASETS} files; "
+            f"received {len(uploaded_files)}."
+        )
         for message in format_intake_error_messages(
             classify_upload_errors(upload_payloads)
         ):
             st.error(message)
         _drop_stale_approval(None)
+    elif not uploaded_files:
+        _drop_stale_approval(None)
     else:
-        dataset_count = len(bundle.datasets)
-        single_sha = bundle.datasets[0].sha256 if dataset_count == 1 else None
-        accepted_identity = approval_identity(dataset_count, single_sha)
-        _drop_stale_approval(accepted_identity)
-        if chart_planning_allowed(dataset_count):
-            dataset_ref = bundle.datasets[0]
-            dataset = bundle.loaded_dataset(dataset_ref.dataset_id)
-            st.success(
-                f"Loaded {dataset.file_name}: {len(dataset.frame):,} rows × "
-                f"{len(dataset.frame.columns)} columns"
-            )
-            st.dataframe(dataset.frame.head(20), use_container_width=True)
-            st.caption(f"Dataset ID: {dataset_ref.dataset_id}")
-            st.caption(f"SHA-256: {dataset.sha256}")
-            st.caption(
-                "Qualified columns: "
-                + ", ".join(dataset_ref.qualified_column_names)
-            )
-
-            with st.expander(t("dataset.context_optional"), expanded=False):
-                _restore_dataset_context()
-                data_source = st.text_input(
-                    t("dataset.data_source"),
-                    placeholder="e.g., LBMA Gold Price PM / official source URL",
-                    key="eda_data_source",
+        try:
+            bundle = build_dataset_bundle(upload_payloads, project_id=project_id)
+        except ValueError as exc:
+            bundle_rejected = True
+            st.error(str(exc))
+            for message in format_intake_error_messages(
+                classify_upload_errors(upload_payloads)
+            ):
+                if message != str(exc):
+                    st.error(message)
+            _drop_stale_approval(None)
+        except Exception as exc:
+            bundle_rejected = True
+            st.error(f"Dataset processing failed: {type(exc).__name__}: {exc}")
+            for message in format_intake_error_messages(
+                classify_upload_errors(upload_payloads)
+            ):
+                st.error(message)
+            _drop_stale_approval(None)
+        else:
+            dataset_count = len(bundle.datasets)
+            single_sha = bundle.datasets[0].sha256 if dataset_count == 1 else None
+            accepted_identity = approval_identity(dataset_count, single_sha)
+            _drop_stale_approval(accepted_identity)
+            if chart_planning_allowed(dataset_count):
+                dataset_ref = bundle.datasets[0]
+                dataset = bundle.loaded_dataset(dataset_ref.dataset_id)
+                st.success(
+                    f"Loaded {dataset.file_name}: {len(dataset.frame):,} rows × "
+                    f"{len(dataset.frame.columns)} columns"
                 )
-                frequency_choice = st.selectbox(
-                    t("dataset.frequency"),
-                    FREQUENCY_OPTIONS,
-                    format_func=_frequency_label,
-                    key="eda_frequency",
-                )
-                units_text = st.text_area(
-                    t("dataset.units"),
-                    placeholder="price = USD per troy ounce",
-                    key="eda_column_units",
-                    height=80,
+                st.dataframe(dataset.frame.head(20), use_container_width=True)
+                st.caption(f"Dataset ID: {dataset_ref.dataset_id}")
+                st.caption(f"SHA-256: {dataset.sha256}")
+                st.caption(
+                    "Qualified columns: "
+                    + ", ".join(dataset_ref.qualified_column_names)
                 )
 
-            use_ai_planner = st.checkbox(
-                t("dataset.ai_planner"),
-                value=False,
-                help=t("dataset.ai_planner_help"),
-            )
-            if use_ai_planner:
-                st.warning(t("dataset.ai_warning"))
-            else:
-                st.caption(t("dataset.ai_off"))
-
-            if st.button(t("dataset.generate_plan"), type="primary", key="generate_chart_plan"):
-                _clear_pending_plan()
-                _clear_saved_report()
-                try:
-                    column_units = _parse_units(
-                        units_text,
-                        dataset.frame.columns.astype(str).tolist(),
+                with st.expander(t("dataset.context_optional"), expanded=False):
+                    _restore_dataset_context()
+                    data_source = st.text_input(
+                        t("dataset.data_source"),
+                        placeholder="e.g., LBMA Gold Price PM / official source URL",
+                        key="eda_data_source",
                     )
-                    frequency_value = (
+                    frequency_choice = st.selectbox(
+                        t("dataset.frequency"),
+                        FREQUENCY_OPTIONS,
+                        format_func=_frequency_label,
+                        key="eda_frequency",
+                    )
+                    units_text = st.text_area(
+                        t("dataset.units"),
+                        placeholder="price = USD per troy ounce",
+                        key="eda_column_units",
+                        height=80,
+                    )
+
+                use_ai_planner = st.checkbox(
+                    t("dataset.ai_planner"),
+                    value=False,
+                    help=t("dataset.ai_planner_help"),
+                )
+                if use_ai_planner:
+                    st.warning(t("dataset.ai_warning"))
+                else:
+                    st.caption(t("dataset.ai_off"))
+
+                if st.button(t("dataset.generate_plan"), type="primary", key="generate_chart_plan"):
+                    _clear_pending_plan()
+                    _clear_saved_report()
+                    try:
+                        column_units = _parse_units(
+                            units_text,
+                            dataset.frame.columns.astype(str).tolist(),
+                        )
+                        frequency_value = (
+                            None if frequency_choice.startswith("Not specified") else frequency_choice
+                        )
+                        report = build_eda_report(
+                            dataset,
+                            project_id,
+                            data_source=data_source,
+                            temporal_frequency=frequency_value,
+                            column_units=column_units,
+                        )
+                        if use_ai_planner:
+                            plan = plan_visual_eda(
+                                problem_text,
+                                report,
+                                dataset.frame,
+                                settings=settings,
+                            )
+                        else:
+                            plan = fallback_chart_plan(report).model_copy(
+                                update={
+                                    "fallback_reason": (
+                                        "AI planner was not enabled; "
+                                "generated generic deterministic EDA."
+                                    )
+                                }
+                            )
+                        validate_chart_plan(plan, dataset.frame, report)
+                        st.session_state["eda_pending_plan"] = plan.model_dump(mode="json")
+                        st.session_state["eda_pending_report"] = report.model_dump(mode="json")
+                        st.session_state["eda_pending_dataset_sha"] = dataset.sha256
+                        st.session_state["eda_pending_problem_statement"] = problem_text
+                        st.session_state["eda_pending_context_signature"] = _context_signature(
+                            project_id,
+                            data_source,
+                            frequency_value,
+                            column_units,
+                            use_ai_planner,
+                            settings.llm_provider,
+                            settings.llm_model,
+                            st.session_state.get(SESSION_REVISION_KEY, 0),
+                        )
+                        st.success(t("dataset.plan_generated"))
+                    except ValueError as exc:
+                        st.error(str(exc))
+                    except Exception as exc:
+                        st.error(t("dataset.planning_failed", err=f"{type(exc).__name__}: {exc}"))
+
+                if "eda_pending_plan" in st.session_state and pending_plan_matches(
+                    st.session_state.get("eda_pending_dataset_sha"),
+                    dataset.sha256,
+                ):
+                    pending_plan = ChartPlan.model_validate(st.session_state["eda_pending_plan"])
+                    pending_report = EDAReport.model_validate(st.session_state["eda_pending_report"])
+                    current_frequency = (
                         None if frequency_choice.startswith("Not specified") else frequency_choice
                     )
-                    report = build_eda_report(
-                        dataset,
-                        project_id,
-                        data_source=data_source,
-                        temporal_frequency=frequency_value,
-                        column_units=column_units,
-                    )
-                    if use_ai_planner:
-                        plan = plan_visual_eda(
-                            problem_text,
-                            report,
-                            dataset.frame,
-                            settings=settings,
-                        )
-                    else:
-                        plan = fallback_chart_plan(report).model_copy(
-                            update={
-                                "fallback_reason": (
-                                    "AI planner was not enabled; "
-                            "generated generic deterministic EDA."
-                                )
-                            }
-                        )
-                    validate_chart_plan(plan, dataset.frame, report)
-                    st.session_state["eda_pending_plan"] = plan.model_dump(mode="json")
-                    st.session_state["eda_pending_report"] = report.model_dump(mode="json")
-                    st.session_state["eda_pending_dataset_sha"] = dataset.sha256
-                    st.session_state["eda_pending_problem_statement"] = problem_text
-                    st.session_state["eda_pending_context_signature"] = _context_signature(
-                        project_id,
-                        data_source,
-                        frequency_value,
-                        column_units,
-                        use_ai_planner,
-                        settings.llm_provider,
-                        settings.llm_model,
-                        st.session_state.get(SESSION_REVISION_KEY, 0),
-                    )
-                    st.success(t("dataset.plan_generated"))
-                except ValueError as exc:
-                    st.error(str(exc))
-                except Exception as exc:
-                    st.error(t("dataset.planning_failed", err=f"{type(exc).__name__}: {exc}"))
-
-            if "eda_pending_plan" in st.session_state and pending_plan_matches(
-                st.session_state.get("eda_pending_dataset_sha"),
-                dataset.sha256,
-            ):
-                pending_plan = ChartPlan.model_validate(st.session_state["eda_pending_plan"])
-                pending_report = EDAReport.model_validate(st.session_state["eda_pending_report"])
-                current_frequency = (
-                    None if frequency_choice.startswith("Not specified") else frequency_choice
-                )
-                try:
-                    current_units = _parse_units(
-                        units_text,
-                        dataset.frame.columns.astype(str).tolist(),
-                    )
-                    current_signature = _context_signature(
-                        project_id,
-                        data_source,
-                        current_frequency,
-                        current_units,
-                        use_ai_planner,
-                        settings.llm_provider,
-                        settings.llm_model,
-                        st.session_state.get(SESSION_REVISION_KEY, 0),
-                    )
-                    stored_problem = st.session_state.get("eda_pending_problem_statement")
-                    stored_signature = st.session_state.get("eda_pending_context_signature")
-                    context_changed = (
-                        problem_text != stored_problem
-                        or current_signature != stored_signature
-                    )
-                except ValueError as exc:
-                    context_changed = True
-                    st.warning(str(exc))
-                _render_chart_plan(pending_plan)
-
-                if context_changed:
-                    st.warning(t("dataset.context_changed"))
-
-                approve_col, discard_col = st.columns(2)
-                with approve_col:
-                    approve_clicked = st.button(
-                        t("dataset.approve_plan"),
-                        type="primary",
-                        disabled=context_changed,
-                        key="approve_chart_plan",
-                    )
-                with discard_col:
-                    discard_clicked = st.button(t("dataset.discard_plan"), key="discard_chart_plan")
-
-                if discard_clicked:
-                    _clear_pending_plan()
-                    st.rerun()
-
-                if approve_clicked:
                     try:
-                        artifacts = save_eda_artifacts(
-                            dataset,
-                            pending_report,
-                            settings.output_dir,
-                            chart_plan=pending_plan,
-                            human_approved=True,
+                        current_units = _parse_units(
+                            units_text,
+                            dataset.frame.columns.astype(str).tolist(),
                         )
-                        st.session_state["eda_report"] = pending_report.model_dump(mode="json")
-                        st.session_state["eda_artifacts"] = artifacts
-                        st.session_state["eda_report_dataset_sha"] = dataset.sha256
-                        st.session_state["eda_report_project_id"] = pending_report.project_id
-                        recorded = st.session_state.get("last_run")
-                        form_sig = st.session_state.get("foundation_input_signature")
-                        if (
-                            isinstance(recorded, dict)
-                            and recorded.get("run_id")
-                            and form_sig
-                        ):
-                            profiles = build_bundle_profiles(bundle)
-                            plan_payload = st.session_state.get("problem_aware_eda_plan")
-                            compact = build_compact_eda_report(
-                                project_id=pending_report.project_id,
-                                bundle_fingerprint=bundle.fingerprint,
-                                profiles=list(profiles.values()),
-                                plan=plan_payload,
-                                mode="single_file_charts",
-                            )
-                            # Strip forbidden dense fields from session full report before store.
-                            store = get_or_create_store(lambda: build_project_store(settings))
-                            saved = persist_approved_eda_into_state(
-                                store,
-                                project_id=str(
-                                    recorded.get("project_id") or pending_report.project_id
-                                ),
-                                project_name=str(
-                                    recorded.get("project_name") or project_name
-                                ),
-                                state=recorded,
-                                input_signature=str(form_sig),
-                                compact_eda=compact,
-                                artifacts=artifacts,
-                                dataset_sha256=dataset.sha256,
-                                note="phase3-approved-single-eda",
-                            )
-                            st.session_state["last_run"] = saved
+                        current_signature = _context_signature(
+                            project_id,
+                            data_source,
+                            current_frequency,
+                            current_units,
+                            use_ai_planner,
+                            settings.llm_provider,
+                            settings.llm_model,
+                            st.session_state.get(SESSION_REVISION_KEY, 0),
+                        )
+                        stored_problem = st.session_state.get("eda_pending_problem_statement")
+                        stored_signature = st.session_state.get("eda_pending_context_signature")
+                        context_changed = (
+                            problem_text != stored_problem
+                            or current_signature != stored_signature
+                        )
+                    except ValueError as exc:
+                        context_changed = True
+                        st.warning(str(exc))
+                    _render_chart_plan(pending_plan)
+
+                    if context_changed:
+                        st.warning(t("dataset.context_changed"))
+
+                    approve_col, discard_col = st.columns(2)
+                    with approve_col:
+                        approve_clicked = st.button(
+                            t("dataset.approve_plan"),
+                            type="primary",
+                            disabled=context_changed,
+                            key="approve_chart_plan",
+                        )
+                    with discard_col:
+                        discard_clicked = st.button(t("dataset.discard_plan"), key="discard_chart_plan")
+
+                    if discard_clicked:
                         _clear_pending_plan()
-                        st.success(t("dataset.plan_executed"))
                         st.rerun()
-                    except Exception as exc:
-                        st.error(t("dataset.execution_failed", err=f"{type(exc).__name__}: {exc}"))
-        else:
-            _render_multi_dataset_eda(bundle)
+
+                    if approve_clicked:
+                        try:
+                            artifacts = save_eda_artifacts(
+                                dataset,
+                                pending_report,
+                                settings.output_dir,
+                                chart_plan=pending_plan,
+                                human_approved=True,
+                            )
+                            st.session_state["eda_report"] = pending_report.model_dump(mode="json")
+                            st.session_state["eda_artifacts"] = artifacts
+                            st.session_state["eda_report_dataset_sha"] = dataset.sha256
+                            st.session_state["eda_report_project_id"] = pending_report.project_id
+                            recorded = st.session_state.get("last_run")
+                            form_sig = st.session_state.get("foundation_input_signature")
+                            if (
+                                isinstance(recorded, dict)
+                                and recorded.get("run_id")
+                                and form_sig
+                            ):
+                                profiles = build_bundle_profiles(bundle)
+                                plan_payload = st.session_state.get("problem_aware_eda_plan")
+                                compact = build_compact_eda_report(
+                                    project_id=pending_report.project_id,
+                                    bundle_fingerprint=bundle.fingerprint,
+                                    profiles=list(profiles.values()),
+                                    plan=plan_payload,
+                                    mode="single_file_charts",
+                                )
+                                # Strip forbidden dense fields from session full report before store.
+                                store = get_or_create_store(lambda: build_project_store(settings))
+                                saved = persist_approved_eda_into_state(
+                                    store,
+                                    project_id=str(
+                                        recorded.get("project_id") or pending_report.project_id
+                                    ),
+                                    project_name=str(
+                                        recorded.get("project_name") or project_name
+                                    ),
+                                    state=recorded,
+                                    input_signature=str(form_sig),
+                                    compact_eda=compact,
+                                    artifacts=artifacts,
+                                    dataset_sha256=dataset.sha256,
+                                    note="phase3-approved-single-eda",
+                                )
+                                st.session_state["last_run"] = saved
+                            _clear_pending_plan()
+                            st.success(t("dataset.plan_executed"))
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(t("dataset.execution_failed", err=f"{type(exc).__name__}: {exc}"))
+            else:
+                _render_multi_dataset_eda(bundle)
 
 report_matches_selection = _saved_report_matches_current(accepted_identity, project_id)
 saved_project_id = st.session_state.get("eda_report_project_id")
@@ -1004,6 +1008,7 @@ progress = derive_progress_chrome(
 )
 # Render after syncing project state, so the guide reflects current inputs.
 render_research_guide(recorded_state if isinstance(recorded_state, dict) else None)
+selected_stage = int(st.session_state.get("guided_stage_preview", stage_index(progress.current_step)))
 with st.sidebar:
     st.subheader(t("chrome.workspace"))
     st.info(progress.sidebar_badge)
@@ -1019,21 +1024,25 @@ st.caption(progress.stepper_line)
 st.info(t("chrome.independent_profiles_info"))
 
 _state_dict = recorded_state if isinstance(recorded_state, dict) else None
-# UX-D: guided next step + soft locks (never auto-approves H1/H2/H3).
-render_next_step_guide(_state_dict)
+# The six-stage guide replaces the redundant action card.
+# Hard gates continue to be enforced by each panel.
 
-render_project_phases(recorded_state, inputs_current=inputs_current)
-if panel_is_unlocked("problem", _state_dict):
-    spec_for_eda = render_problem_analyst_panel(
-        problem_text,
-        settings=settings,
-        recorded_state=_state_dict,
-    )
+with st.expander("技术状态 / Advanced research state", expanded=False):
+    render_project_phases(recorded_state, inputs_current=inputs_current)
+if selected_stage == 0:
+    if panel_is_unlocked("problem", _state_dict):
+        spec_for_eda = render_problem_analyst_panel(
+            problem_text,
+            settings=settings,
+            recorded_state=_state_dict,
+        )
+    else:
+        render_locked_panel_stub("problem", _state_dict)
+        spec_for_eda = resolve_displayed_problem_specification(_state_dict)
 else:
-    render_locked_panel_stub("problem", _state_dict)
     spec_for_eda = resolve_displayed_problem_specification(_state_dict)
 # Problem-aware plan runs after foundation sync + analyst so cleared specs cannot linger.
-if bundle is not None and not bundle_rejected:
+if selected_stage == 1 and bundle is not None and not bundle_rejected:
     if panel_is_unlocked("eda", _state_dict):
         render_problem_aware_eda_panel(
             bundle,
@@ -1049,7 +1058,7 @@ if isinstance(recorded_state, dict):
     maybe_eda = recorded_state.get("eda_report")
     if isinstance(maybe_eda, dict):
         eda_report_for_lit = maybe_eda
-if panel_is_unlocked("literature", _state_dict):
+if selected_stage == 2 and panel_is_unlocked("literature", _state_dict):
     render_literature_evidence_panel(
         settings=settings,
         problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
@@ -1060,7 +1069,7 @@ if panel_is_unlocked("literature", _state_dict):
         project_name=project_name,
         input_signature=form_signature,
     )
-else:
+elif selected_stage == 2:
     render_locked_panel_stub("literature", _state_dict)
 evidence_for_h1 = None
 if isinstance(recorded_state, dict):
@@ -1071,7 +1080,7 @@ if evidence_for_h1 is None:
     cached_ev = st.session_state.get("literature_evidence_report")
     if isinstance(cached_ev, dict) and cached_ev:
         evidence_for_h1 = cached_ev
-if panel_is_unlocked("h1", _state_dict):
+if selected_stage == 2 and panel_is_unlocked("h1", _state_dict):
     render_research_h1_panel(
         settings=settings,
         problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
@@ -1083,9 +1092,9 @@ if panel_is_unlocked("h1", _state_dict):
         project_name=project_name,
         input_signature=form_signature,
     )
-else:
+elif selected_stage == 2:
     render_locked_panel_stub("h1", _state_dict)
-if panel_is_unlocked("modeling", _state_dict):
+if selected_stage == 3 and panel_is_unlocked("modeling", _state_dict):
     render_modeling_experiment_panel(
         settings=settings,
         problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
@@ -1094,21 +1103,23 @@ if panel_is_unlocked("modeling", _state_dict):
         project_name=project_name,
         input_signature=form_signature,
         upload_count=len(uploaded_files),
+        upload_payloads=upload_payloads,
     )
-else:
+elif selected_stage == 3:
     render_locked_panel_stub("modeling", _state_dict)
-if panel_is_unlocked("h2", _state_dict):
+if selected_stage == 4 and panel_is_unlocked("h2", _state_dict):
     render_validation_h2_panel(
         settings=settings,
+        upload_payloads=upload_payloads,
         problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
         recorded_state=_state_dict,
         project_id=project_id,
         project_name=project_name,
         input_signature=form_signature,
     )
-else:
+elif selected_stage == 4:
     render_locked_panel_stub("h2", _state_dict)
-if panel_is_unlocked("paper", _state_dict):
+if selected_stage == 5 and panel_is_unlocked("paper", _state_dict):
     render_paper_h3_panel(
         settings=settings,
         problem_specification=spec_for_eda if isinstance(spec_for_eda, dict) else None,
@@ -1117,7 +1128,7 @@ if panel_is_unlocked("paper", _state_dict):
         project_name=project_name,
         input_signature=form_signature,
     )
-else:
+elif selected_stage == 5:
     render_locked_panel_stub("paper", _state_dict)
 render_persistence_panel(
     project_store,
