@@ -261,6 +261,24 @@ def render_problem_analyst_panel(
 
     if spec_dict:
         render_problem_specification_summary(spec_dict)
+        st.info(
+            "题意拆解已完成。接下来上传数据、查看质量/价格/收益/回撤图表，"
+            "再据此审查模型，而不是马上宣布最优模型。"
+            if get_locale() == "zh" else
+            "Problem intake is ready. Next, upload and explore actual datasets "
+            "before accepting a supposedly optimal model."
+        )
+        if st.button(
+            "继续到第二阶段：EDA 数据分析 →" if get_locale() == "zh"
+            else "Continue to Stage 2: EDA →",
+            key="problem_to_eda",
+            type="primary",
+        ):
+            if not isinstance(st.session_state.get("last_run"), dict):
+                st.warning("Please initialize and save the project first.")
+            else:
+                st.session_state["guided_stage_preview"] = 1
+                st.rerun()
     else:
         st.info(t("pa.none_yet"))
 
