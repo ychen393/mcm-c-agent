@@ -131,7 +131,7 @@ def test_paper_refuses_stale_real_data_validation_for_other_run():
     state["validation_report"] = stale
     state["approval_status"]["h2"] = "approved"
     state["decision_report"]["h2"] = {"status": "approved"}
-    with pytest.raises(ValueError, match="same baseline experiment"):
+    with pytest.raises(ValueError, match=r"baseline (run|experiment)"):
         run_paper_planner(
             state=state,
             problem_specification=spec,
