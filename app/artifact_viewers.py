@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from app.i18n import t
-from modeling.fixture_data import PRICE_FIXTURE_ID, load_price_fixture
+from modeling.fixture_data import PRICE_FIXTURE_ID, PriceBar, load_price_fixture
 
 
 def _candidate_by_id(
@@ -145,6 +145,7 @@ def render_modeling_artifact_viewers(
     artifacts: list[Any],
     *,
     fixture_id: str = PRICE_FIXTURE_ID,
+    uploaded_bars: list[PriceBar] | None = None,
 ) -> None:
     """Plot equity curve and fixture price series; raw JSON stays in expanders."""
     arts = [a for a in artifacts if isinstance(a, dict)]
@@ -170,21 +171,29 @@ def render_modeling_artifact_viewers(
         if isinstance(payload, dict) and payload.get("fixture_id"):
             resolved_fixture = str(payload["fixture_id"])
 
-    try:
-        bars = load_price_fixture(resolved_fixture)
-    except Exception:
-        bars = []
+    if uploaded_bars is not None:
+        bars = uploaded_bars
+    else:
+        try:
+            bars = load_price_fixture(resolved_fixture)
+        except Exception:
+            bars = []
     if bars:
+        # Downsample large historical series for responsive UI only; backend results stay unchanged.
+        sampled = bars[::max(1, len(bars) // 300)]
+        if sampled[-1].date != bars[-1].date:
+            sampled = [*sampled, bars[-1]]
         price_rows = [
             {
                 "date": bar.date,
                 "bitcoin": bar.bitcoin,
                 "gold": bar.gold if bar.gold is not None else float("nan"),
             }
-            for bar in bars
+            for bar in sampled
         ]
         price_frame = pd.DataFrame(price_rows).set_index("date")
-        st.caption(t("viewer.price_series", fixture=resolved_fixture))
+        st.caption(("Historical uploaded CSV price series" if uploaded_bars is not None
+                    else t("viewer.price_series", fixture=resolved_fixture)))
         st.line_chart(price_frame, use_container_width=True)
 
 
