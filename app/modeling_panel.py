@@ -278,6 +278,18 @@ def render_modeling_experiment_panel(
             st.warning("演示数据实验结果，不可作为真实赛题研究结论 / Synthetic demo result")
         runs = report_dict.get("runs") or []
         latest = runs[-1] if runs else {}
+        params_extra = ((latest.get("params") or {}).get("extra") or {})
+        real_report = report_dict.get("strategy") == "deterministic_uploaded_csv"
+        matching_uploaded_inputs = bool(
+            real_report and prepared is not None and
+            params_extra.get("gold_sha256") == prepared.gold_sha256 and
+            params_extra.get("bitcoin_sha256") == prepared.bitcoin_sha256
+        )
+        if real_report and not matching_uploaded_inputs:
+            st.warning(
+                "真实 CSV 实验仅可查看已存档摘要；如需重新附件或显示原始行情曲线，"
+                "必须重新上传哈希一致的两份 CSV。"
+            )
         st.markdown(
             f"**Report:** `{report_dict.get('report_id')}` · "
             f"**Proposal:** `{report_dict.get('proposal_id')}` · "
@@ -313,7 +325,11 @@ def render_modeling_experiment_panel(
                 for ref in latest.get("code_refs") or []:
                     if isinstance(ref, dict) and ref.get("kind") == "fixture_id":
                         fixture_id = str(ref.get("value") or fixture_id)
-            render_modeling_artifact_viewers(artifacts, fixture_id=fixture_id)
+            render_modeling_artifact_viewers(
+                artifacts,
+                fixture_id=fixture_id,
+                uploaded_bars=(list(prepared.bars) if matching_uploaded_inputs else None),
+            )
             st.markdown(t("mod.artifacts_raw"))
             for art in artifacts:
                 with st.expander(
@@ -333,7 +349,7 @@ def render_modeling_experiment_panel(
         attach = st.button(
             t("mod.attach"),
             key="persist_modeling_experiment",
-            disabled=not gate.modeling_allowed,
+            disabled=(not gate.modeling_allowed or (real_report and not matching_uploaded_inputs)),
             help=t("mod.attach_help"),
         )
         if attach:
