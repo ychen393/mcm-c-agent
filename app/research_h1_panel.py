@@ -6,7 +6,8 @@ from typing import Any, MutableMapping
 
 import streamlit as st
 
-from app.i18n import t
+from app.i18n import get_locale, t
+from app.problem_narrative import is_2022_trading_spec, trading_research_brief
 
 from agents.debate_critic import critique_research_proposal
 from agents.research_strategy import synthesize_research_proposal
@@ -90,6 +91,54 @@ def render_research_h1_panel(
     """Render Research Strategy + Critique + human H1 controls."""
     st.subheader(t("h1.subheader"))
     st.caption(t("h1.caption"))
+    zh = get_locale() == "zh"
+    st.markdown(
+        "#### Agent 协作流程：从题目和 EDA 走向可验证模型"
+        if zh else
+        "#### Agent collaboration: from problem and EDA to testable models"
+    )
+    st.write(
+        "① Problem Analyst（题意与约束） → ② EDA Specialist（真实数据证据） → "
+        "③ Research Strategist（候选方案） → ④ Debate Critic（反例与风险） → "
+        "⑤ 你批准 H1。每个环节都有可见输出，没有自动批准。"
+        if zh else
+        "Problem Analyst → EDA Specialist → Research Strategist → Debate Critic → "
+        "your H1 approval. Each role produces visible outputs; nothing is auto-approved."
+    )
+    insight = (eda_report or {}).get("interpreted_findings") if isinstance(eda_report, dict) else None
+    measured = insight.get("datasets", []) if isinstance(insight, dict) else []
+    if measured:
+        st.success(
+            (f"EDA Agent 已提供 {len(measured)} 份上传数据的统计证据；"
+             "候选方案将引用波动率、回撤与缺失值风险。")
+            if zh else f"EDA Agent supplied observed statistics for {len(measured)} datasets."
+        )
+        for observed in measured[:5]:
+            st.caption(
+                f"{observed.get('name')}: "
+                f"volatility={observed.get('volatility_pct')}%, "
+                f"drawdown={observed.get('max_drawdown_pct')}%, "
+                f"valid quotes={observed.get('valid_prices')}"
+            )
+    else:
+        st.warning(
+            "尚无真实 EDA 数值；可以预览备选方案，但不能凭题目直接证明推荐模型更好。"
+            if zh else
+            "No observed EDA statistics. Candidate ideas may be previewed but not empirically ranked."
+        )
+    if isinstance(problem_specification, dict) and is_2022_trading_spec(problem_specification):
+        brief = trading_research_brief("zh" if zh else "en")
+        with st.expander("模型方案比较与实施边界" if zh else "Candidate model families and implementation scope", expanded=True):
+            for title, description, status in brief["models"]:
+                st.write(f"**{title} · {status}**")
+                st.caption(description)
+        st.caption(
+            "研究假设不等于已经实现。现有执行器只支持有限的确定性基线策略；"
+            "应确认所批准的候选方法与实际执行的策略一致。"
+            if zh else
+            "Research ideas are not implemented models. The runner currently supports limited "
+            "deterministic baselines; verify the approved method matches the executed strategy."
+        )
 
     use_llm = st.checkbox(
         t("h1.use_llm"),
@@ -98,6 +147,19 @@ def render_research_h1_panel(
         key="research_strategy_use_llm_ui",
     )
 
+    team_run = st.button(
+        ("运行研究协作：策略 Agent → 独立 Critic" if zh
+         else "Run research team: Strategist → independent Critic"),
+        type="primary",
+        key="run_research_team",
+    )
+    st.caption(
+        ("此协作调用两个独立的规则分析模块；当前 Strategy/Critic 的 LLM 选项仍是占位接口，"
+         "不会假装已经进行了模型推理。")
+        if zh else
+        "The Strategist and Critic are independent deterministic modules; "
+        "the optional LLM implementation here remains a stub."
+    )
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         synthesize = st.button(
@@ -119,7 +181,7 @@ def render_research_h1_panel(
     proposal_dict = resolve_displayed_proposal(recorded_state)
     critique_dict = resolve_displayed_critique(recorded_state)
 
-    if synthesize:
+    if synthesize or team_run:
         try:
             proposal = synthesize_research_proposal(
                 problem_specification=problem_specification,
@@ -155,7 +217,7 @@ def render_research_h1_panel(
             if proposal.llm_attempted and proposal.llm_note:
                 st.info(proposal.llm_note)
 
-    if critique_btn:
+    if critique_btn or team_run:
         if not proposal_dict:
             st.warning(t("h1.synth_before_critique"))
         else:
@@ -164,6 +226,7 @@ def render_research_h1_panel(
                     proposal=proposal_dict,
                     problem_specification=problem_specification,
                     evidence_report=evidence_report,
+                    eda_report=eda_report,
                     use_llm=use_llm,
                     settings=settings,
                 )
@@ -179,6 +242,14 @@ def render_research_h1_panel(
                         b=critique.blocking_count,
                     )
                 )
+                if team_run:
+                    st.info(
+                        "研究方案 Agent 和独立 Critic 已分别完成分析。"
+                        "请阅读方案和批评，保存方案，再手动决定 H1。"
+                        if zh else
+                        "Strategist and independent Critic finished. Review both, "
+                        "attach the proposal and decide H1 manually."
+                    )
                 if critique.llm_attempted and critique.llm_note:
                     st.info(critique.llm_note)
 
