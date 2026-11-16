@@ -55,8 +55,9 @@ def prepare_uploaded_2022_prices(gold_csv: bytes, bitcoin_csv: bytes) -> Prepare
         raise ValueError("Gold has no observed price")
     if btc["Value"].isna().any():
         raise ValueError("Bitcoin prices must be present for each provided date")
-    if btc["Date"].min() < gold.loc[gold["USD (PM)"].notna(), "Date"].min():
-        raise ValueError("Gold needs an observed price on or before the first bitcoin date")
+    # The official competition begins on a Sunday (before the first gold quote).
+    # Initial zero gold holdings are valued at zero until the first observed quote.
+    # Never fill with a future price.
     merged = btc.merge(gold, on="Date", how="left", validate="one_to_one")
     bars = tuple(
         PriceBar(
