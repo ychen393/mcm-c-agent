@@ -512,7 +512,88 @@ def synthesize_research_proposal(
     llm_on = _llm_enabled(settings, use_llm)
 
     candidates = _build_candidates(spec, evidence)
+    # EDA Agent → Strategy Agent: use observed dataset statistics, not merely
+    # an eda_context_present flag. Do not infer predictive accuracy from EDA.
+    insight = (
+        eda_report.get("interpreted_findings") if isinstance(eda_report, dict)
+        else None
+    )
+    measured = (
+        [row for row in insight.get("datasets", []) if isinstance(row, dict)]
+        if isinstance(insight, dict) else []
+    )
+    observed_files = {
+        str(row.get("name") or "").casefold() for row in measured
+    }
+    observations = []
+    for item in measured:
+        if item.get("valid_prices", 0) and item.get("volatility_pct") is not None:
+            observations.append(
+                f"{item.get('name')}: {item.get('valid_prices')} quotes; "
+                f"quote-return volatility={item['volatility_pct']:.2f}%; "
+                f"max observed price drawdown={item.get('max_drawdown_pct'):.2f}%."
+            )
+    if measured:
+        adjusted = []
+        for candidate in candidates:
+            payload = candidate.model_dump(mode="python")
+            for need in payload.get("data_needs", []):
+                description = str(need.get("description") or "").casefold()
+                if "supplied dataset" in description:
+                    need["satisfied"] = any(
+                        name in description for name in observed_files
+                    )
+            source = next(
+                (row for row in measured if row.get("valid_prices")), None
+            )
+            if source:
+                payload["provenance"] = [
+                    *payload.get("provenance", []),
+                    {
+                        "kind": "eda_report",
+                        "ref_id": str(source.get("dataset_id") or "eda")[:80],
+                        "summary": (
+                            f"Observed {source.get('name')} summary; "
+                            f"volatility={source.get('volatility_pct')}%; "
+                            f"drawdown={source.get('max_drawdown_pct')}%."
+                        )[:800],
+                    },
+                ][:24]
+            if candidate.method_family in {"portfolio_optimization", "trend_following",
+                                           "cost_aware_trading", "risk_management"}:
+                payload["strengths"] = [
+                    *payload.get("strengths", []),
+                    "Candidate addresses observed volatility and/or turnover risk; "
+                    "must still be evaluated in a causal fee-aware backtest.",
+                ][:12]
+                payload["weaknesses"] = [
+                    *payload.get("weaknesses", []),
+                    "Descriptive EDA does not demonstrate out-of-sample superiority "
+                    "or global optimality.",
+                ][:12]
+            adjusted.append(CandidateMethod.model_validate(payload))
+        candidates = adjusted
+
     recommended_id = _recommend(candidates)
+    if measured:
+        # Prefer cost-aware/risk-aware candidate methods when both market
+        # datasets are actually observed; still a research hypothesis only.
+        valid_markets = [row for row in measured if row.get("valid_prices", 0) > 2]
+        if len(valid_markets) >= 2:
+            method_priority = {
+                "cost_aware_trading": 5, "portfolio_optimization": 4,
+                "trend_following": 3, "risk_management": 3,
+                "simulation_backtest": 2,
+            }
+            ranked = sorted(
+                candidates,
+                key=lambda cand: (
+                    -method_priority.get(cand.method_family, 0),
+                    cand.candidate_id,
+                ),
+            )
+            if ranked and method_priority.get(ranked[0].method_family, 0) >= 3:
+                recommended_id = ranked[0].candidate_id
     marked: list[CandidateMethod] = []
     for cand in candidates:
         payload = cand.model_dump(mode="python")
@@ -525,6 +606,14 @@ def synthesize_research_proposal(
         "Candidates are proposals only — H1 requires explicit human Approve / Request-revision.",
     ]
     open_questions: list[str] = []
+    if observations:
+        notes.append("Observed EDA evidence: " + " | ".join(observations)[:1600])
+        notes.append("Recommendation conditioned on uploaded historical dataset diagnostics.")
+    if not measured:
+        open_questions.append(
+            "No quantified uploaded EDA evidence is attached; model suitability "
+            "and expected return cannot be concluded from the statement alone."
+        )
     if spec is None:
         notes.append("ProblemSpecification absent; only a baseline candidate was emitted.")
         open_questions.append("Provide or attach a ProblemSpecification before H1 approval.")
@@ -543,7 +632,12 @@ def synthesize_research_proposal(
 
     consensus: list[str] = []
     if recommended_id:
-        consensus.append(f"Rule-based recommendation: {recommended_id} (highest evidence/data score).")
+        consensus.append(
+            f"Provisional research recommendation: {recommended_id}; "
+            "selection is a hypothesis, not a backtested optimal trading rule."
+        )
+        if observations:
+            consensus.append("EDA signals informing the shortlist: " + " | ".join(observations)[:850])
     consensus.append("Modeling & Experiment remain blocked until human H1 approval.")
 
     llm_attempted = False
@@ -558,6 +652,7 @@ def synthesize_research_proposal(
         spec.problem_id if spec else "unknown",
         recommended_id or "none",
         str(len(marked)),
+        str(insight.get("bundle_fingerprint") or "") if isinstance(insight, dict) else "",
     )
 
     return ResearchProposal(
