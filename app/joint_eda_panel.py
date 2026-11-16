@@ -49,9 +49,27 @@ def render_joint_eda_panel(bundle: DatasetBundle) -> None:
     if not isinstance(confirmation, dict) or not confirmation.get("confirmed"):
         st.info("先预览并确认两份数据的日期关系，再选择联合分析；不会自动合并。")
         return
-    if confirmation.get("status") != "preview" or confirmation.get("join_type") != "inner":
-        st.warning("目前仅对通过安全预览的 Date 内连接开放联合图表。")
+    if confirmation.get("join_type") != "inner":
+        st.warning("该比较仅支持日期 Inner Join，不进行缺失值填补。")
         return
+    normal_preview = confirmation.get("status") == "preview"
+    calendar_override = (
+        confirmation.get("status") == "blocked"
+        and confirmation.get("reason") == "frequency_mismatch"
+    )
+    if not normal_preview and not calendar_override:
+        st.warning("该日期关系未通过安全检查；不可执行联合分析。")
+        return
+    if calendar_override:
+        st.warning(
+            "黄金只在开市日报价，比特币每天报价；两市场频率不同。"
+            "此专项比较只保留双方实际有报价的日期，不进行周末价格填充。"
+        )
+        if not st.checkbox(
+            "我同意仅比较共同报价日期 / Confirm observed-date-only alignment",
+            key="joint_eda_calendar_ack",
+        ):
+            return
     ids = {ref.dataset_id: ref for ref in bundle.datasets}
     left_id = confirmation.get("left_dataset_id")
     right_id = confirmation.get("right_dataset_id")
