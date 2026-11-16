@@ -5,7 +5,7 @@ from typing import Any, MutableMapping
 
 import streamlit as st
 from app.i18n import get_locale, t
-from app.problem_narrative import render_trading_problem_brief
+from app.problem_narrative import is_2022_trading_spec, render_trading_problem_brief
 
 from agents.problem_analyst import analyze_problem
 from core.config import Settings
@@ -35,8 +35,21 @@ def render_problem_specification_summary(spec_dict: dict[str, Any]) -> None:
     title = str(spec_dict.get("title") or t("pa.untitled"))
     problem_id = str(spec_dict.get("problem_id") or "unknown")
     strategy = str(spec_dict.get("strategy") or "unknown")
-    st.markdown(f"**{title}**")
-    st.caption(f"problem_id={problem_id} · strategy={strategy}")
+    st.markdown(
+        "**2022 MCM C：黄金与比特币交易策略**"
+        if get_locale() == "zh" and is_2022_trading_spec(spec_dict)
+        else f"**{title}**"
+    )
+    with st.expander("分析来源与技术标识 / Analysis provenance", expanded=False):
+        st.caption(f"Original title: {title}")
+        st.caption(f"problem_id={problem_id} · strategy={strategy}")
+        if strategy == "agent":
+            st.caption(
+                f"Structured LLM analyst: {spec_dict.get('analyst_provider') or 'unknown'}"
+                f" / {spec_dict.get('analyst_model') or 'unknown'}"
+            )
+        else:
+            st.caption("Offline deterministic extraction; no language-model call.")
     render_trading_problem_brief(spec_dict)
     if get_locale() == "zh":
         st.caption("原始研究条目仍保留英文以便核对题目；上方是针对本题的中文研究解释。")
