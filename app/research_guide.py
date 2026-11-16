@@ -71,9 +71,10 @@ def render_research_guide(state: dict | None) -> None:
     progress = derive_progress_chrome(state)
     active = stage_index(progress.current_step)
     completed = completed_stage_indices(state)
-    if st.session_state.get("guided_last_active") != active:
+    # Do not overwrite a deliberate stage choice on every progress update.
+    # EDA save-and-continue and the Previous/Next controls own navigation.
+    if "guided_stage_preview" not in st.session_state:
         st.session_state["guided_stage_preview"] = active
-        st.session_state["guided_last_active"] = active
     st.progress(len(completed) / len(stages),
                 text=(f"已完成 {len(completed)}/{len(stages)} 个阶段" if zh
                       else f"{len(completed)}/{len(stages)} stages complete"))
