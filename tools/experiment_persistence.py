@@ -147,6 +147,14 @@ def persist_experiment_into_state(
     artifacts = model_artifact_entries_from_run(latest)
 
     updated = dict(state)
+    # A new experiment invalidates all dependent validation and paper approvals.
+    # Never reuse H2/H3 outcomes from a different baseline run.
+    for key in ("validation_report", "paper_outline", "latex_source", "review_report"):
+        updated.pop(key, None)
+    approval = dict(updated.get("approval_status") or {})
+    approval["h2"] = "pending"
+    approval["h3"] = "pending"
+    updated["approval_status"] = approval
     experiment_logs = list(updated.get("experiment_logs") or [])
     experiment_logs.append(log_entry)
     updated["experiment_logs"] = experiment_logs
@@ -160,6 +168,9 @@ def persist_experiment_into_state(
     updated["model_artifacts"] = prior_artifacts + artifacts
 
     decision_report = dict(updated.get("decision_report") or {})
+    for key in ("validation", "h2", "paper", "h3", "paper_gate",
+                "e2e_gate", "validation_gate"):
+        decision_report.pop(key, None)
     decision_report["experiment"] = compact_report
     decision_report["modeling_gate"] = modeling_gate_status(updated).model_dump(mode="json")
     updated["decision_report"] = decision_report
@@ -167,6 +178,10 @@ def persist_experiment_into_state(
     phases = dict(updated.get("workspace_phases") or {})
     phases["strategy_modeling"] = "experiment_recorded"
     phases["modeling_experiment"] = "recorded"
+    phases["validation_sensitivity"] = "pending"
+    phases["h2"] = "pending"
+    phases["paper_latex"] = "blocked_until_h2"
+    phases["h3"] = "pending"
     updated["workspace_phases"] = phases
 
     # Do not mark research_task_complete, approve H2, or start Phase 8 paper.
