@@ -28,7 +28,7 @@ def test_rejects_ambiguous_or_invalid_market_data(gold, btc):
 
 
 def test_first_bitcoin_date_precedes_first_gold_quote_without_future_fill():
-    btc = b"Date,Value\\n2022-01-06,40000\\n2022-01-07,40100\\n"
+    btc = b"Date,Value\n2022-01-06,40000\n2022-01-07,40100\n"
     output = prepare_uploaded_2022_prices(GOLD, btc)
     assert output.bars[0].gold is None
     assert output.bars[1].gold == 1800
