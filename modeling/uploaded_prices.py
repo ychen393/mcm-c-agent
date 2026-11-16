@@ -44,8 +44,8 @@ def _parse_prices(payload: bytes, *, price_column: str, name: str) -> pd.DataFra
 def prepare_uploaded_2022_prices(gold_csv: bytes, bitcoin_csv: bytes) -> PreparedPrices:
     """Align on bitcoin calendar; gold None on closed/missing quote days.
 
-    Missing bitcoin prices are rejected rather than filled. A gold quote must
-    exist by the first bitcoin date to support past-only valuation.
+    Missing bitcoin prices are rejected rather than filled. Gold positions are
+    zero until an observed quote, avoiding any future price lookahead.
     """
     gold = _parse_prices(gold_csv, price_column="USD (PM)", name="LBMA-GOLD")
     btc = _parse_prices(bitcoin_csv, price_column="Value", name="BCHAIN-MKPRU")
@@ -55,6 +55,10 @@ def prepare_uploaded_2022_prices(gold_csv: bytes, bitcoin_csv: bytes) -> Prepare
         raise ValueError("Gold has no observed price")
     if btc["Value"].isna().any():
         raise ValueError("Bitcoin prices must be present for each provided date")
+    if len(btc) > 1 and not btc["Date"].diff().iloc[1:].eq(pd.Timedelta(days=1)).all():
+        raise ValueError("Bitcoin daily dates have gaps; missing days must be resolved explicitly")
+    if gold.loc[gold["USD (PM)"].notna(), "Date"].dt.dayofweek.ge(5).any():
+        raise ValueError("Gold trading quotes on weekends are not permitted")
     # The official competition begins on a Sunday (before the first gold quote).
     # Initial zero gold holdings are valued at zero until the first observed quote.
     # Never fill with a future price.
