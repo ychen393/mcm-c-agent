@@ -50,6 +50,11 @@ def test_full_offline_problem_to_eda_to_research_team_is_navigable():
     assert saved["eda_report"]["interpreted_findings"]["datasets"][0]["valid_prices"] == 3
     assert saved["workspace_phases"]["independent_eda"] == "done"
 
+    assert any("Run research team" in b.label for b in app.button), (
+        f"stage={app.session_state.get('guided_stage_preview')}, "
+        f"buttons={[b.label for b in app.button]}, "
+        f"eda_status={app.session_state['last_run'].get('workspace_phases')}"
+    )
     app = _button(app, "Run research team").click().run()
     assert not app.exception
     assert app.session_state.get("research_proposal_draft")
