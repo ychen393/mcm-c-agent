@@ -122,3 +122,19 @@ def test_paper_draft_includes_actual_metrics_and_dataset_hashes():
     assert package.latex is not None
     assert package.outline.h2_approved
     assert state["approval_status"].get("h3") != "approved"
+
+
+def test_paper_refuses_stale_real_data_validation_for_other_run():
+    spec, proposal, state, experiment, validation, bars, sha = _model_and_validate()
+    stale = validation.model_dump(mode="json")
+    stale["baseline_run_id"] = "erun_unrelated"
+    state["validation_report"] = stale
+    state["approval_status"]["h2"] = "approved"
+    state["decision_report"]["h2"] = {"status": "approved"}
+    with pytest.raises(ValueError, match="same baseline experiment"):
+        run_paper_planner(
+            state=state,
+            problem_specification=spec,
+            use_llm=False,
+            attempt_pdf_compile=False,
+        )
