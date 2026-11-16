@@ -27,6 +27,7 @@ from app.problem_analyst_panel import (
     resolve_displayed_problem_specification,
 )
 from app.progress_chrome import derive_progress_chrome
+from app.research_guide import render_research_guide
 from app.relationship_panel import render_relationship_panel
 from app.research_h1_panel import render_research_h1_panel
 from app.paper_h3_panel import render_paper_h3_panel
@@ -86,6 +87,9 @@ if page == _NAV_API:
 
 st.title(t("chrome.title"))
 st.caption(t("chrome.caption"))
+
+# Read-only six-stage guide; existing research panels remain authoritative.
+render_research_guide(st.session_state.get("last_run"))
 
 # Stable English values; labels via format_func so startswith("Not specified") stays valid.
 FREQUENCY_OPTIONS = [
