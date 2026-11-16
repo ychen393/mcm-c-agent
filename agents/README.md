@@ -26,6 +26,9 @@ The planner service is connected to the Streamlit Dataset Explorer through an ex
 - **Implementation:** `agents/literature_evidence.py` exposes `gather_literature_evidence()`.
 - **Contract:** `schemas/evidence.py` (`EvidenceCard`, `EvidenceGap`, `LiteratureEvidenceReport`).
 - **Default path:** offline fixture corpus under `knowledge/fixture_corpus/` (synthetic CI stubs only).
+- **Embeddings:** when a vector index is present, prefers embedding retrieval
+  (`tools/corpus_ingest.py` + `retrieve_similar_chunks`); otherwise fixture keyword search.
+  See `docs/CORPUS_EMBEDDINGS.md`. Default embedder is deterministic `hash` (CI-safe).
 - **Optional live retrieval:** `LITERATURE_LIVE_RETRIEVAL` / `use_live=True` — Phase 4 stub records unavailability and never invents sources.
 - **UI:** Research Lab Literature & Evidence panel reviews cards/gaps and attaches sanitized `evidence_report` + `citations`.
 - **Phase 5 stub:** `agents/research_strategy_stub.py` re-exports live `research_strategy_status` (`h1_auto_approve=false`).

@@ -1,10 +1,10 @@
 {
   "corpus_id": "2022_mcm_c_fixture_v1",
-  "corpus_version": "1.0",
+  "corpus_version": "1.1",
   "problem_ids": [
     "2022_mcm_c"
   ],
-  "disclaimer": "Synthetic CI stubs only. Not real MCM papers or peer-reviewed sources.",
+  "disclaimer": "Synthetic CI stubs only. Not real MCM papers or peer-reviewed sources. Excellent-paper-style entries are structure/method references for retrieval demos — never cite as award winners.",
   "sources": [
     {
       "source_id": "fx_txn_cost_portfolio",
@@ -26,7 +26,7 @@
         "excerpt_quote"
       ],
       "review_status": "fixture",
-      "notes": "Illustrates \u03b1-cost aware rebalancing themes for gold/bitcoin trading problems.",
+      "notes": "Illustrates α-cost aware rebalancing themes for gold/bitcoin trading problems.",
       "keywords": [
         "transaction costs",
         "portfolio",
@@ -50,8 +50,8 @@
         {
           "note_id": "mn_cost_aware_rebalance",
           "method_name": "Cost-aware rebalancing threshold",
-          "summary": "Only rebalance when expected edge exceeds proportional transaction costs (\u03b1).",
-          "applicability": "Useful when \u03b1_gold and \u03b1_bitcoin differ and holdings update daily.",
+          "summary": "Only rebalance when expected edge exceeds proportional transaction costs (α).",
+          "applicability": "Useful when α_gold and α_bitcoin differ and holdings update daily.",
           "limitations": "Fixture only; thresholds must be estimated from past prices only."
         }
       ],
@@ -61,10 +61,10 @@
         "bibtex_fields": {
           "title": "Fixture note: portfolio choice with proportional transaction costs",
           "year": "2022",
-          "note": "CI fixture stub \u2014 not a real publication"
+          "note": "CI fixture stub — not a real publication"
         }
       },
-      "claim_summary": "Transaction costs should gate rebalancing; unequal \u03b1 across assets can change turnover."
+      "claim_summary": "Transaction costs should gate rebalancing; unequal α across assets can change turnover."
     },
     {
       "source_id": "fx_past_price_only",
@@ -120,7 +120,7 @@
         "bibtex_fields": {
           "title": "Fixture note: causal decision rules on past price streams",
           "year": "2022",
-          "note": "CI fixture stub \u2014 not a real publication"
+          "note": "CI fixture stub — not a real publication"
         }
       },
       "claim_summary": "Daily trading rules must be causal: only the past price stream may inform each decision."
@@ -145,7 +145,7 @@
         "excerpt_quote"
       ],
       "review_status": "fixture",
-      "notes": "Gold traded only on open days; bitcoin daily \u2014 state vector [cash, gold, bitcoin].",
+      "notes": "Gold traded only on open days; bitcoin daily — state vector [cash, gold, bitcoin].",
       "keywords": [
         "gold",
         "bitcoin",
@@ -180,10 +180,191 @@
         "bibtex_fields": {
           "title": "Fixture note: dual-asset calendars (cash, gold, bitcoin)",
           "year": "2022",
-          "note": "CI fixture stub \u2014 not a real publication"
+          "note": "CI fixture stub — not a real publication"
         }
       },
       "claim_summary": "Asset calendars differ; models must encode gold open-day limits and daily bitcoin trades."
+    },
+    {
+      "source_id": "fx_paper_structure",
+      "title": "Fixture reference: excellent-paper-style write-up structure for MCM C",
+      "authors": [
+        "MCM C Fixture Corpus"
+      ],
+      "year": 2022,
+      "venue": "CI fixture bundle — synthetic excellent-paper-style",
+      "source_type": "fixture_stub",
+      "original_url": null,
+      "local_path": "knowledge/fixture_corpus/snippets/fx_paper_structure.txt",
+      "publisher": "mcm-c-agent fixtures",
+      "license_or_rights": "internal synthetic fixture; not a real award paper; not for redistribution as scholarship",
+      "acquisition_method": "fixture_bundle",
+      "allowed_operations": [
+        "metadata_index",
+        "summarize",
+        "excerpt_quote"
+      ],
+      "review_status": "fixture",
+      "notes": "SYNTHETIC excellent-paper-style structure guide only. Do not cite as an MCM award winner.",
+      "keywords": [
+        "paper structure",
+        "summary sheet",
+        "assumptions",
+        "validation",
+        "sensitivity",
+        "equity curve",
+        "trader memorandum"
+      ],
+      "themes": [
+        "writing_structure",
+        "validation",
+        "trading_strategy"
+      ],
+      "rq_hints": [
+        "rq_trader_memorandum",
+        "rq_best_strategy_evidence"
+      ],
+      "snippet_file": "knowledge/fixture_corpus/snippets/fx_paper_structure.txt",
+      "method_notes": [
+        {
+          "note_id": "mn_paper_outline",
+          "method_name": "Contest paper section outline",
+          "summary": "Summary → assumptions/notation → model → daily policy → walk-forward validation → sensitivity → limitations.",
+          "applicability": "Guides paper planning without copying any real award text.",
+          "limitations": "Fixture structure only; not peer-reviewed guidance."
+        }
+      ],
+      "citation": {
+        "citation_key": "FixturePaperStructure2022",
+        "citation_type": "fixture",
+        "bibtex_fields": {
+          "title": "Fixture reference: excellent-paper-style write-up structure for MCM C",
+          "year": "2022",
+          "note": "CI synthetic stub — not a real award paper"
+        }
+      },
+      "claim_summary": "Strong write-ups separate model, causal validation, sensitivity, and limitations with explicit units and constraints."
+    },
+    {
+      "source_id": "fx_sensitivity_methods",
+      "title": "Fixture reference: sensitivity sweeps for transaction costs and calendars",
+      "authors": [
+        "MCM C Fixture Corpus"
+      ],
+      "year": 2022,
+      "venue": "CI fixture bundle — synthetic excellent-paper-style",
+      "source_type": "fixture_stub",
+      "original_url": null,
+      "local_path": "knowledge/fixture_corpus/snippets/fx_sensitivity_methods.txt",
+      "publisher": "mcm-c-agent fixtures",
+      "license_or_rights": "internal synthetic fixture; not a real award paper; not for redistribution as scholarship",
+      "acquisition_method": "fixture_bundle",
+      "allowed_operations": [
+        "metadata_index",
+        "summarize",
+        "excerpt_quote"
+      ],
+      "review_status": "fixture",
+      "notes": "SYNTHETIC method excerpt for α and calendar robustness. Not a real publication.",
+      "keywords": [
+        "sensitivity",
+        "transaction costs",
+        "alpha gold",
+        "alpha bitcoin",
+        "robustness",
+        "buy and hold",
+        "rank order"
+      ],
+      "themes": [
+        "sensitivity_analysis",
+        "transaction_costs",
+        "validation"
+      ],
+      "rq_hints": [
+        "rq_transaction_sensitivity",
+        "rq_best_strategy_evidence"
+      ],
+      "snippet_file": "knowledge/fixture_corpus/snippets/fx_sensitivity_methods.txt",
+      "method_notes": [
+        {
+          "note_id": "mn_alpha_sweep",
+          "method_name": "One-at-a-time and joint α sweeps",
+          "summary": "Sweep α_gold and α_bitcoin; report policy rank changes versus buy-and-hold under the same causal window.",
+          "applicability": "Supports transaction-cost sensitivity research questions.",
+          "limitations": "Fixture only; thresholds are illustrative."
+        }
+      ],
+      "citation": {
+        "citation_key": "FixtureSensitivity2022",
+        "citation_type": "fixture",
+        "bibtex_fields": {
+          "title": "Fixture reference: sensitivity sweeps for transaction costs and calendars",
+          "year": "2022",
+          "note": "CI synthetic stub — not a real award paper"
+        }
+      },
+      "claim_summary": "Robustness claims need causal α/calendar sweeps that preserve no-lookahead evaluation."
+    },
+    {
+      "source_id": "fx_multiobjective_portfolio",
+      "title": "Fixture reference: multi-objective wealth–turnover framing under frictions",
+      "authors": [
+        "MCM C Fixture Corpus"
+      ],
+      "year": 2022,
+      "venue": "CI fixture bundle — synthetic excellent-paper-style",
+      "source_type": "fixture_stub",
+      "original_url": null,
+      "local_path": "knowledge/fixture_corpus/snippets/fx_multiobjective_portfolio.txt",
+      "publisher": "mcm-c-agent fixtures",
+      "license_or_rights": "internal synthetic fixture; not a real award paper; not for redistribution as scholarship",
+      "acquisition_method": "fixture_bundle",
+      "allowed_operations": [
+        "metadata_index",
+        "summarize",
+        "excerpt_quote"
+      ],
+      "review_status": "fixture",
+      "notes": "SYNTHETIC multi-objective method excerpt. Not a real award paper.",
+      "keywords": [
+        "multi-objective",
+        "pareto",
+        "terminal wealth",
+        "drawdown",
+        "turnover",
+        "transaction costs",
+        "portfolio"
+      ],
+      "themes": [
+        "portfolio_allocation",
+        "transaction_costs",
+        "trading_strategy"
+      ],
+      "rq_hints": [
+        "rq_best_strategy_value",
+        "rq_trader_memorandum",
+        "rq_transaction_sensitivity"
+      ],
+      "snippet_file": "knowledge/fixture_corpus/snippets/fx_multiobjective_portfolio.txt",
+      "method_notes": [
+        {
+          "note_id": "mn_pareto_wealth_turnover",
+          "method_name": "Wealth–turnover Pareto front",
+          "summary": "Optimize terminal wealth with turnover penalties and hard gold open-day constraints; communicate trade-offs via Pareto front.",
+          "applicability": "Trader memo when no unique optimum exists under frictions.",
+          "limitations": "Fixture framing only; objectives must be estimated causally."
+        }
+      ],
+      "citation": {
+        "citation_key": "FixtureMultiObj2022",
+        "citation_type": "fixture",
+        "bibtex_fields": {
+          "title": "Fixture reference: multi-objective wealth–turnover framing under frictions",
+          "year": "2022",
+          "note": "CI synthetic stub — not a real award paper"
+        }
+      },
+      "claim_summary": "Multi-objective framing makes wealth–turnover trade-offs explicit under gold/bitcoin calendar constraints."
     }
   ]
 }

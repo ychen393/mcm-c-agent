@@ -1,0 +1,9 @@
+FIXTURE SNIPPET — synthetic excellent-paper-style reference; NOT a real MCM award paper.
+Method excerpt (structure only): after a baseline strategy is fixed, excellent papers probe
+robustness by one-at-a-time and joint sweeps of transaction-cost parameters α_gold and
+α_bitcoin, initial capital, and gold open-day calendars. They report how rank-order of
+candidate policies changes when α doubles, and whether the recommended policy remains
+above a buy-and-hold cash/gold/bitcoin benchmark. Sensitivity plots should use the same
+causal evaluation window as the main results so that apparent robustness is not an artifact
+of lookahead. When evidence is thin, the paper marks the claim as provisional rather than
+citing nonexistent sources.
