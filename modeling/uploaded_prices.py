@@ -57,7 +57,7 @@ def prepare_uploaded_2022_prices(gold_csv: bytes, bitcoin_csv: bytes) -> Prepare
         raise ValueError("Bitcoin prices must be present for each provided date")
     if len(btc) > 1 and not btc["Date"].diff().iloc[1:].eq(pd.Timedelta(days=1)).all():
         raise ValueError("Bitcoin daily dates have gaps; missing days must be resolved explicitly")
-    if gold.loc[gold["USD (PM)"].notna(), "Date"].dt.dayofweek.ge(5).any():
+    if gold.loc[gold["USD (PM)"].notna(), "Date"].dt.day_of_week.ge(5).any():
         raise ValueError("Gold trading quotes on weekends are not permitted")
     # The official competition begins on a Sunday (before the first gold quote).
     # Initial zero gold holdings are valued at zero until the first observed quote.
