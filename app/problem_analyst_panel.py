@@ -211,6 +211,19 @@ def render_problem_analyst_panel(
                                 "validation_report", "paper_outline", "latex_source",
                                 "review_report"):
                         updated.pop(key, None)
+                    updated["model_artifacts"] = []
+                    updated["experiment_logs"] = []
+                    phases = dict(updated.get("workspace_phases") or {})
+                    for phase in ("independent_eda", "literature_evidence",
+                                  "research_strategy", "research_proposal", "h1",
+                                  "strategy_modeling", "modeling_experiment",
+                                  "validation_sensitivity", "h2", "paper_latex",
+                                  "h3", "e2e_acceptance"):
+                        phases.pop(phase, None)
+                    phases["independent_eda"] = (
+                        "ready" if updated.get("uploaded_files") else "not ready"
+                    )
+                    updated["workspace_phases"] = phases
                     approval = dict(updated.get("approval_status") or {})
                     # These gates are not even pending until their own research
                     # artifacts exist. Otherwise progress jumps straight to H1.
