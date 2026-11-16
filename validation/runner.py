@@ -545,7 +545,8 @@ def _robustness_notes(
                 severity="info",
                 summary=(
                     f"Cost-stress coverage: {len(cost_scenarios)} scenario(s) "
-                    "perturb αgold and/or αbitcoin on the synthetic fixture."
+                    "perturb αgold and/or αbitcoin on the "
+                    + ("uploaded historical CSV series." if uploaded else "synthetic fixture.")
                 ),
                 related_scenario_ids=[s.scenario_id for s in cost_scenarios],
                 related_metric_ids=["m_cost_paid", "m_terminal_value"],
@@ -572,9 +573,12 @@ def _robustness_notes(
             note_id="rn_fixture_limitation",
             severity="info",
             summary=(
-                "Sensitivity uses the Phase 6 synthetic 2022 MCM C price fixture, "
-                "not live LBMA/BCHAIN series. Treat results as CI-safe robustness "
-                "signals, not competition-grade validation."
+                ("Sensitivity uses uploaded historical CSV series. This is in-sample "
+                 "sensitivity analysis, not proof of optimality or out-of-sample performance."
+                 if uploaded else
+                 "Sensitivity uses the Phase 6 synthetic 2022 MCM C price fixture, "
+                 "not live LBMA/BCHAIN series. Treat results as CI-safe robustness "
+                 "signals, not competition-grade validation.")
             ),
             related_scenario_ids=[s.scenario_id for s in scenarios[:4]],
             related_metric_ids=[],
