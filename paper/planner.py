@@ -434,6 +434,11 @@ def build_fixture_outline(
         raise ValueError("Real-data paper outline requires recorded uploaded CSV provenance")
     if uploaded and validation.get("strategy") != "deterministic_uploaded_csv":
         raise ValueError("Real-data experiment requires matching real-data validation")
+    if uploaded and (not baseline_run_id or not baseline
+                     or baseline.get("run_id") != baseline_run_id):
+        raise ValueError("Cannot produce historical paper without its recorded baseline run")
+    if uploaded and validation.get("baseline_run_id") != baseline_run_id:
+        raise ValueError("Real-data paper requires validation of the same baseline experiment")
 
     bib_entries, citation_gaps = _collect_bib_entries(state)
     bib_keys = [e.citation_key for e in bib_entries]
