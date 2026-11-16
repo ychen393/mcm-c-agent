@@ -11,6 +11,7 @@ from app.problem_narrative import is_2022_trading_spec, trading_research_brief
 
 from agents.debate_critic import critique_research_proposal
 from agents.research_strategy import synthesize_research_proposal
+from agents.live_research_team import run_live_research_team
 from app.artifact_viewers import (
     candidate_display_label,
     render_approved_banner,
@@ -153,12 +154,21 @@ def render_research_h1_panel(
         type="primary",
         key="run_research_team",
     )
+    live_review = st.checkbox(
+        ("额外调用真实 LLM Strategist + Critic（2 次模型请求，可能产生费用）"
+         if zh else
+         "Also run live LLM Strategist + Critic (2 paid API requests possible)"),
+        value=False,
+        key="research_team_live_opt_in",
+    )
     st.caption(
-        ("此协作调用两个独立的规则分析模块；当前 Strategy/Critic 的 LLM 选项仍是占位接口，"
-         "不会假装已经进行了模型推理。")
+        ("默认协作调用两个独立的离线规则模块，无付费请求。"
+         "勾选上方选项并点击运行后，才会额外请求已配置模型两次；"
+         "LLM 建议仅供审阅，不能自动批准 H1。")
         if zh else
-        "The Strategist and Critic are independent deterministic modules; "
-        "the optional LLM implementation here remains a stub."
+        "Default team = two independent offline modules (no API charges). "
+        "Checking opt-in and clicking run adds two live model requests. "
+        "LLM advice never approves H1."
     )
     col_a, col_b, col_c = st.columns(3)
     with col_a:
@@ -198,6 +208,7 @@ def render_research_h1_panel(
             st.session_state[PROPOSAL_SESSION_KEY] = proposal_dict
             # New proposal invalidates prior critique cache.
             st.session_state.pop(CRITIQUE_SESSION_KEY, None)
+            st.session_state.pop("research_live_team_review", None)
             critique_dict = None
             if st.session_state.get("last_run") is not None:
                 updated = dict(st.session_state["last_run"])
@@ -252,6 +263,58 @@ def render_research_h1_panel(
                     )
                 if critique.llm_attempted and critique.llm_note:
                     st.info(critique.llm_note)
+
+    # Optional *real* two-call LLM review, never conflated with deterministic agents.
+    if team_run and live_review and proposal_dict and critique_dict:
+        if not measured:
+            st.warning(
+                "未检测到可核对的真实 EDA 统计，已跳过付费 LLM 调用。"
+                if zh else "No observed EDA statistics: paid model calls skipped."
+            )
+        elif not isinstance(problem_specification, dict):
+            st.warning("No structured problem specification; live review skipped.")
+        else:
+            try:
+                result = run_live_research_team(
+                    specification=problem_specification,
+                    proposal=proposal_dict,
+                    eda_report=eda_report,
+                    settings=settings,
+                    language="zh" if zh else "en",
+                )
+                result["proposal_id"] = proposal_dict.get("proposal_id")
+                result["eda_fingerprint"] = (insight or {}).get("bundle_fingerprint")
+                st.session_state["research_live_team_review"] = result
+                st.success(
+                    "真实 LLM Strategist 和 Critic 已分别完成调用；输出不自动成为实验结论。"
+                    if zh else "Live LLM Strategist and Critic calls completed; advice remains provisional."
+                )
+            except Exception as exc:
+                st.error(
+                    ("真实 LLM 协作调用失败；离线研究方案仍可审阅。"
+                     if zh else "Live LLM review failed; offline proposal remains usable.")
+                    + f" {type(exc).__name__}: {exc}"
+                )
+
+    live_result = st.session_state.get("research_live_team_review")
+    if (isinstance(live_result, dict) and isinstance(proposal_dict, dict)
+            and live_result.get("proposal_id") == proposal_dict.get("proposal_id")
+            and live_result.get("eda_fingerprint") ==
+                ((insight or {}).get("bundle_fingerprint"))):
+        with st.expander(
+            "真实 LLM 两角色审议（建议，不是事实验证）"
+            if zh else "Live two-role LLM review (advisory, not validated facts)",
+            expanded=True,
+        ):
+            st.caption(f"{live_result.get('provider')} / {live_result.get('model')}")
+            st.markdown("**Strategist**")
+            st.write(live_result.get("strategist"))
+            st.markdown("**Independent Critic**")
+            st.write(live_result.get("critic"))
+            st.warning(
+                "LLM 内容可能含未经核实的推断；需要和 EDA、基线实验及题目逐项核对。"
+                if zh else "LLM output is unverified advice; check against EDA, baselines and problem facts."
+            )
 
     if proposal_dict:
         candidates = proposal_dict.get("candidates") or []
