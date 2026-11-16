@@ -821,157 +821,158 @@ if (
         "It is not shown as output for the current project ID."
     )
 if "eda_report" in st.session_state and report_matches_selection:
-    report_data = st.session_state["eda_report"]
-    artifacts = st.session_state["eda_artifacts"]
-    st.subheader("EDA Summary")
-    summary = report_data["summary"]
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Rows", f"{summary['row_count']:,}")
-    c2.metric("Columns", summary["column_count"])
-    c3.metric("Numeric columns", summary["numeric_column_count"])
-    c4.metric("Columns with missing values", summary["columns_with_missing_values"])
+    with st.expander("已批准的 EDA 报告与图表 / Saved EDA results", expanded=False):
+        report_data = st.session_state["eda_report"]
+        artifacts = st.session_state["eda_artifacts"]
+        st.subheader("EDA Summary")
+        summary = report_data["summary"]
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Rows", f"{summary['row_count']:,}")
+        c2.metric("Columns", summary["column_count"])
+        c3.metric("Numeric columns", summary["numeric_column_count"])
+        c4.metric("Columns with missing values", summary["columns_with_missing_values"])
 
-    approval = summary.get("chart_plan_approval")
-    if approval:
-        st.caption(
-            f"Chart-plan approval: {approval['status']} · "
-            f"{approval['approved_at_utc']}"
-        )
-    st.subheader("Column Profiles")
-    st.dataframe(
-        [
-            {
-                "Column": item["name"],
-                "Type": item["dtype"],
-                "Missing": item["missing_count"],
-                "Missing rate": f"{item['missing_rate']:.1%}",
-                "Unique": item["unique_count"],
-                "IQR outliers": item["outlier_count_iqr"],
-                "Unit": item.get("unit") or "Not provided",
-            }
-            for item in report_data["dataset"]["columns"]
-        ],
-        use_container_width=True,
-    )
-    if report_data["warnings"]:
-        st.subheader("Data Quality Warnings")
-        for warning in report_data["warnings"]:
-            st.warning(warning)
-
-    dataset_meta = report_data["dataset"]
-    st.subheader("Dataset Context")
-    context_cols = st.columns(4)
-    context_cols[0].metric(
-        "Period start",
-        dataset_meta.get("period_start", "N/A")[:10]
-        if dataset_meta.get("period_start")
-        else "N/A",
-    )
-    context_cols[1].metric(
-        "Period end",
-        dataset_meta.get("period_end", "N/A")[:10]
-        if dataset_meta.get("period_end")
-        else "N/A",
-    )
-    context_cols[2].metric(
-        "Declared frequency",
-        dataset_meta.get("temporal_frequency") or "Not specified",
-    )
-    inferred_short = (dataset_meta.get("inferred_frequency") or "N/A").split(" (")[0]
-    context_cols[3].metric("Estimated frequency", inferred_short)
-    st.caption(
-        f"Period: {dataset_meta.get('period_start') or 'N/A'} → "
-        f"{dataset_meta.get('period_end') or 'N/A'}"
-    )
-    if dataset_meta.get("inferred_frequency"):
-        st.caption(f"Frequency estimate: {dataset_meta['inferred_frequency']}")
-    if dataset_meta.get("data_source"):
-        st.caption(f"Source: {dataset_meta['data_source']}")
-    if dataset_meta.get("column_units"):
+        approval = summary.get("chart_plan_approval")
+        if approval:
+            st.caption(
+                f"Chart-plan approval: {approval['status']} · "
+                f"{approval['approved_at_utc']}"
+            )
+        st.subheader("Column Profiles")
         st.dataframe(
             [
-                {"Column": name, "Unit": unit}
-                for name, unit in dataset_meta["column_units"].items()
+                {
+                    "Column": item["name"],
+                    "Type": item["dtype"],
+                    "Missing": item["missing_count"],
+                    "Missing rate": f"{item['missing_rate']:.1%}",
+                    "Unique": item["unique_count"],
+                    "IQR outliers": item["outlier_count_iqr"],
+                    "Unit": item.get("unit") or "Not provided",
+                }
+                for item in report_data["dataset"]["columns"]
             ],
-            hide_index=True,
             use_container_width=True,
         )
+        if report_data["warnings"]:
+            st.subheader("Data Quality Warnings")
+            for warning in report_data["warnings"]:
+                st.warning(warning)
 
-    if artifacts["chart_paths"]:
-        st.subheader("EDA Charts & Evidence")
-        metric_labels = {
-            "count": "Observations",
-            "median": "Median",
-            "min": "Minimum",
-            "max": "Maximum",
-            "mean": "Mean",
-            "first": "First value",
-            "last": "Last value",
-            "change": "Absolute change",
-            "change_pct": "First-to-last change (%)",
-        }
-        for chart_index, chart_path in enumerate(artifacts["chart_paths"], start=1):
-            meta = next(
-                (m for m in report_data.get("chart_metadata", []) if m["path"] == chart_path),
-                None,
+        dataset_meta = report_data["dataset"]
+        st.subheader("Dataset Context")
+        context_cols = st.columns(4)
+        context_cols[0].metric(
+            "Period start",
+            dataset_meta.get("period_start", "N/A")[:10]
+            if dataset_meta.get("period_start")
+            else "N/A",
+        )
+        context_cols[1].metric(
+            "Period end",
+            dataset_meta.get("period_end", "N/A")[:10]
+            if dataset_meta.get("period_end")
+            else "N/A",
+        )
+        context_cols[2].metric(
+            "Declared frequency",
+            dataset_meta.get("temporal_frequency") or "Not specified",
+        )
+        inferred_short = (dataset_meta.get("inferred_frequency") or "N/A").split(" (")[0]
+        context_cols[3].metric("Estimated frequency", inferred_short)
+        st.caption(
+            f"Period: {dataset_meta.get('period_start') or 'N/A'} → "
+            f"{dataset_meta.get('period_end') or 'N/A'}"
+        )
+        if dataset_meta.get("inferred_frequency"):
+            st.caption(f"Frequency estimate: {dataset_meta['inferred_frequency']}")
+        if dataset_meta.get("data_source"):
+            st.caption(f"Source: {dataset_meta['data_source']}")
+        if dataset_meta.get("column_units"):
+            st.dataframe(
+                [
+                    {"Column": name, "Unit": unit}
+                    for name, unit in dataset_meta["column_units"].items()
+                ],
+                hide_index=True,
+                use_container_width=True,
             )
-            if meta:
-                spec = meta["spec"]
-                st.markdown(f"### Figure {chart_index:02d} · {spec['title']}")
-                st.caption(f"LaTeX reference: \\label{{{spec['figure_label']}}}")
-                st.image(chart_path, caption=spec["caption"], use_container_width=True)
-                st.markdown(f"**Analytical question:** {spec['analytical_question']}")
-                st.caption(
-                    f"Axes: {spec['x_label']} / {spec['y_label']} · "
-                    f"Plotted rows: {meta['plotted_rows']}"
-                )
-                preferred_order = (
-                    ["count", "median", "min", "max"]
-                    if spec["chart_type"] in ("histogram", "box_plot")
-                    else ["count", "first", "last", "change_pct", "min", "max"]
-                )
-                selected_metrics = [
-                    (metric_labels.get(key, key), meta["metrics"][key])
-                    for key in preferred_order
-                    if key in meta["metrics"] and meta["metrics"][key] is not None
-                ]
-                if selected_metrics:
-                    metric_cols = st.columns(min(4, len(selected_metrics)))
-                    for metric_index, (label, value) in enumerate(selected_metrics[:4]):
-                        display_value = (
-                            f"{value:,.2f}"
-                            if isinstance(value, float)
-                            else f"{value:,}"
-                            if isinstance(value, int)
-                            else str(value)
-                        )
-                        metric_cols[metric_index % len(metric_cols)].metric(label, display_value)
-                st.caption(
-                    f"Source columns: {', '.join(meta.get('source_columns', [spec['x']]))} · "
-                    f"Dataset SHA-256: {meta['source_sha256'][:12]}…"
-                )
-                with st.expander(t("dataset.technical_metrics")):
-                    st.json(meta["metrics"])
-            else:
-                st.image(chart_path, caption=chart_path.split("/")[-1], use_container_width=True)
-    else:
-        st.info(t("dataset.no_charts_generated"))
 
-    with open(artifacts["report_markdown_path"], "rb") as report_file:
-        st.download_button(
-            t("dataset.download_md"),
-            data=report_file,
-            file_name="eda_report.md",
-            mime="text/markdown",
-        )
-    with open(artifacts["report_json_path"], "rb") as report_file:
-        st.download_button(
-            t("dataset.download_json"),
-            data=report_file,
-            file_name="eda_report.json",
-            mime="application/json",
-        )
-    st.caption(t("dataset.artifacts_under", path=settings.output_dir / project_id / "eda"))
+        if artifacts["chart_paths"]:
+            st.subheader("EDA Charts & Evidence")
+            metric_labels = {
+                "count": "Observations",
+                "median": "Median",
+                "min": "Minimum",
+                "max": "Maximum",
+                "mean": "Mean",
+                "first": "First value",
+                "last": "Last value",
+                "change": "Absolute change",
+                "change_pct": "First-to-last change (%)",
+            }
+            for chart_index, chart_path in enumerate(artifacts["chart_paths"], start=1):
+                meta = next(
+                    (m for m in report_data.get("chart_metadata", []) if m["path"] == chart_path),
+                    None,
+                )
+                if meta:
+                    spec = meta["spec"]
+                    st.markdown(f"### Figure {chart_index:02d} · {spec['title']}")
+                    st.caption(f"LaTeX reference: \\label{{{spec['figure_label']}}}")
+                    st.image(chart_path, caption=spec["caption"], use_container_width=True)
+                    st.markdown(f"**Analytical question:** {spec['analytical_question']}")
+                    st.caption(
+                        f"Axes: {spec['x_label']} / {spec['y_label']} · "
+                        f"Plotted rows: {meta['plotted_rows']}"
+                    )
+                    preferred_order = (
+                        ["count", "median", "min", "max"]
+                        if spec["chart_type"] in ("histogram", "box_plot")
+                        else ["count", "first", "last", "change_pct", "min", "max"]
+                    )
+                    selected_metrics = [
+                        (metric_labels.get(key, key), meta["metrics"][key])
+                        for key in preferred_order
+                        if key in meta["metrics"] and meta["metrics"][key] is not None
+                    ]
+                    if selected_metrics:
+                        metric_cols = st.columns(min(4, len(selected_metrics)))
+                        for metric_index, (label, value) in enumerate(selected_metrics[:4]):
+                            display_value = (
+                                f"{value:,.2f}"
+                                if isinstance(value, float)
+                                else f"{value:,}"
+                                if isinstance(value, int)
+                                else str(value)
+                            )
+                            metric_cols[metric_index % len(metric_cols)].metric(label, display_value)
+                    st.caption(
+                        f"Source columns: {', '.join(meta.get('source_columns', [spec['x']]))} · "
+                        f"Dataset SHA-256: {meta['source_sha256'][:12]}…"
+                    )
+                    with st.expander(t("dataset.technical_metrics")):
+                        st.json(meta["metrics"])
+                else:
+                    st.image(chart_path, caption=chart_path.split("/")[-1], use_container_width=True)
+        else:
+            st.info(t("dataset.no_charts_generated"))
+
+        with open(artifacts["report_markdown_path"], "rb") as report_file:
+            st.download_button(
+                t("dataset.download_md"),
+                data=report_file,
+                file_name="eda_report.md",
+                mime="text/markdown",
+            )
+        with open(artifacts["report_json_path"], "rb") as report_file:
+            st.download_button(
+                t("dataset.download_json"),
+                data=report_file,
+                file_name="eda_report.json",
+                mime="application/json",
+            )
+        st.caption(t("dataset.artifacts_under", path=settings.output_dir / project_id / "eda"))
 
 project_store = get_or_create_store(lambda: build_project_store(settings))
 llm_revision = int(st.session_state.get(SESSION_REVISION_KEY, 0))
@@ -1016,14 +1017,15 @@ with st.sidebar:
     st.info(progress.sidebar_badge)
     st.caption(progress.stepper_line)
 
-st.subheader(t("chrome.system_status"))
-status_cols = st.columns(3)
-status_cols[0].metric(t("chrome.metric.current_stage"), progress.milestone_metric)
-status_cols[1].metric(t("chrome.metric.lab_progress"), progress.progress_metric)
-status_cols[2].metric(t("chrome.metric.provider"), settings.llm_provider)
-st.caption(progress.caption)
-st.caption(progress.stepper_line)
-st.info(t("chrome.independent_profiles_info"))
+with st.expander("研究状态与执行详情 / Research diagnostics", expanded=False):
+    st.subheader(t("chrome.system_status"))
+    status_cols = st.columns(3)
+    status_cols[0].metric(t("chrome.metric.current_stage"), progress.milestone_metric)
+    status_cols[1].metric(t("chrome.metric.lab_progress"), progress.progress_metric)
+    status_cols[2].metric(t("chrome.metric.provider"), settings.llm_provider)
+    st.caption(progress.caption)
+    st.caption(progress.stepper_line)
+    st.info(t("chrome.independent_profiles_info"))
 
 _state_dict = recorded_state if isinstance(recorded_state, dict) else None
 # Preserve the legacy expert guide and soft-override behind a collapsed control.
@@ -1056,6 +1058,8 @@ if selected_stage == 1 and bundle is not None and not bundle_rejected:
         )
     else:
         render_locked_panel_stub("eda", _state_dict)
+elif selected_stage == 1:
+    st.info("请在上方「项目与数据设置」展开区上传 CSV/XLSX 数据集。")
 eda_plan_for_lit = st.session_state.get("problem_aware_eda_plan")
 eda_report_for_lit = None
 if isinstance(recorded_state, dict):
@@ -1134,13 +1138,14 @@ if selected_stage == 5 and panel_is_unlocked("paper", _state_dict):
     )
 elif selected_stage == 5:
     render_locked_panel_stub("paper", _state_dict)
-render_persistence_panel(
-    project_store,
-    project_id=project_id,
-    project_name=project_name,
-    recorded_state=recorded_state,
-    input_signature=form_signature,
-)
+with st.expander("保存项目、历史运行与恢复 / Project history", expanded=False):
+    render_persistence_panel(
+        project_store,
+        project_id=project_id,
+        project_name=project_name,
+        recorded_state=recorded_state,
+        input_signature=form_signature,
+    )
 
 if recorded_state is not None:
     st.subheader(t("chrome.foundation_state"))
