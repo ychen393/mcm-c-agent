@@ -64,6 +64,7 @@ def run_live_research_team(
     eda_report: dict[str, Any] | None,
     settings: Settings,
     llm: BaseLLM | None = None,
+    language: str = "zh",
 ) -> dict[str, str]:
     """Two calls: strategy reviewer then independent skeptical critic.
 
@@ -74,6 +75,7 @@ def run_live_research_team(
     provider = llm if llm is not None else LLMFactory.create(settings)
     context = json.dumps(_compact_context(specification, proposal, eda_report),
                          ensure_ascii=False, separators=(",", ":"))
+    response_language = "Chinese with English technical terms" if language == "zh" else "English"
     strategist = provider.invoke([
         {"role": "system", "content": (
             "You are a mathematical modeling research strategist. Using ONLY "
@@ -81,7 +83,7 @@ def run_live_research_team(
             "candidates, give a concrete modeling workflow, limitations and "
             "what must be tested. Never fabricate backtest results, papers or "
             "citations. Clearly distinguish observation from hypothesis. "
-            "Reply in Chinese with technical names also in English."
+            f"Reply in {response_language}."
         )},
         {"role": "user", "content": context},
     ])
@@ -93,7 +95,7 @@ def run_live_research_team(
             "trading calendar mistakes, commission handling, data sufficiency, "
             "overfitting and unimplemented methods. Supply testable counterexamples. "
             "Use only source facts; do not invent results or citations. "
-            "Reply in Chinese. Do not approve H1."
+            f"Reply in {response_language}. Do not approve H1."
         )},
         {"role": "user", "content": context + "\nStrategist proposal for independent review:\n"
          + advisor_text},
