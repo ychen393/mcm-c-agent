@@ -1,0 +1,13 @@
+# Railway packaging config only — does not create project/DB/Volume resources.
+# Owner must provision Railway Postgres + Volume separately after final approve.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "streamlit run app/main.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false"
+healthcheckPath = "/_stcore/health"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

@@ -35,7 +35,12 @@ def build_project_store(
     prefer_postgres: bool | None = None,
 ) -> ProjectStore:
     """Prefer PostgreSQL; fall back to ``data/projects`` when DB is down."""
-    root = projects_root or default_projects_root(settings.upload_dir, settings.output_dir)
+    if projects_root is not None:
+        root = projects_root
+    elif getattr(settings, "projects_dir", None) is not None:
+        root = Path(settings.projects_dir)
+    else:
+        root = default_projects_root(settings.upload_dir, settings.output_dir)
     backend = getattr(settings, "project_store_backend", "auto")
     if prefer_postgres is None:
         prefer_postgres = backend != "local"

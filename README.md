@@ -60,6 +60,10 @@ pytest
 streamlit run app/main.py
 ```
 
+### Railway packaging (not provisioned from this repo)
+Container and env contracts live in `Dockerfile`, `railway.toml`, and [docs/RAILWAY_DEPLOY.md](docs/RAILWAY_DEPLOY.md). Do not create Railway resources or public URLs until the owner approves; set `APP_PASSWORD` and `PROJECT_STORE_BACKEND=postgres` for any production-like deploy. Demo without paid LLM: keep all `*_USE_LLM=false`.
+
+
 ## M0 scope
 - Configuration validation
 - Multi-provider LLM adapter interface

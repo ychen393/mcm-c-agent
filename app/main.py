@@ -36,6 +36,7 @@ from app.soft_orchestration import (
     render_next_step_guide,
 )
 from app.validation_h2_panel import render_validation_h2_panel
+from app.auth import require_streamlit_auth
 from core.config import get_settings
 from database.repositories import build_project_store
 from schemas.chart_plan import ChartPlan
@@ -61,6 +62,8 @@ from tools.relationship_profiler import profile_relationships
 
 base_settings = get_settings()
 st.set_page_config(page_title=base_settings.app_name, page_icon="🧮", layout="wide")
+# Server-side password gate before Research Lab / API Settings content.
+require_streamlit_auth(base_settings)
 # Language toggle early so all subsequent t() calls see the active locale.
 render_language_toggle(location="sidebar")
 settings = build_runtime_settings(
