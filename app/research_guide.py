@@ -66,6 +66,12 @@ def render_research_guide(state: dict | None) -> None:
     progress = derive_progress_chrome(state)
     active = stage_index(progress.current_step)
     completed = completed_stage_indices(state)
+    if st.session_state.get("guided_last_active") != active:
+        st.session_state["guided_stage_preview"] = active
+        st.session_state["guided_last_active"] = active
+    st.progress(len(completed) / len(stages),
+                text=(f"已完成 {len(completed)}/{len(stages)} 个阶段" if zh
+                      else f"{len(completed)}/{len(stages)} stages complete"))
     st.subheader("研究路线 · 你现在在哪里？" if zh else "Research roadmap · Where are you?")
     st.caption(
         "六个用户阶段对应九个底层研究节点。查看阶段不会启动模型或批准闸门。"
@@ -99,12 +105,17 @@ def render_research_guide(state: dict | None) -> None:
                 if zh else "This is a preview; recorded research state determines actual progress."
             )
     if active >= 3:
-        st.warning(
-            "数据来源：当前建模使用合成 fixture，上传的 CSV 不会驱动回测。不得把结果当作真实数据研究结论。"
-            if zh else
-            "Data provenance: modeling currently uses a synthetic fixture, not uploaded CSV files. "
-            "Do not present fixture results as real-data research findings."
-        )
+        experiment = ((state or {}).get("decision_report") or {}).get("experiment") or {}
+        mode = experiment.get("strategy") if isinstance(experiment, dict) else None
+        if mode == "deterministic_uploaded_csv":
+            st.success("已记录真实 CSV 实验；后续验证必须使用相同文件。" if zh else
+                       "Recorded historical CSV experiment; validation requires identical inputs.")
+        elif mode == "deterministic_fixture":
+            st.warning("当前保存的实验仅使用合成测试数据。" if zh else
+                       "Recorded experiment uses synthetic demonstration prices.")
+        else:
+            st.info("模型阶段可选择真实 CSV 或合成演示；请在运行前确认数据来源。" if zh else
+                    "Modeling supports uploaded historical CSVs or an explicit synthetic demo. Check provenance before running.")
     with st.expander("高级信息：内部研究节点与审批" if zh else "Advanced: internal steps and approvals"):
         st.caption(progress.stepper_line)
         st.caption(
