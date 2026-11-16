@@ -73,7 +73,13 @@ def render_research_guide(state: dict | None) -> None:
     completed = completed_stage_indices(state)
     # Do not overwrite a deliberate stage choice on every progress update.
     # EDA save-and-continue and the Previous/Next controls own navigation.
-    if "guided_stage_preview" not in st.session_state:
+    # Page-body CTAs run *after* the stage selectbox is instantiated. They
+    # request a transition here and are applied before the widget exists on
+    # the next rerun, as required by Streamlit session-state semantics.
+    requested = st.session_state.pop("guided_stage_target", None)
+    if requested is not None:
+        st.session_state["guided_stage_preview"] = max(0, min(5, int(requested)))
+    elif "guided_stage_preview" not in st.session_state:
         st.session_state["guided_stage_preview"] = active
     st.progress(len(completed) / len(stages),
                 text=(f"已完成 {len(completed)}/{len(stages)} 个阶段" if zh
