@@ -29,6 +29,7 @@ from app.problem_analyst_panel import (
 from app.progress_chrome import derive_progress_chrome
 from app.research_guide import render_research_guide, stage_index
 from app.relationship_panel import render_relationship_panel
+from app.joint_eda_panel import render_joint_eda_panel
 from app.research_h1_panel import render_research_h1_panel
 from app.paper_h3_panel import render_paper_h3_panel
 from app.soft_orchestration import (
@@ -373,6 +374,7 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
         column_units_by_dataset=units,
         temporal_frequency_by_dataset=frequencies,
     )
+    render_joint_eda_panel(bundle)
     if st.button(
         "Record independent EDA summaries into project state",
         key="persist_multi_eda_summaries",
