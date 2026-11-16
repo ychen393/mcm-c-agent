@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-ValidationStrategy = Literal["deterministic_fixture", "llm_critique", "hybrid"]
+ValidationStrategy = Literal["deterministic_fixture", "deterministic_uploaded_csv", "llm_critique", "hybrid"]
 ScenarioKind = Literal["baseline", "param", "cost", "window", "combined", "other"]
 PerturbationTarget = Literal[
     "alpha_gold",
