@@ -433,7 +433,7 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
                         "EDA findings recorded with source fingerprints. "
                         "No original file bytes or merged rows saved."
                     )
-                    st.session_state["guided_stage_preview"] = 2
+                    st.session_state["guided_stage_target"] = 2
                     st.rerun()
             except Exception as exc:
                 st.error(f"Failed to record EDA state: {type(exc).__name__}: {exc}")
