@@ -24,6 +24,7 @@ from app.persistence_panel import get_or_create_store
 from core.config import Settings
 from database.repositories import build_project_store
 from modeling.fixture_data import PRICE_FIXTURE_ID
+from modeling.uploaded_prices import prepare_uploaded_2022_prices
 from modeling.gate import modeling_allowed, modeling_gate_status
 from tools.experiment_persistence import persist_experiment_into_state
 
@@ -91,21 +92,56 @@ def render_modeling_experiment_panel(
     project_name: str | None = None,
     input_signature: str | None = None,
     upload_count: int = 0,
+    upload_payloads: list[tuple[str, bytes]] | None = None,
 ) -> dict[str, Any] | None:
     """Render Modeling & Experiment controls. Returns latest report dict if any."""
     st.subheader(t("mod.subheader"))
     status = modeling_experiment_status(settings)
     st.caption(t("mod.caption"))
 
-    render_fixture_vs_uploads_banner(
-        upload_count=int(upload_count or 0),
-        fixture_id=PRICE_FIXTURE_ID,
+    files = {name.casefold(): data for name, data in (upload_payloads or [])}
+    real_available = "lbma-gold.csv" in files and "bchain-mkpru.csv" in files
+    modes = (["uploaded_csv", "synthetic_demo"] if real_available else ["synthetic_demo"])
+    data_mode = st.radio(
+        "实验数据来源 / Experiment input",
+        options=modes,
+        format_func=lambda v: (
+            "已上传真实历史 CSV（本地离线回测） / Uploaded historical CSV"
+            if v == "uploaded_csv" else
+            "合成测试数据（仅演示） / Synthetic demo fixture"
+        ),
+        horizontal=True,
+        key="modeling_data_mode",
     )
-    st.warning(
-        "DEMO ONLY / 仅供演示：当前实验使用合成价格数据，"
-        "不会读取已上传的黄金或比特币 CSV。"
-        "任何实验结果、验证报告或论文内容均不可标记为真实数据研究成果。"
-    )
+    prepared = None
+    if data_mode == "uploaded_csv":
+        try:
+            prepared = prepare_uploaded_2022_prices(
+                files["lbma-gold.csv"], files["bchain-mkpru.csv"]
+            )
+        except (ValueError, KeyError, OSError) as exc:
+            st.error(f"真实 CSV 不可用于回测 / Invalid historical input: {exc}")
+        else:
+            st.success(
+                f"真实数据已校验：{len(prepared.bars)} 天 · "
+                f"{prepared.bars[0].date} → {prepared.bars[-1].date} · "
+                "黄金休市日不执行黄金交易，不使用未来价格。"
+            )
+            st.caption(
+                f"Gold SHA-256: {prepared.gold_sha256} · "
+                f"Bitcoin SHA-256: {prepared.bitcoin_sha256}"
+            )
+    else:
+        render_fixture_vs_uploads_banner(
+            upload_count=int(upload_count or 0),
+            fixture_id=PRICE_FIXTURE_ID,
+        )
+        st.warning(
+            "DEMO ONLY / 仅供演示：本次运行使用合成价格夹具，"
+            "而非上传的黄金和比特币 CSV。"
+        )
+        if not real_available:
+            st.info("如需真实回测，请上传 LBMA-GOLD.csv 与 BCHAIN-MKPRU.csv 两份文件。")
 
     gate = modeling_gate_status(recorded_state if isinstance(recorded_state, dict) else None)
     if gate.modeling_allowed:
@@ -187,9 +223,11 @@ def render_modeling_experiment_panel(
 
     report_dict = resolve_displayed_experiment_report(recorded_state)
 
-    run_disabled = not gate.modeling_allowed or not proposal or not selected_candidate_id
+    run_disabled = (not gate.modeling_allowed or not proposal or not selected_candidate_id
+                    or (data_mode == "uploaded_csv" and prepared is None))
     run = st.button(
-        "Run synthetic-data demo / 运行合成数据演示",
+        ("运行真实 CSV 回测 / Run historical backtest" if data_mode == "uploaded_csv"
+         else "运行合成数据演示 / Run synthetic demo"),
         type="primary",
         key="run_modeling_experiment",
         disabled=run_disabled,
@@ -214,6 +252,9 @@ def render_modeling_experiment_panel(
                     rebalance_every_n_days=int(rebalance_every),
                     allow_sandboxed_python=allow_sandbox,
                     settings=settings,
+                    price_bars=(list(prepared.bars) if prepared is not None else None),
+                    price_sha256=({"gold": prepared.gold_sha256, "bitcoin": prepared.bitcoin_sha256}
+                                  if prepared is not None else None),
                 )
             except PermissionError as exc:
                 st.error(t("mod.gate_blocked", err=exc))
@@ -230,6 +271,11 @@ def render_modeling_experiment_panel(
                     st.info(report.runs[0].sandboxed_python_note)
 
     if report_dict:
+        report_mode = report_dict.get("strategy")
+        if report_mode == "deterministic_uploaded_csv":
+            st.success("真实 CSV 离线回测结果 / Historical CSV experiment")
+        else:
+            st.warning("演示数据实验结果，不可作为真实赛题研究结论 / Synthetic demo result")
         runs = report_dict.get("runs") or []
         latest = runs[-1] if runs else {}
         st.markdown(
