@@ -242,6 +242,9 @@ def _params_from_baseline(
         for key in ("initial_cash", "alpha_gold", "alpha_bitcoin"):
             if key in params_raw and params_raw[key] is not None:
                 updates[key] = params_raw[key]
+        # Preserve uploaded CSV identities; never downgrade real data to fixtures.
+        if isinstance(params_raw.get("extra"), dict):
+            updates["extra"] = dict(params_raw["extra"])
         if updates:
             params = params.model_copy(update=updates)
             constraints = constraints.model_copy(
