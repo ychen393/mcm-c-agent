@@ -76,6 +76,12 @@ def _problem(at: AppTest):
     return next(area for area in at.text_area if area.label.startswith("MCM problem statement"))
 
 
+def _show_eda(at: AppTest) -> AppTest:
+    """Navigate to the dedicated EDA workspace (no implicit research mutation)."""
+    guide = next(box for box in at.selectbox if "Explore a stage" in box.label)
+    return guide.select(guide.options[1]).run()
+
+
 def _button(at: AppTest, label: str):
     return next(button for button in at.button if button.label == label)
 
@@ -210,6 +216,8 @@ def test_two_files_are_recorded_only_after_initialize_and_stay_unjoined():
 
     at.session_state["last_run"]["approval_status"] = {"h1": "approved"}
     at.session_state["last_run"]["research_proposal"] = {"strategy": "momentum"}
+    at = at.run()
+    at = _show_eda(at)
     at = _button(at, "Preview join").click().run()
     assert not at.exception
     kept = at.session_state["last_run"]
