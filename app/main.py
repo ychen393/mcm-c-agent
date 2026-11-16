@@ -88,8 +88,6 @@ if page == _NAV_API:
 st.title(t("chrome.title"))
 st.caption(t("chrome.caption"))
 
-# Read-only six-stage guide; existing research panels remain authoritative.
-render_research_guide(st.session_state.get("last_run"))
 
 # Stable English values; labels via format_func so startswith("Not specified") stays valid.
 FREQUENCY_OPTIONS = [
@@ -1004,6 +1002,8 @@ if computed is not None:
 progress = derive_progress_chrome(
     recorded_state if isinstance(recorded_state, dict) else None
 )
+# Render after syncing project state, so the guide reflects current inputs.
+render_research_guide(recorded_state if isinstance(recorded_state, dict) else None)
 with st.sidebar:
     st.subheader(t("chrome.workspace"))
     st.info(progress.sidebar_badge)
