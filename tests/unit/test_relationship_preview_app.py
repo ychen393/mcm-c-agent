@@ -24,6 +24,11 @@ def _forbid_planner(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("agents.visual_eda_agent.plan_visual_eda", _called)
 
 
+def _show_eda(at: AppTest) -> AppTest:
+    guide = next(box for box in at.selectbox if "Explore a stage" in box.label)
+    return guide.select(guide.options[1]).run()
+
+
 def _messages(at: AppTest) -> str:
     parts: list[str] = []
     for group in (at.success, at.error, at.info, at.warning, at.caption, at.markdown, at.subheader):
@@ -71,6 +76,7 @@ def test_user_selects_keys_and_previews_a_safe_join(monkeypatch: pytest.MonkeyPa
         .run()
     )
     assert not at.exception
+    at = _show_eda(at)
     assert "Generate chart plan" not in [button.label for button in at.button]
     text = _messages(at)
     assert "does not join files" in text
@@ -111,6 +117,7 @@ def test_unrelated_datasets_show_cannot_safely_join(monkeypatch: pytest.MonkeyPa
         .run()
     )
     assert not at.exception
+    at = _show_eda(at)
     assert "cannot safely join" in _messages(at)
     at = _select(at, "Left dataset").set_value("stations.csv").run()
     at = _select(at, "Right dataset").set_value("outcomes.csv").run()
