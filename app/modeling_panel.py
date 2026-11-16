@@ -101,6 +101,11 @@ def render_modeling_experiment_panel(
         upload_count=int(upload_count or 0),
         fixture_id=PRICE_FIXTURE_ID,
     )
+    st.warning(
+        "DEMO ONLY / 仅供演示：当前实验使用合成价格数据，"
+        "不会读取已上传的黄金或比特币 CSV。"
+        "任何实验结果、验证报告或论文内容均不可标记为真实数据研究成果。"
+    )
 
     gate = modeling_gate_status(recorded_state if isinstance(recorded_state, dict) else None)
     if gate.modeling_allowed:
@@ -184,7 +189,7 @@ def render_modeling_experiment_panel(
 
     run_disabled = not gate.modeling_allowed or not proposal or not selected_candidate_id
     run = st.button(
-        t("mod.run"),
+        "Run synthetic-data demo / 运行合成数据演示",
         type="primary",
         key="run_modeling_experiment",
         disabled=run_disabled,
