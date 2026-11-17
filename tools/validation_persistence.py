@@ -110,6 +110,12 @@ def persist_validation_into_state(
     if not isinstance(old_revisions, list):
         old_revisions = []
     if revision_record is not None:
+        prior_decision = ((state.get("decision_report") or {}).get("h2") or {})
+        prior_report = state.get("validation_report") or {}
+        if prior_decision.get("status") != "revision_requested":
+            raise ValueError("H2 history requires an explicit human revision request")
+        if revision_record.get("previous_report_id") != prior_report.get("report_id"):
+            raise ValueError("H2 revision must reference exactly the rejected report")
         record = {
             str(k): str(v)[:3500] for k,v in revision_record.items()
             if isinstance(k,str) and isinstance(v,(str,int,float,bool))
