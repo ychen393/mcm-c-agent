@@ -152,6 +152,7 @@ def render_research_h1_panel(
          else "Run research team: Strategist → independent Critic"),
         type="primary",
         key="run_research_team",
+        disabled=((st.session_state.get("last_run") or {}).get("approval_status") or {}).get("h1") == "revision_requested",
     )
     live_review = st.checkbox(
         ("额外调用真实 LLM Strategist + Critic（2 次模型请求，可能产生费用）"
@@ -175,6 +176,7 @@ def render_research_h1_panel(
             t("h1.synthesize"),
             type="primary",
             key="run_research_strategy",
+            disabled=((st.session_state.get("last_run") or {}).get("approval_status") or {}).get("h1") == "revision_requested",
         )
     with col_b:
         critique_btn = st.button(t("h1.critique"), key="run_debate_critic")
