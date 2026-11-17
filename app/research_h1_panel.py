@@ -8,6 +8,7 @@ import streamlit as st
 
 from app.i18n import get_locale, t
 from app.problem_narrative import is_2022_trading_spec, trading_research_brief
+from app.research_decision_story import render_research_decision
 
 from agents.debate_critic import critique_research_proposal
 from agents.research_strategy import synthesize_research_proposal
@@ -468,66 +469,70 @@ def render_research_h1_panel(
 
     if proposal_dict:
         candidates = proposal_dict.get("candidates") or []
-        st.markdown(
-            t(
-                "h1.proposal_summary",
-                id=proposal_dict.get("proposal_id"),
-                n=len(candidates),
-                rec=proposal_dict.get("recommended_candidate_id"),
-                spec=("yes" if proposal_dict.get("problem_specification_present") else "no"),
-                eda=("yes" if proposal_dict.get("eda_context_present") else "no"),
-                ev=("yes" if proposal_dict.get("evidence_present") else "no"),
-            )
-        )
-        for note in proposal_dict.get("consensus_notes") or []:
-            st.write(f"- {note}")
-        if proposal_dict.get("open_questions"):
-            st.markdown(t("h1.open_questions"))
-            for q in proposal_dict["open_questions"]:
-                st.warning(q)
-        method_explanations_zh = {
-            "portfolio_optimization": "通过历史波动与资产权重设计组合，重点核对收益与回撤之间的取舍。必须加入交易费用和黄金开市约束。",
-            "trend_following": "使用过去可获得的趋势信号制定交易规则，需要特别防范手续费侵蚀与样本内过拟合。",
-            "cost_aware_trading": "把黄金 1% 与比特币 2% 手续费纳入调仓门槛，研究何时不交易反而更有利。",
-            "risk_management": "优先控制极端回撤和仓位暴露，不应仅以期末资产金额评价策略。",
-            "simulation_backtest": "通过历史复现与基线比较验证候选策略，不应把回测表现直接称为全局最优。",
-            "mean_reversion": "研究价格偏离后回归的可能性，须用实际数据验证信号和参数稳定性。",
-            "forecasting": "预测必须采用滚动历史窗口，不能使用未来价格或未来训练信息。",
-        }
-        for cand in candidates:
-            with st.expander(
-                f"{cand.get('candidate_id')} · {cand.get('title')} · {cand.get('status')}",
-                expanded=cand.get("status") == "recommended",
-            ):
-                if zh:
-                    method_note = method_explanations_zh.get(str(cand.get("method_family") or ""))
-                    if method_note:
-                        st.info("研究方向中文解读（非原文直译）： " + method_note)
-                st.write(cand.get("summary") or "")
-                st.caption(
-                    f"family={cand.get('method_family')} · "
-                    f"evidence_cards={len(cand.get('evidence_card_ids') or [])} · "
-                    f"gaps={len(cand.get('evidence_gap_ids') or [])}"
+        render_research_decision(proposal_dict, eda_report)
+        with st.expander(
+            "原始技术明细、候选参数与证据 / Original technical details", expanded=False
+        ):
+            st.markdown(
+                t(
+                    "h1.proposal_summary",
+                    id=proposal_dict.get("proposal_id"),
+                    n=len(candidates),
+                    rec=proposal_dict.get("recommended_candidate_id"),
+                    spec=("yes" if proposal_dict.get("problem_specification_present") else "no"),
+                    eda=("yes" if proposal_dict.get("eda_context_present") else "no"),
+                    ev=("yes" if proposal_dict.get("evidence_present") else "no"),
                 )
-                if cand.get("hypotheses"):
-                    st.markdown(t("h1.hypotheses"))
-                    for hyp in cand["hypotheses"]:
-                        st.write(f"- {hyp.get('statement')}")
-                if cand.get("data_needs"):
-                    st.markdown(t("h1.data_needs"))
-                    for need in cand["data_needs"]:
-                        st.write(
-                            f"- {need.get('description')} "
-                            f"(satisfied={need.get('satisfied')})"
-                        )
-                if cand.get("validation_plan"):
-                    st.markdown(t("h1.validation_plan"))
-                    for plan in cand["validation_plan"]:
-                        st.write(f"- [{plan.get('method')}] {plan.get('description')}")
-                if cand.get("strengths"):
-                    st.markdown(t("h1.strengths", text="; ".join(cand["strengths"])))
-                if cand.get("weaknesses"):
-                    st.markdown(t("h1.weaknesses", text="; ".join(cand["weaknesses"])))
+            )
+            for note in proposal_dict.get("consensus_notes") or []:
+                st.write(f"- {note}")
+            if proposal_dict.get("open_questions"):
+                st.markdown(t("h1.open_questions"))
+                for q in proposal_dict["open_questions"]:
+                    st.warning(q)
+            method_explanations_zh = {
+                "portfolio_optimization": "通过历史波动与资产权重设计组合，重点核对收益与回撤之间的取舍。必须加入交易费用和黄金开市约束。",
+                "trend_following": "使用过去可获得的趋势信号制定交易规则，需要特别防范手续费侵蚀与样本内过拟合。",
+                "cost_aware_trading": "把黄金 1% 与比特币 2% 手续费纳入调仓门槛，研究何时不交易反而更有利。",
+                "risk_management": "优先控制极端回撤和仓位暴露，不应仅以期末资产金额评价策略。",
+                "simulation_backtest": "通过历史复现与基线比较验证候选策略，不应把回测表现直接称为全局最优。",
+                "mean_reversion": "研究价格偏离后回归的可能性，须用实际数据验证信号和参数稳定性。",
+                "forecasting": "预测必须采用滚动历史窗口，不能使用未来价格或未来训练信息。",
+            }
+            for cand in candidates:
+                with st.expander(
+                    f"{cand.get('candidate_id')} · {cand.get('title')} · {cand.get('status')}",
+                    expanded=cand.get("status") == "recommended",
+                ):
+                    if zh:
+                        method_note = method_explanations_zh.get(str(cand.get("method_family") or ""))
+                        if method_note:
+                            st.info("研究方向中文解读（非原文直译）： " + method_note)
+                    st.write(cand.get("summary") or "")
+                    st.caption(
+                        f"family={cand.get('method_family')} · "
+                        f"evidence_cards={len(cand.get('evidence_card_ids') or [])} · "
+                        f"gaps={len(cand.get('evidence_gap_ids') or [])}"
+                    )
+                    if cand.get("hypotheses"):
+                        st.markdown(t("h1.hypotheses"))
+                        for hyp in cand["hypotheses"]:
+                            st.write(f"- {hyp.get('statement')}")
+                    if cand.get("data_needs"):
+                        st.markdown(t("h1.data_needs"))
+                        for need in cand["data_needs"]:
+                            st.write(
+                                f"- {need.get('description')} "
+                                f"(satisfied={need.get('satisfied')})"
+                            )
+                    if cand.get("validation_plan"):
+                        st.markdown(t("h1.validation_plan"))
+                        for plan in cand["validation_plan"]:
+                            st.write(f"- [{plan.get('method')}] {plan.get('description')}")
+                    if cand.get("strengths"):
+                        st.markdown(t("h1.strengths", text="; ".join(cand["strengths"])))
+                    if cand.get("weaknesses"):
+                        st.markdown(t("h1.weaknesses", text="; ".join(cand["weaknesses"])))
 
         attach = st.button(
             t("h1.attach_proposal"),
@@ -567,26 +572,52 @@ def render_research_h1_panel(
 
     if critique_dict:
         findings = critique_dict.get("findings") or []
-        st.markdown(
-            t(
-                "h1.critique_summary",
-                id=critique_dict.get("critique_id"),
-                n=len(findings),
-                b=critique_dict.get("blocking_count", 0),
-            )
-        )
-        for finding in findings:
-            level = finding.get("severity")
-            text = (
-                f"`{finding.get('finding_id')}` · {finding.get('kind')} · "
-                f"{level} · {finding.get('statement')}"
-            )
-            if level == "blocking":
-                st.error(text)
-            elif level in {"high", "medium"}:
-                st.warning(text)
+        zh_kinds = {
+            "data_gap":"数据还不够：需要补查数据质量或数据适用性",
+            "weak_assumption":"模型假设可能站不住脚：先设计一个反例测试",
+            "validation_gap":"验证方法不够：需要增加公平的对照和样本外检查",
+            "evidence_gap":"支持证据不足：不能把假设当作已证实的结论",
+            "contradiction":"研究约束存在冲突：可能违反题目要求",
+            "alternative":"还有其他可对比方案：不能只测试一个模型",
+        }
+        st.markdown("### 独立审查人对方案有什么担心？" if zh
+                    else "### What did the independent reviewer challenge?")
+        if not findings:
+            st.write("当前未发现自动规则覆盖的明显问题，但这不代表没有缺陷。" if zh
+                     else "No rule-based findings; this does not certify the plan.")
+        for item in findings[:8]:
+            if not isinstance(item, dict): continue
+            severity = str(item.get("severity") or "medium")
+            kind = str(item.get("kind") or "other")
+            if zh:
+                st.write("**需要重点检查**：" + zh_kinds.get(
+                    kind,"请核对方案中的假设和验证步骤")+
+                    ("（较高优先级）" if severity in {"blocking","high"} else ""))
             else:
-                st.info(text)
+                st.write(f"**Check:** {kind.replace('_',' ')} ({severity})")
+        with st.expander(
+            "独立 Critic 的详细原始意见 / Full reviewer findings", expanded=False
+        ):
+                st.markdown(
+                t(
+                    "h1.critique_summary",
+                    id=critique_dict.get("critique_id"),
+                    n=len(findings),
+                    b=critique_dict.get("blocking_count", 0),
+                )
+            )
+            for finding in findings:
+                level = finding.get("severity")
+                text = (
+                    f"`{finding.get('finding_id')}` · {finding.get('kind')} · "
+                    f"{level} · {finding.get('statement')}"
+                )
+                if level == "blocking":
+                    st.error(text)
+                elif level in {"high", "medium"}:
+                    st.warning(text)
+                else:
+                    st.info(text)
         if proposal_dict and st.button(
             t("h1.attach_critique"),
             key="persist_debate_critique",
