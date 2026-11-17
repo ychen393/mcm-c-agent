@@ -600,6 +600,7 @@ def execute_validation_report(
     llm_enabled: bool = False,
     price_bars: list[PriceBar] | None = None,
     price_sha256: dict[str, str] | None = None,
+    extra_scenarios: list[dict[str, Any]] | None = None,
 ) -> ValidationReport:
     """Build a deterministic ValidationReport from a Phase 6 experiment payload.
 
@@ -638,6 +639,61 @@ def execute_validation_report(
         constraints=constraints,
         price_bars=price_bars,
     )
+    # Revisions may add *computed* allowlisted stress scenarios, never AI
+    # supplied metric values. Every scenario uses the SAME source price bars,
+    # baseline identity and the deterministic trading execution engine.
+    if extra_scenarios:
+        if len(extra_scenarios) > 3:
+            raise ValueError("At most three human-requested extra scenarios")
+        import math
+        for n, request in enumerate(extra_scenarios, 1):
+            if not isinstance(request, dict) or set(request) != {"target", "value", "rationale"}:
+                raise ValueError("Each requested scenario requires target, value and rationale")
+            target = request["target"]
+            if target not in {"alpha_gold", "alpha_bitcoin", "lookback_days",
+                              "rebalance_every_n_days"}:
+                raise ValueError(f"Unsupported validation change: {target}; rerun not claimed")
+            value = request["value"]
+            if isinstance(value, bool) or not isinstance(value, (float, int)) or not math.isfinite(value):
+                raise ValueError("Scenario value must be a finite number")
+            if target.startswith("alpha_"):
+                if not 0 <= value <= 0.10:
+                    raise ValueError("Commission stress must be between 0 and 10 percent")
+            else:
+                if not 1 <= value <= 60 or int(value) != value:
+                    raise ValueError("Lookback/rebalance window must be a whole number from 1 to 60")
+                value = int(value)
+            desc = str(request["rationale"]).strip()
+            if len(desc) < 8 or len(desc) > 350:
+                raise ValueError("Scenario rationale must have 8–350 characters")
+            old = getattr(params, target)
+            if old == value:
+                raise ValueError("Feedback scenario duplicates the baseline parameter")
+            changed_params = params.model_copy(update={target: value})
+            changed_constraints = (
+                constraints.model_copy(update={target: value})
+                if target.startswith("alpha_") else constraints
+            )
+            scenarios.append(
+                _run_scenario(
+                    scenario_id=f"scn_feedback_{n}_{target}",
+                    kind="cost" if target.startswith("alpha_") else
+                         ("window" if target == "lookback_days" else "param"),
+                    label=f"Reviewer request {n}: {target} = {value}",
+                    description=desc,
+                    baseline_run_id=str(baseline_run["run_id"]),
+                    baseline_metrics=baseline_metrics,
+                    params=changed_params,
+                    constraints=changed_constraints,
+                    perturbations=[PerturbationSpec(
+                        target=target,
+                        description=desc,
+                        baseline_value=old,
+                        scenario_value=value,
+                    )],
+                    price_bars=price_bars,
+                )
+            )
     robustness = _robustness_notes(scenarios, uploaded=uploaded)
 
     llm_attempted = bool(llm_enabled)
@@ -650,6 +706,7 @@ def execute_validation_report(
         selected_candidate_id,
         str(baseline_run["run_id"]),
         started,
+        json.dumps(extra_scenarios or [], sort_keys=True, ensure_ascii=False),
     )
     notes = [
         ("Phase 7 uploaded CSV sensitivity runner completed." if uploaded else
