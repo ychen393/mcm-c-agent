@@ -217,3 +217,98 @@ def test_h3_requires_human_feedback_and_rejects_unsupported_new_experiments():
         revise_paper_with_feedback(
             state=state,package=old,feedback="fix",settings=get_settings(),
             llm=FakeH3())
+
+
+# Actual Streamlit widget acceptance. The provider factory is mocked: clicking
+# a review button without separate consent must incur zero provider calls.
+from pathlib import Path
+from streamlit.testing.v1 import AppTest
+
+PANEL_APP = Path(__file__).resolve().parents[1] / "fixtures" / "revision_gate_app.py"
+
+
+def _app_with_review_state(tmp_path, monkeypatch, *, gate):
+    if gate == "h2":
+        state,report,bars,sha = _study()
+        feedback = "Please rerun with 3 percent Bitcoin transaction costs using the exact original historical datasets."
+        state["approval_status"]["h2"] = "revision_requested"
+        state["decision_report"]["h2"] = {
+            "status":"revision_requested","notes":feedback
+        }
+        uploads=[("LBMA-GOLD.csv",GOLD),("BCHAIN-MKPRU.csv",BTC)]
+        monkeypatch.setattr("app.validation_h2_panel.get_or_create_store",lambda factory:store)
+    else:
+        state,package=_paper_study()
+        feedback = "Rewrite the conclusion for readers and avoid unsupported claims of global optimality."
+        state["decision_report"]["h3"]["notes"] = feedback
+        uploads=[]
+        monkeypatch.setattr("app.paper_h3_panel.get_or_create_store",lambda factory:store)
+    # app has to be seeded from actual saved ResearchState to exercise persistence.
+    store=LocalProjectStore(tmp_path / "projects")
+    _p,run,saved=store.save_project_state(
+        project_id=state["project_id"],project_name=state["project_name"],
+        state=state,input_signature="review-gate-ux",note="boot",
+    )
+    app=AppTest.from_file(str(PANEL_APP),default_timeout=70)
+    app.session_state["last_run"]={**saved,"run_id":run.run_id}
+    app.session_state["foundation_input_signature"]="review-gate-ux"
+    app.session_state["test_review_stage"]=gate
+    app.session_state["test_upload_payloads"]=uploads
+    return app.run(),feedback
+
+
+def test_h2_widget_feedback_rerun_requires_consent_and_recalculates(tmp_path,monkeypatch):
+    fake=FakeH2()
+    created=[]
+    def factory(_settings):
+        created.append(fake)
+        return fake
+    monkeypatch.setattr("llm.factory.LLMFactory.create",factory)
+    app,feedback=_app_with_review_state(tmp_path,monkeypatch,gate="h2")
+    assert not app.exception
+    label="Recompute validation from feedback"
+    button=next(b for b in app.button if label in b.label)
+    app=button.click().run()
+    assert not app.exception
+    assert not created
+    assert app.session_state["last_run"]["approval_status"]["h2"]=="revision_requested"
+    consent=next(c for c in app.checkbox if "I authorize two provider-model calls for H2" in c.label)
+    app=consent.check().run()
+    app=next(b for b in app.button if label in b.label).click().run()
+    assert not app.exception
+    assert len(created)==1 and len(fake.calls)==2, (
+        f"errors={[x.value for x in app.error]} "
+        f"warnings={[x.value for x in app.warning]}"
+    )
+    updated=app.session_state["last_run"]
+    assert updated["approval_status"]["h2"]=="pending"
+    assert updated["approval_status"]["h3"]=="pending"
+    assert updated["decision_report"]["h2_revision_history"][-1]["feedback"]==feedback
+
+
+def test_h3_widget_feedback_rerun_rewrites_tex_after_consent(tmp_path,monkeypatch):
+    fake=FakeH3()
+    created=[]
+    def factory(_settings):
+        created.append(fake)
+        return fake
+    monkeypatch.setattr("llm.factory.LLMFactory.create",factory)
+    app,feedback=_app_with_review_state(tmp_path,monkeypatch,gate="h3")
+    assert not app.exception
+    label="Rewrite paper from feedback"
+    app=next(b for b in app.button if label in b.label).click().run()
+    assert not created
+    assert app.session_state["last_run"]["approval_status"]["h3"]=="revision_requested"
+    consent=next(c for c in app.checkbox if "I authorize two provider-model calls for H3" in c.label)
+    app=consent.check().run()
+    app=next(b for b in app.button if label in b.label).click().run()
+    assert not app.exception
+    assert len(created)==1 and len(fake.calls)==2, (
+        f"errors={[x.value for x in app.error]}"
+    )
+    updated=app.session_state["last_run"]
+    assert updated["approval_status"]["h3"]=="pending"
+    history=updated["decision_report"]["h3_revision_history"][-1]
+    assert history["feedback"]==feedback
+    assert updated["latex_source"]
+    assert "not yet available" in history["critic_feedback"]
