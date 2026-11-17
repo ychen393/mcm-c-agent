@@ -8,7 +8,7 @@ import streamlit as st
 
 from app.i18n import get_locale, t
 from app.problem_narrative import is_2022_trading_spec, trading_research_brief
-from app.research_decision_story import render_research_decision
+from app.research_decision_story import render_research_decision, plan_readable
 
 from agents.debate_critic import critique_research_proposal
 from agents.research_strategy import synthesize_research_proposal
@@ -693,7 +693,10 @@ def render_research_h1_panel(
     ]
     candidate_ids = [str(c["candidate_id"]) for c in candidates]
     labels_by_id = {
-        str(c["candidate_id"]): candidate_display_label(c) for c in candidates
+        str(c["candidate_id"]): (
+            f"{'方案' if zh else 'Option'} {i+1} · "
+            f"{plan_readable(c, language='zh' if zh else 'en')['name']}"
+        ) for i, c in enumerate(candidates)
     }
     recommended = proposal_dict.get("recommended_candidate_id")
 
@@ -729,12 +732,15 @@ def render_research_h1_panel(
         (c for c in candidates if c.get("candidate_id") == preview_id),
         None,
     )
-    st.markdown(t("h1.approval_card"))
-    render_h1_approval_card(
-        candidate=preview_cand,
-        critique=critique_dict,
-        recommended=bool(preview_id and preview_id == recommended),
-    )
+    with st.expander(
+        "需要看更详细的技术评审卡？/ Technical review card", expanded=False
+    ):
+        st.markdown(t("h1.approval_card"))
+        render_h1_approval_card(
+            candidate=preview_cand,
+            critique=critique_dict,
+            recommended=bool(preview_id and preview_id == recommended),
+        )
 
     default_idx = 0
     if recommended in candidate_ids:
