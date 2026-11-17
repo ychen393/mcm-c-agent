@@ -84,6 +84,7 @@ def persist_validation_into_state(
     state: dict[str, Any],
     input_signature: str,
     report: ValidationReport | dict[str, Any],
+    revision_record: dict[str, Any] | None = None,
     note: str = "phase7-validation-sensitivity",
 ) -> dict[str, Any]:
     """Attach sanitized validation report. Requires H1 + experiment results."""
@@ -105,6 +106,21 @@ def persist_validation_into_state(
     for key in ("paper", "h3", "e2e_gate"):
         decision_report.pop(key, None)
     decision_report["validation"] = compact
+    old_revisions = decision_report.get("h2_revision_history") or []
+    if not isinstance(old_revisions, list):
+        old_revisions = []
+    if revision_record is not None:
+        record = {
+            str(k): str(v)[:3500] for k,v in revision_record.items()
+            if isinstance(k,str) and isinstance(v,(str,int,float,bool))
+        }
+        if not record.get("feedback") or record.get("new_report_id") != compact["report_id"]:
+            raise ValueError("H2 revision history must match recomputed report and actual human feedback")
+        if record.get("baseline_run_id") != compact["baseline_run_id"]:
+            raise ValueError("H2 revision cannot silently change baseline experiment")
+        decision_report["h2_revision_history"] = [*old_revisions[-7:],record][-8:]
+    elif old_revisions:
+        decision_report["h2_revision_history"] = old_revisions[-8:]
     decision_report["h2"] = {
         "status": "pending",
         "auto_approved": False,
