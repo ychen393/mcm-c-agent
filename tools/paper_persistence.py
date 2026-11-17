@@ -121,6 +121,12 @@ def persist_paper_into_state(
     if not isinstance(older_revisions, list):
         older_revisions = []
     if revision_record is not None:
+        prior_decision = ((state.get("decision_report") or {}).get("h3") or {})
+        prior_paper = ((state.get("decision_report") or {}).get("paper") or {})
+        if prior_decision.get("status") != "revision_requested":
+            raise ValueError("H3 history requires an explicit human revision request")
+        if revision_record.get("previous_package_id") != prior_paper.get("package_id"):
+            raise ValueError("H3 revision must reference exactly the rejected paper")
         record = {
             str(key): str(value)[:3500] for key,value in revision_record.items()
             if isinstance(key,str) and isinstance(value,(str,int,float,bool))
