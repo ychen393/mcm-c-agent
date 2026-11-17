@@ -297,13 +297,71 @@ def render_validation_h2_panel(
         else:
             st.warning("合成测试数据敏感性结果 / Synthetic fixture validation")
         scenarios = report_dict.get("scenarios") or []
-        st.markdown(
-            f"**Report:** `{report_dict.get('report_id')}` · "
+        metrics_by_id = {
+            str(metric.get("metric_id")): metric.get("value")
+            for metric in report_dict.get("baseline_metrics") or []
+            if isinstance(metric, dict)
+        }
+        st.markdown("### 当前策略已经得到什么结果？" if zh else
+                    "### What did the actual baseline achieve?")
+        baseline_cols = st.columns(3)
+        terminal_value = metrics_by_id.get("m_terminal_value")
+        max_dd = metrics_by_id.get("m_max_drawdown")
+        fees = metrics_by_id.get("m_cost_paid")
+        baseline_cols[0].metric(
+            "期末资产" if zh else "Ending portfolio value",
+            f"USD {terminal_value:,.2f}" if isinstance(terminal_value,(int,float)) else "–",
+        )
+        baseline_cols[1].metric(
+            "最大组合回撤" if zh else "Portfolio drawdown",
+            f"{max_dd*100:.1f}%" if isinstance(max_dd,(int,float)) else "–",
+        )
+        baseline_cols[2].metric(
+            "付出的手续费" if zh else "Transaction fees",
+            f"USD {fees:,.2f}" if isinstance(fees,(int,float)) else "–",
+        )
+        requested = [
+            s for s in scenarios if isinstance(s,dict)
+            and str(s.get("scenario_id") or "").startswith("scn_feedback_")
+        ]
+        if requested:
+            st.markdown("#### 按你反馈新做的实验" if zh else
+                        "#### Newly computed tests from your feedback")
+            for scenario in requested:
+                tested = next(
+                    (m for m in scenario.get("metrics") or []
+                     if m.get("metric_id")=="m_terminal_value"), {}
+                )
+                final = tested.get("value")
+                pert = scenario.get("perturbations") or []
+                detail = pert[0] if pert else {}
+                target = detail.get("target")
+                old_value = detail.get("baseline_value")
+                new_value = detail.get("scenario_value")
+                effect = (
+                    final - terminal_value
+                    if isinstance(final,(int,float)) and isinstance(terminal_value,(int,float))
+                    else None
+                )
+                st.write(
+                    (f"**测试 {target}：{old_value} → {new_value}。** "
+                     f"重新计算的最终资产为 USD {final:,.2f}，"
+                     f"相对原策略变化 {effect:+,.2f} 美元。" if zh else
+                     f"**Test {target}: {old_value} → {new_value}.** "
+                     f"Recomputed ending value USD {final:,.2f}, difference {effect:+,.2f} USD.")
+                    if effect is not None else
+                    f"{target}: {old_value} → {new_value}"
+                )
+            st.caption("上述变化来自相同历史数据的重新执行，不能直接作为样本外有效性的证明。"
+                       if zh else "Recomputed on the same data; not out-of-sample evidence.")
+        with st.expander("实验标识与完整技术数据 / Technical experiment metadata", expanded=False):
+            st.markdown(
+                f"**Report:** `{report_dict.get('report_id')}` · "
             f"**Baseline run:** `{report_dict.get('baseline_run_id')}` · "
             f"**Proposal:** `{report_dict.get('proposal_id')}` · "
             f"**Candidate:** `{report_dict.get('selected_candidate_id')}` · "
-            f"**Scenarios:** {len(scenarios)}"
-        )
+                f"**Scenarios:** {len(scenarios)}"
+            )
 
         render_h2_scenario_viewers(report_dict)
 
