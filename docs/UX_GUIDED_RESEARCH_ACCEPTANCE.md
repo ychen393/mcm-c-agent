@@ -28,6 +28,40 @@ python -m streamlit run app/main.py --server.port 8502
 
 Open http://localhost:8502 in a browser after the server is ready.
 
+## H2 + H3 complete review loops (Nov 17, 2026)
+
+### H2 · Validate and improve the *actual computed experiment*
+
+1. After H1 approval and a real Phase 6 run, run and attach the sensitivity report. Choose **Request revision (H2)** and enter a concrete request of at least 12 characters (e.g. "Add Bitcoin commission 3% to the sensitivity comparison, recompute returns and fees").
+2. Observe H2=revision_requested. It must still block the paper stage. The plain **run** and **attach** controls cannot overwrite the returned report.
+3. The new top-of-stage review card repeats the user's saved feedback. **No LLM request** happens just from entering or returning notes; clicking rerun without a separate, initially unchecked consent also does nothing.
+4. After explicit consent (two configured-provider calls may incur costs), the first model emits ONLY an allowlisted change to `alpha_gold`, `alpha_bitcoin`, `lookback_days` or `rebalance_every_n_days`. The deterministic offline runner recomputes each scenario against **the same original experimental data and baseline run**, including real-data source SHA-256 checks. Invalid/unsupported scenarios fail without changes; no fabricated result counts as done.
+5. The second LLM independently challenges the **computed metrics** and states unresolved gaps. The app preserves exact feedback, previous/updated report IDs, scenario results, differences, review notes and the unmodified baseline identity.
+6. Fresh H2 is **pending**; H3 and any old paper draft are invalidated. Manually review the revised results and choose **Approve H2** to unlock paper. No auto-approval, no automatic live trading calls.
+7. Unsupported experiment types (e.g. new trading algorithm, full walk-forward study) must return a clear implementation blocker instead of fabricating a scenario. The supported rerun is historical in-sample sensitivity, **not** proof of model optimality.
+
+### H3 · Rewrite the *actual paper artifact* and review it
+
+1. With H2 explicitly approved, run/attach a paper package and enter specific H3 notes, e.g. "Rewrite the conclusion in accessible language and explain sensitivity without claiming a proven global optimum." Click **Request revision (H3)**.
+2. H3=revision_requested must still block final export/Phase 9 acceptance. Default paper-generation/attach cannot erase the review without a replacement.
+3. Human input is shown above the package. Clicking the rerun button without the separate two-call opt-in **must not call the provider**.
+4. Once authorized, the editor model returns changes to 1–5 **existing** section IDs only; modified actual section text is inserted into the structured outline. It cannot modify references or provenance and is forbidden from inventing numerical results. New numerical claims not in prior evidence are rejected.
+5. Code produces a **new outline ID, new `.tex` and `.bib`**, then runs structural/citation checks. A second independent model critiques the rewritten sections; invalid changes or unsupported requests leave the returned previous version untouched.
+6. UI shows exact human notes, before/after chapter text, explanation of changes, independent criticism and the rebuilt LaTeX draft. The old/new history is saved with the same **H2 validation report ID**.
+7. Fresh H3 is **pending** until manual approval. H3 cannot generate new experiments or add unverified citations. If feedback requires new numbers, return to H2 (and rebuild the paper after validation), not an LLM-improvised conclusion.
+
+### Safe local testing
+
+The automated suite mocks the provider and exercises typed algorithms, persistence and Streamlit H2/H3 widgets without billable requests. To test on your machine, choose the same six-stage feature branch and run:
+
+~~~powershell
+python -m pytest -q tests/unit/test_h2_h3_feedback_revision.py tests/unit/test_user_h1_feedback_journey.py
+python -m pytest -q
+python -m streamlit run app/main.py --server.port 8502
+~~~
+
+Re-check real CSV hashes, the exact saved feedback, scenario metrics, regenerated .tex and manual gate status in the UI. **Do not** tick live-model opt-in during free/offline acceptance.
+
 ## Human-readable research + revision acceptance (Nov 17, 2026)
 
 The previous acceptance screens were too technical. The following flow must now pass:
