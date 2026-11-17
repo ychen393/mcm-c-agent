@@ -122,15 +122,25 @@ def persist_research_proposal_into_state(
     input_signature: str,
     proposal: ResearchProposal | dict[str, Any],
     critique: DebateCritique | dict[str, Any] | None = None,
+    review_record: dict[str, Any] | None = None,
     note: str = "phase5-research-proposal",
 ) -> dict[str, Any]:
     """Attach sanitized research_proposal (+ optional critique) into project state."""
     compact = compact_research_proposal(proposal)
     updated = dict(state)
     updated["research_proposal"] = compact
+    # Replacing a proposal invalidates earlier modeling, validation and paper
+    # artifacts; otherwise old H2/H3 approval could survive a changed method.
+    for downstream in ("validation_report", "paper_outline", "latex_source",
+                       "review_report"):
+        updated.pop(downstream, None)
+    updated["model_artifacts"] = []
+    updated["experiment_logs"] = []
     # Reset H1 when a new proposal is attached — never inherit silent approval.
     approval_status = dict(updated.get("approval_status") or {})
     approval_status["h1"] = "pending"
+    approval_status.pop("h2", None)
+    approval_status.pop("h3", None)
     updated["approval_status"] = approval_status
 
     decision_report = {
@@ -161,8 +171,28 @@ def persist_research_proposal_into_state(
         else:
             updated["disagreement_log"] = []
 
+    previous_decision = state.get("decision_report") or {}
+    previous_revisions = (
+        previous_decision.get("revision_history") or []
+        if isinstance(previous_decision, dict) else []
+    )
+    if not isinstance(previous_revisions, list):
+        previous_revisions = []
+    if review_record is not None:
+        safe_record = {
+            str(key): str(value)[:3000] for key, value in review_record.items()
+            if isinstance(key, str) and isinstance(value, (str, int, float, bool))
+        }
+        if not safe_record.get("feedback"):
+            raise ValueError("A revision record must retain the actual human feedback")
+        decision_report["revision_history"] = [*previous_revisions[-7:], safe_record][-8:]
+    elif previous_revisions:
+        decision_report["revision_history"] = previous_revisions[-8:]
     updated["decision_report"] = decision_report
     phases = dict(updated.get("workspace_phases") or {})
+    for downstream in ("modeling_experiment", "validation_sensitivity", "paper_latex",
+                       "h2", "h3", "e2e_acceptance"):
+        phases.pop(downstream, None)
     phases["research_strategy"] = "proposed"
     phases["h1"] = "pending"
     # Phase 6 modeling remains not implemented; gate stays blocked.
