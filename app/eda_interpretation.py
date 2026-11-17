@@ -12,6 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from app.i18n import get_locale
+from app.eda_story import chart_stories, render_chart_interpretation
 from tools.dataset_bundle import DatasetBundle
 
 
@@ -120,6 +121,7 @@ def _plot_market(frame: pd.DataFrame, summary: dict[str, Any], zh: bool) -> None
     drawdown = (data["price"] / data["price"].cummax() - 1) * 100
     pct = summary.get("change_pct")
     vola = summary.get("volatility_pct")
+    stories = chart_stories(frame, summary, language="zh" if zh else "en")
     if zh:
         st.markdown("**图 1 · 历史价格趋势**")
         st.caption(f"展示原始报价的趋势与波动；首尾价格变化 {pct:+.1f}% "
@@ -131,6 +133,8 @@ def _plot_market(frame: pd.DataFrame, summary: dict[str, Any], zh: bool) -> None
                    if pct is not None else "Observed quotes only.")
     sample = data.iloc[::max(1, len(data)//500)]
     st.line_chart(sample["price"], width="stretch")
+    if stories.get("price"):
+        render_chart_interpretation(stories["price"], language="zh" if zh else "en")
 
     st.markdown("**图 2 · 相邻报价日收益率分布**" if zh else
                 "**Chart 2 · Between-observation return distribution**")
@@ -145,6 +149,8 @@ def _plot_market(frame: pd.DataFrame, summary: dict[str, Any], zh: bool) -> None
         index=[f"{edges[i]:+.1f}% to {edges[i+1]:+.1f}%" for i in range(len(counts))]
     )
     st.bar_chart(hist, width="stretch")
+    if stories.get("returns"):
+        render_chart_interpretation(stories["returns"], language="zh" if zh else "en")
 
     st.markdown("**图 3 · 历史峰值回撤**" if zh else "**Chart 3 · Price drawdown from past peaks**")
     st.caption(
@@ -154,6 +160,8 @@ def _plot_market(frame: pd.DataFrame, summary: dict[str, Any], zh: bool) -> None
         "Price drawdown from peaks available up to each date; not yet a portfolio backtest."
     )
     st.line_chart(drawdown.iloc[::max(1, len(drawdown)//500)], width="stretch")
+    if stories.get("drawdown"):
+        render_chart_interpretation(stories["drawdown"], language="zh" if zh else "en")
 
     st.markdown("**图 4 · 滚动波动率**" if zh else "**Chart 4 · Rolling realized volatility**")
     if len(returns) >= 20:
@@ -165,6 +173,8 @@ def _plot_market(frame: pd.DataFrame, summary: dict[str, Any], zh: bool) -> None
     else:
         st.caption("有效收益率少于 20 个，暂不能计算可靠的滚动波动率。"
                    if zh else "Fewer than 20 returns; rolling volatility not shown.")
+    if stories.get("rolling"):
+        render_chart_interpretation(stories["rolling"], language="zh" if zh else "en")
 
 
 def render_explainable_eda(bundle: DatasetBundle) -> dict[str, Any]:
@@ -216,6 +226,26 @@ def render_explainable_eda(bundle: DatasetBundle) -> dict[str, Any]:
                     ),
                     hide_index=True, width="stretch",
                 )
+    st.markdown("### 这些数据如何决定下一步建模？" if zh else "### How these measurements shape the next experiment")
+    if len(insight["datasets"]) >= 2:
+        st.write(
+            "你不是在两条价格曲线里“挑涨得最多的资产”，而是在比较两类不一样的风险。" if zh
+            else "The goal is not to pick the line that rose most; the two markets expose different risks."
+        )
+        for row in insight["datasets"]:
+            dd = row.get("max_drawdown_pct")
+            if dd is not None:
+                st.write(f"**{row['name']}：** "+ (
+                    f"观察到资产价格最大回撤 {dd:.1f}%；先把该资产的买入持有作为基线，"
+                    "再检查加入风控/手续费后是否更好。" if zh else
+                    f"Observed price drawdown {dd:.1f}%. Compare against buy-and-hold before adding risk controls."
+                ))
+        st.warning(
+            "黄金开市间隔与比特币自然日不同。若要比较收益率或相关性，必须明确共同观察日期，"
+            "不能把缺失日期随意补成价格；图表结论不是最优策略的证明。" if zh else
+            "Gold and Bitcoin have different quote calendars. Align observed dates explicitly; "
+            "never fill unobserved tradable prices, and do not claim an optimal strategy from EDA."
+        )
     st.info(
         "如何用于模型：通过 EDA 识别高波动、潜在回撤和休市缺口；下一阶段应该"
         "比较低换手率基线、趋势策略、风险控制策略，并用手续费敏感性与样本外检验区分。"
