@@ -12,6 +12,7 @@ from app.problem_narrative import is_2022_trading_spec, trading_research_brief
 from agents.debate_critic import critique_research_proposal
 from agents.research_strategy import synthesize_research_proposal
 from agents.live_research_team import run_live_research_team
+from agents.research_revision import revise_with_feedback
 from app.artifact_viewers import (
     candidate_display_label,
     render_approved_banner,
@@ -186,6 +187,120 @@ def render_research_h1_panel(
     proposal_dict = resolve_displayed_proposal(recorded_state)
     critique_dict = resolve_displayed_critique(recorded_state)
 
+    # Human review must be actionable, not a dead-end approval status.
+    latest_state = st.session_state.get("last_run")
+    review_status = (
+        (latest_state.get("approval_status") or {}).get("h1")
+        if isinstance(latest_state, dict) else None
+    )
+    review_decision = (
+        ((latest_state.get("decision_report") or {}).get("h1") or {})
+        if isinstance(latest_state, dict) else {}
+    )
+    if review_status == "revision_requested" and isinstance(proposal_dict, dict):
+        st.markdown(
+            "### 修改意见已收到 · 让模型按你的要求重新做"
+            if zh else "### Revision requested · Revise with your actual feedback"
+        )
+        prior_feedback = str(review_decision.get("notes") or "").strip()
+        st.write(
+            ("**你上次提出：** " if zh else "**Your exact feedback:** ") + prior_feedback
+        )
+        st.caption(
+            "系统不会仅把状态改为“已退回”。勾选后点按钮，将真实调用模型"
+            "重新写方案，再调用独立 Critic 挑问题，保留前后版本；"
+            "不自动批准，不自动跑交易模型。"
+            if zh else
+            "No fake revision: opt in below for one actual model revision and a "
+            "second independent critique, retaining before/after versions; H1 stays unapproved."
+        )
+        review_paid = st.checkbox(
+            ("我同意用已配置模型重新生成并审查（2 次 API 请求，可能收费）"
+             if zh else
+             "I approve two configured-model API calls to revise and critique (may cost money)"),
+            value=False, key="h1_revision_two_call_consent",
+        )
+        regenerate = st.button(
+            "按反馈重新生成方案 → 重新审查" if zh else
+            "Regenerate from feedback → rerun reviewer",
+            key="h1_regenerate_from_feedback",
+            type="primary",
+        )
+        if regenerate:
+            if not review_paid:
+                st.warning(
+                    "请先确认是否允许这两次模型请求。离线规则模块无法理解自由文本反馈，"
+                    "因此不会假装已经按你的意见重新生成。"
+                    if zh else "Consent is required; offline rules cannot rewrite a free-text research request."
+                )
+            elif len(prior_feedback) < 12:
+                st.error("修改意见太短，请在上一轮审批中填写具体要求。" if zh
+                         else "Revision feedback must contain at least 12 characters.")
+            elif not isinstance(problem_specification, dict) or not measured:
+                st.error(
+                    "题目规格或上传数据的 EDA 证据缺失，无法安全重新生成。"
+                    if zh else "Problem specification or recorded EDA evidence missing."
+                )
+            else:
+                form_sig = input_signature or st.session_state.get("foundation_input_signature")
+                if not form_sig or not isinstance(latest_state, dict):
+                    st.error(t("common.sig_missing"))
+                else:
+                    try:
+                        with st.spinner("按你的意见修改方案，并交给独立 Agent 审查…" if zh
+                                        else "Revising and independently reviewing…"):
+                            revised, audit = revise_with_feedback(
+                                proposal=proposal_dict,
+                                feedback=prior_feedback,
+                                problem_specification=problem_specification,
+                                eda_report=eda_report,
+                                settings=settings,
+                                language="zh" if zh else "en",
+                            )
+                            new_critique = critique_research_proposal(
+                                proposal=revised,
+                                problem_specification=problem_specification,
+                                evidence_report=evidence_report,
+                                eda_report=eda_report,
+                                use_llm=False,
+                                settings=settings,
+                            )
+                            store = get_or_create_store(lambda: build_project_store(settings))
+                            saved = persist_research_proposal_into_state(
+                                store,
+                                project_id=str(project_id or latest_state.get("project_id") or "mcm-c-demo"),
+                                project_name=str(project_name or latest_state.get("project_name") or "MCM C Demo Project"),
+                                state=latest_state,
+                                input_signature=str(form_sig),
+                                proposal=revised,
+                                critique=new_critique,
+                                review_record=audit,
+                                note="h1-feedback-llm-revision",
+                            )
+                        st.session_state["last_run"] = saved
+                        st.session_state[PROPOSAL_SESSION_KEY] = saved.get("research_proposal")
+                        st.session_state[CRITIQUE_SESSION_KEY] = (
+                            (saved.get("decision_report") or {}).get("critique")
+                        )
+                        st.session_state.pop("research_live_team_review", None)
+                        st.success(
+                            "已重新生成，旧版本和你的反馈已保存。H1 仍待你审核。"
+                            if zh else "Revised proposal saved with before/after and feedback. H1 remains pending."
+                        )
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(
+                            ("重新生成失败：旧方案和退回状态保持不变。"
+                             if zh else "Revision failed; the original proposal and review remain unchanged.")
+                            + f" {type(exc).__name__}: {exc}"
+                        )
+        # In review-requested status, the old candidate must not be approved
+        # until an actual revised proposal is attached.
+        st.info(
+            "当前方案仍处于“待修改”状态，请先完成重新生成，或返回修改反馈。"
+            if zh else "This proposal remains under requested revision; do not approve the unchanged version."
+        )
+
     if synthesize or team_run:
         try:
             proposal = synthesize_research_proposal(
@@ -310,6 +425,46 @@ def render_research_h1_panel(
                 "LLM 内容可能含未经核实的推断；需要和 EDA、基线实验及题目逐项核对。"
                 if zh else "LLM output is unverified advice; check against EDA, baselines and problem facts."
             )
+
+    # Show the exact human feedback, old/new plan and real independent review.
+    decision_for_history = (
+        (st.session_state.get("last_run") or {}).get("decision_report") or {}
+    )
+    revisions = decision_for_history.get("revision_history") or []
+    if isinstance(revisions, list) and revisions:
+        latest = revisions[-1]
+        st.markdown(
+            "### 上次退回后，模型到底改了什么？"
+            if zh else "### What exactly changed after your feedback?"
+        )
+        with st.container(border=True):
+            st.markdown("**你提出的意见 / Your feedback**")
+            st.write(latest.get("feedback") or "")
+            st.markdown("**修改前 / Before**")
+            st.write(latest.get("before") or "")
+            st.markdown("**修改后 / After**")
+            st.write(latest.get("after") or "")
+            st.markdown("**怎样回应意见 / What changed**")
+            st.write(latest.get("changes_made") or "")
+            st.markdown("**独立审查指出的问题 / Independent Critic**")
+            st.write(latest.get("critic_feedback") or "")
+            st.markdown("**还需要验证什么 / Next tests**")
+            st.write(latest.get("next_tests") or "")
+            st.caption(
+                f"模型：{latest.get('provider')} / {latest.get('model')} · "
+                "方案更新后 H1 必须重新审批；这些文字不是实验结果。"
+                if zh else
+                f"Model: {latest.get('provider')} / {latest.get('model')}. "
+                "Revisions require renewed H1 approval and are not test results."
+            )
+        if len(revisions) > 1:
+            with st.expander(
+                "历史修改轮次 / Earlier review rounds", expanded=False
+            ):
+                for round_no, entry in enumerate(revisions[:-1], start=1):
+                    st.markdown(f"**Round {round_no}**")
+                    st.write(entry.get("feedback") or "")
+                    st.caption(entry.get("changes_made") or "")
 
     if proposal_dict:
         candidates = proposal_dict.get("candidates") or []
@@ -573,12 +728,25 @@ def render_research_h1_panel(
                 recommended=selected == recommended,
             )
 
+    st.markdown(
+        "### 你来审阅：同意，还是告诉 Agent 哪里需要重做？"
+        if zh else "### Your review: approve or tell the agent what to change"
+    )
+    st.caption(
+        "例如：‘建议不要只用移动平均，要考虑比特币大回撤、黄金周末不开盘；"
+        "重新比较风险控制策略，给出具体实验设计。’"
+        if zh else
+        "Example: 'Do not only use moving averages; address Bitcoin drawdowns, "
+        "gold closures and design a risk-controlled comparison.'"
+    )
     h1_notes = st.text_area(
-        t("h1.notes"),
+        "你对当前方案的修改意见（退回修改时必填）" if zh
+        else "Your feedback on this plan (required to request revision)",
         value="",
-        height=80,
+        height=130,
         key="h1_reviewer_notes",
-        help=t("h1.notes_help"),
+        help="写清楚哪里不满意、希望怎么调整、如何判断改好了。" if zh
+        else "Describe what is wrong, what to change and how to verify improvement.",
     )
 
     approve_col, revise_col = st.columns(2)
@@ -605,6 +773,14 @@ def render_research_h1_panel(
             st.error(t("common.sig_missing"))
         elif not candidate_ids:
             st.error(t("h1.no_candidates"))
+        elif revise_clicked and len(h1_notes.strip()) < 12:
+            st.error(
+                "请至少写 12 个字的具体修改意见，让模型知道需要改变什么。"
+                if zh else "Write at least 12 characters of actionable revision feedback."
+            )
+        elif approve_clicked and review_status == "revision_requested":
+            st.error("上一轮退回尚未重新生成，不能批准旧方案。" if zh
+                     else "Regenerate the rejected proposal before approving.")
         else:
             status = "approved" if approve_clicked else "revision_requested"
             try:
@@ -656,7 +832,11 @@ def render_research_h1_panel(
                     )
                 else:
                     st.warning(
-                        t("h1.revision_msg", reason=gate_after.reason)
+                        "修改意见已记录。返回本阶段顶部，勾选真实模型重跑后，"
+                        "可以比较旧版、新版和独立 Critic 的意见。"
+                        if zh else
+                        "Feedback recorded. At the top of this stage, explicitly "
+                        "authorize model rerun to compare the old and revised plan."
                     )
             except Exception as exc:
                 st.error(t("h1.decision_failed", err=f"{type(exc).__name__}: {exc}"))
