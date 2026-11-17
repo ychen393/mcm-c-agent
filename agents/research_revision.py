@@ -69,7 +69,9 @@ def revise_with_feedback(
     """
     prev = (
         proposal if isinstance(proposal, ResearchProposal)
-        else ResearchProposal.model_validate(proposal)
+        else ResearchProposal.model_validate({
+            k: v for k, v in proposal.items() if k != "report_version"
+        })
     )
     feedback = feedback.strip()
     if len(feedback) < 12 or len(feedback) > 2400:
