@@ -357,9 +357,9 @@ def render_validation_h2_panel(
         with st.expander("实验标识与完整技术数据 / Technical experiment metadata", expanded=False):
             st.markdown(
                 f"**Report:** `{report_dict.get('report_id')}` · "
-            f"**Baseline run:** `{report_dict.get('baseline_run_id')}` · "
-            f"**Proposal:** `{report_dict.get('proposal_id')}` · "
-            f"**Candidate:** `{report_dict.get('selected_candidate_id')}` · "
+                f"**Baseline run:** `{report_dict.get('baseline_run_id')}` · "
+                f"**Proposal:** `{report_dict.get('proposal_id')}` · "
+                f"**Candidate:** `{report_dict.get('selected_candidate_id')}` · "
                 f"**Scenarios:** {len(scenarios)}"
             )
 
