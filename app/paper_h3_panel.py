@@ -279,12 +279,24 @@ def render_paper_h3_panel(
         latex = package_dict.get("latex") or {}
         review = package_dict.get("review") or {}
         st.markdown(
-            f"**Package:** `{package_dict.get('package_id')}` · "
+            ("### 论文草稿：" if zh else "### Paper draft: ")
+            + str(outline.get("title") or "Untitled")
+        )
+        st.caption(
+            "下面是已生成的正文框架，可以展开每章检查内容。"
+            "如果论证不够、文字不清楚或遗漏限制，请在底部写具体意见并退回。"
+            if zh else
+            "Expand sections to inspect the actual draft; request concrete revisions "
+            "when explanations, evidence or limitations are incomplete."
+        )
+        with st.expander("内部版本标识 / Technical package identifiers",expanded=False):
+            st.markdown(
+                f"**Package:** `{package_dict.get('package_id')}` · "
             f"**Outline:** `{outline.get('outline_id')}` · "
             f"**Title:** {outline.get('title')} · "
             f"**Sections:** {len(outline.get('sections') or [])} · "
-            f"**Bib entries:** {len(outline.get('bib_entries') or [])}"
-        )
+                f"**Bib entries:** {len(outline.get('bib_entries') or [])}"
+            )
 
         if outline.get("strategy") == "deterministic_uploaded_csv":
             st.success("论文草稿已关联真实 CSV 实验与敏感性结果（仍需人工核对论证与参考文献）。")
@@ -292,9 +304,9 @@ def render_paper_h3_panel(
             st.warning("本论文大纲基于合成测试数据，只能作为结构示例，不能作为正式竞赛成果。")
         render_paper_pdf_preview(package_dict)
 
-        for section in outline.get("sections") or []:
+        for n, section in enumerate(outline.get("sections") or [], start=1):
             with st.expander(
-                f"{section.get('section_id')} · {section.get('title')} · {section.get('kind')}",
+                f"{n}. {section.get('title')}",
                 expanded=section.get("kind") in {"abstract", "methods"},
             ):
                 st.write(section.get("summary") or "")
