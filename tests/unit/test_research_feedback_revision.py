@@ -77,7 +77,7 @@ def test_user_feedback_produces_distinct_proposal_and_two_independent_calls():
     assert revised.recommended_candidate_id in [c.candidate_id for c in revised.candidates]
     assert history["feedback"] == feedback
     assert history["before"] != history["after"]
-    assert "commission" in history["after"]
+    assert "transaction fees" in history["after"]
     assert "H1 remains pending" in history["critic_feedback"]
     assert "approval_status" not in history
 
