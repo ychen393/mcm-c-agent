@@ -86,7 +86,12 @@ def test_user_can_write_feedback_and_revise_after_explicit_model_consent(monkeyp
     app=consent.check().run()
     app=button(app,"Regenerate from feedback").click().run()
     assert not app.exception
-    assert len(created)==1 and len(created[0].calls)==2
+    assert len(created)==1 and len(created[0].calls)==2, (
+        f"consent={app.session_state.get('h1_revision_two_call_consent')}; "
+        f"warnings={[w.value for w in app.warning]}; "
+        f"errors={[e.value for e in app.error]}; "
+        f"infos={[i.value for i in app.info]}"
+    )
     state=app.session_state["last_run"]
     assert state["approval_status"]["h1"]=="pending"
     history=state["decision_report"]["revision_history"][-1]
