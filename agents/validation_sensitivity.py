@@ -143,6 +143,7 @@ def run_validation_sensitivity(
     settings: Settings | None = None,
     price_bars: list[PriceBar] | None = None,
     price_sha256: dict[str, str] | None = None,
+    extra_scenarios: list[dict[str, Any]] | None = None,
 ) -> ValidationReport:
     """Run deterministic validation when H1 + experiments allow; else PermissionError."""
     assert_validation_allowed(state)
@@ -179,6 +180,7 @@ def run_validation_sensitivity(
         llm_enabled=llm,
         price_bars=price_bars,
         price_sha256=price_sha256,
+        extra_scenarios=extra_scenarios,
     )
 
     notes = list(report.analysis_notes)
