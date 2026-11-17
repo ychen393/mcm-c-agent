@@ -11,6 +11,7 @@ from typing import Any
 import streamlit as st
 
 from app.i18n import get_locale
+from app.research_playbook import render_research_playbook
 
 
 def is_2022_trading_spec(spec: dict[str, Any]) -> bool:
@@ -109,11 +110,13 @@ def render_trading_problem_brief(spec: dict[str, Any]) -> bool:
     d = trading_research_brief("zh" if zh else "en")
     st.markdown(f"### {d['title']}")
     st.write(d["thesis"])
-    st.markdown("#### 需要完成的研究任务" if zh else "#### Research work packages")
-    for i, (title, body) in enumerate(d["tasks"], start=1):
-        with st.container(border=True):
-            st.markdown(f"**{i}. {title}**")
-            st.write(body)
+    render_research_playbook()
+    with st.expander("原题任务摘要（用于对照） / Original task checklist", expanded=False):
+        st.markdown("#### 需要完成的研究任务" if zh else "#### Research work packages")
+        for i, (title, body) in enumerate(d["tasks"], start=1):
+            with st.container(border=True):
+                st.markdown(f"**{i}. {title}**")
+                st.write(body)
     st.markdown("#### 初步建模路线（待 EDA 修正）" if zh else "#### Preliminary modeling routes (subject to EDA)")
     for title, body, status in d["models"]:
         st.markdown(f"**{title}** — {status}")
