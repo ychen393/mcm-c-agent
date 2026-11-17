@@ -303,79 +303,90 @@ def _render_independent_profile(view: dict, preview) -> None:
 
 
 def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
-    st.info(
-        "Each file is profiled on its own. This step does not join files, "
-        "align dates, draw a cross-dataset chart, or call a model."
-    )
-    for note in bundle.manifest.limitations:
-        st.caption(note)
-    st.caption(f"Bundle fingerprint: {bundle.fingerprint}")
-    st.dataframe(
-        [
-            {
-                "Dataset ID": ref.dataset_id,
-                "Display name": ref.display_name,
-                "File": ref.file_name,
-                "Rows": len(bundle.loaded_dataset(ref.dataset_id).frame),
-                "SHA-256": ref.sha256,
-                "Qualified columns": ", ".join(ref.qualified_column_names),
-            }
-            for ref in bundle.datasets
-        ],
-        use_container_width=True,
-    )
-    sources: dict[str, str] = {}
-    frequencies: dict[str, str | None] = {}
-    units: dict[str, dict[str, str]] = {}
-    for ref in bundle.datasets:
-        with st.expander(f"Dataset context · {ref.display_name}", expanded=False):
-            st.caption(f"Dataset ID: {ref.dataset_id}")
-            sources[ref.dataset_id] = st.text_input(
-                "Data source",
-                placeholder="Optional source name or URL",
-                key=f"eda_source_{ref.dataset_id}",
-            )
-            frequency_choice = st.selectbox(
-                t("dataset.frequency"),
-                FREQUENCY_OPTIONS,
-                format_func=_frequency_label,
-                key=f"eda_frequency_{ref.dataset_id}",
-            )
-            frequencies[ref.dataset_id] = (
-                None if frequency_choice.startswith("Not specified") else frequency_choice
-            )
-            units_text = st.text_area(
-                "Column units (one per line: column_name = unit)",
-                key=f"eda_units_{ref.dataset_id}",
-                height=80,
-            )
-            try:
-                units[ref.dataset_id] = _parse_units(units_text, ref.column_names)
-            except ValueError as exc:
-                units[ref.dataset_id] = {}
-                st.error(str(exc))
-    # Stash notes for the post-sync problem-aware plan panel (avoids stale specs).
-    st.session_state["eda_bundle_units"] = units
-    st.session_state["eda_bundle_frequencies"] = frequencies
-    st.session_state["eda_bundle_sources"] = sources
-    profiles = build_bundle_profiles(
-        bundle,
-        column_units_by_dataset=units,
-        data_source_by_dataset=sources,
-        temporal_frequency_by_dataset=frequencies,
-    )
-    tabs = st.tabs([f"{ref.display_name} · {ref.dataset_id}" for ref in bundle.datasets])
-    for tab, ref in zip(tabs, bundle.datasets, strict=True):
-        with tab:
-            view = describe_independent_eda(ref, profiles[ref.dataset_id])
-            preview = bundle.loaded_dataset(ref.dataset_id).frame.head(20)
-            _render_independent_profile(view, preview)
-    render_relationship_panel(
-        bundle,
-        column_units_by_dataset=units,
-        temporal_frequency_by_dataset=frequencies,
-    )
-    render_joint_eda_panel(bundle)
+    with st.expander(
+        "进阶检查：两份数据如何按日期对应？（可选查看明细）"
+        if get_locale() == "zh" else
+        "Advanced: How do the uploaded datasets align by date?",
+        expanded=False,
+    ):
+        st.caption(
+            "原始文件仍保持独立；预览日期关联不代表正式合并或补全缺失报价。"
+            if get_locale() == "zh" else
+            "Original files remain separate; date previews never permanently merge or fill prices."
+        )
+        st.info(
+            "Each file is profiled on its own. This step does not join files, "
+            "align dates, draw a cross-dataset chart, or call a model."
+        )
+        for note in bundle.manifest.limitations:
+            st.caption(note)
+        st.caption(f"Bundle fingerprint: {bundle.fingerprint}")
+        st.dataframe(
+            [
+                {
+                    "Dataset ID": ref.dataset_id,
+                    "Display name": ref.display_name,
+                    "File": ref.file_name,
+                    "Rows": len(bundle.loaded_dataset(ref.dataset_id).frame),
+                    "SHA-256": ref.sha256,
+                    "Qualified columns": ", ".join(ref.qualified_column_names),
+                }
+                for ref in bundle.datasets
+            ],
+            use_container_width=True,
+        )
+        sources: dict[str, str] = {}
+        frequencies: dict[str, str | None] = {}
+        units: dict[str, dict[str, str]] = {}
+        for ref in bundle.datasets:
+            with st.expander(f"Dataset context · {ref.display_name}", expanded=False):
+                st.caption(f"Dataset ID: {ref.dataset_id}")
+                sources[ref.dataset_id] = st.text_input(
+                    "Data source",
+                    placeholder="Optional source name or URL",
+                    key=f"eda_source_{ref.dataset_id}",
+                )
+                frequency_choice = st.selectbox(
+                    t("dataset.frequency"),
+                    FREQUENCY_OPTIONS,
+                    format_func=_frequency_label,
+                    key=f"eda_frequency_{ref.dataset_id}",
+                )
+                frequencies[ref.dataset_id] = (
+                    None if frequency_choice.startswith("Not specified") else frequency_choice
+                )
+                units_text = st.text_area(
+                    "Column units (one per line: column_name = unit)",
+                    key=f"eda_units_{ref.dataset_id}",
+                    height=80,
+                )
+                try:
+                    units[ref.dataset_id] = _parse_units(units_text, ref.column_names)
+                except ValueError as exc:
+                    units[ref.dataset_id] = {}
+                    st.error(str(exc))
+        # Stash notes for the post-sync problem-aware plan panel (avoids stale specs).
+        st.session_state["eda_bundle_units"] = units
+        st.session_state["eda_bundle_frequencies"] = frequencies
+        st.session_state["eda_bundle_sources"] = sources
+        profiles = build_bundle_profiles(
+            bundle,
+            column_units_by_dataset=units,
+            data_source_by_dataset=sources,
+            temporal_frequency_by_dataset=frequencies,
+        )
+        tabs = st.tabs([f"{ref.display_name} · {ref.dataset_id}" for ref in bundle.datasets])
+        for tab, ref in zip(tabs, bundle.datasets, strict=True):
+            with tab:
+                view = describe_independent_eda(ref, profiles[ref.dataset_id])
+                preview = bundle.loaded_dataset(ref.dataset_id).frame.head(20)
+                _render_independent_profile(view, preview)
+        render_relationship_panel(
+            bundle,
+            column_units_by_dataset=units,
+            temporal_frequency_by_dataset=frequencies,
+        )
+        render_joint_eda_panel(bundle)
     if st.button(
         ("完成 EDA · 保存并继续研究方案" if get_locale() == "zh"
          else "Finish EDA · Save and continue to research plan"),
@@ -1064,12 +1075,15 @@ if selected_stage == 1 and bundle is not None and not bundle_rejected:
     if len(bundle.datasets) >= 2:
         _render_multi_dataset_eda(bundle)
     if panel_is_unlocked("eda", _state_dict):
-        render_problem_aware_eda_panel(
-            bundle,
-            problem_specification=spec_for_eda,
-            column_units_by_dataset=st.session_state.get("eda_bundle_units"),
-            temporal_frequency_by_dataset=st.session_state.get("eda_bundle_frequencies"),
-        )
+        with st.expander(
+            "专业分析规划明细（可选） / Advanced EDA planning", expanded=False
+        ):
+            render_problem_aware_eda_panel(
+                bundle,
+                problem_specification=spec_for_eda,
+                column_units_by_dataset=st.session_state.get("eda_bundle_units"),
+                temporal_frequency_by_dataset=st.session_state.get("eda_bundle_frequencies"),
+            )
     else:
         render_locked_panel_stub("eda", _state_dict)
 elif selected_stage == 1:
