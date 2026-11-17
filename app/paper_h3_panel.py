@@ -292,9 +292,9 @@ def render_paper_h3_panel(
         with st.expander("内部版本标识 / Technical package identifiers",expanded=False):
             st.markdown(
                 f"**Package:** `{package_dict.get('package_id')}` · "
-            f"**Outline:** `{outline.get('outline_id')}` · "
-            f"**Title:** {outline.get('title')} · "
-            f"**Sections:** {len(outline.get('sections') or [])} · "
+                f"**Outline:** `{outline.get('outline_id')}` · "
+                f"**Title:** {outline.get('title')} · "
+                f"**Sections:** {len(outline.get('sections') or [])} · "
                 f"**Bib entries:** {len(outline.get('bib_entries') or [])}"
             )
 
