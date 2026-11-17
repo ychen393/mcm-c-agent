@@ -28,6 +28,20 @@ python -m streamlit run app/main.py --server.port 8502
 
 Open http://localhost:8502 in a browser after the server is ready.
 
+## Human-readable research + revision acceptance (Nov 17, 2026)
+
+The previous acceptance screens were too technical. The following flow must now pass:
+
+1. **Problem analysis (2022 C):** The page shows a bilingual, beginner-readable five-step plan. Each step answers WHY, WHAT INPUTS, EXACT ACTIONS, OUTPUT and HOW TO CHECK. Canonical extracted English schema is available in advanced details, not the main explanation.
+2. **EDA (Stage 2):** For both uploaded price files separately, inspect price, observed quote-return distribution, historical drawdown and trailing volatility. Under **each chart**, locate four separate answers: how to read it, numbers actually found in *that upload*, modeling inspiration, and the next experiment to verify. No fabricated findings or future-price filling.
+3. **Hide noise:** Dense dataset IDs, relationship schemas and problem-aware JSON are behind optional advanced expanders. The primary **Finish EDA · Save and continue** action remains visible without opening technical details.
+4. **Research plan (Stage 3):** The first visible section clearly says which direction to test first, its concrete implementation steps, shortcomings, how to test it, and alternative approaches. Historical EDA evidence is linked to the decision. An idea that has not been coded is labeled a research hypothesis.
+5. **Write actual H1 feedback:** Start the offline research team and attach the proposal. In H1, enter e.g. “Consider a no-trade band because the 2% Bitcoin commission may erase small gains. Specify how gold market closures affect trades and validate on later unseen dates.” Click **Request revision (H1)**. Feedback must be at least 12 characters and is durably recorded with H1=revision_requested.
+6. **No unauthorized LLM calls:** A revision-request click alone **must not call the provider**. Returning to Stage 3 shows the exact saved human feedback and a clear re-run action. Clicking without explicitly accepting the two model calls must do nothing to the research proposal.
+7. **True re-run:** When the user ticks the separate two-call consent and clicks **Regenerate from feedback**, the configured LLM must revise an existing candidate and a second independent LLM call must criticize that actual revision. If either call fails or output is invalid, preserve the old proposal and revision_requested status (no silent deterministic substitute).
+8. **Compare before approving:** Display human feedback verbatim, original proposal, revised proposal, explanation of changes, independent criticism and next tests. Persist revision history (without raw CSV rows); reset H1 to pending and invalidate stale experiments/H2/H3. Only explicit manual H1 approval can open modeling.
+9. **Cost/testing:** All automated tests use fake LLM providers. No paid model API or Cloud Agent should be invoked by CI or routine UI navigation. Human can separately test a real provider after opting in.
+
 ## User-feedback regression (Nov 16, 2026)
 
 The following specific UX failures must be verified separately:
