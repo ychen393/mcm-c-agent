@@ -598,7 +598,7 @@ def render_research_h1_panel(
         with st.expander(
             "独立 Critic 的详细原始意见 / Full reviewer findings", expanded=False
         ):
-                st.markdown(
+            st.markdown(
                 t(
                     "h1.critique_summary",
                     id=critique_dict.get("critique_id"),
@@ -608,16 +608,16 @@ def render_research_h1_panel(
             )
             for finding in findings:
                 level = finding.get("severity")
-                text = (
+                full_text = (
                     f"`{finding.get('finding_id')}` · {finding.get('kind')} · "
                     f"{level} · {finding.get('statement')}"
                 )
                 if level == "blocking":
-                    st.error(text)
+                    st.error(full_text)
                 elif level in {"high", "medium"}:
-                    st.warning(text)
+                    st.warning(full_text)
                 else:
-                    st.info(text)
+                    st.info(full_text)
         if proposal_dict and st.button(
             t("h1.attach_critique"),
             key="persist_debate_critique",
