@@ -107,7 +107,7 @@ def test_visual_eda_chart_planning_cases_match_schema_and_fixture_hashes():
             # Git's core.autocrlf may check text fixtures out with CRLF on Windows.
             # The golden hashes are defined over canonical LF bytes so the same
             # fixture has the same identity on Windows, macOS and Linux.
-            canonical_fixture_bytes = fixture_bytes.replace(b"\\r\\n", b"\\n").replace(b"\\r", b"\\n")
+            canonical_fixture_bytes = fixture_bytes.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
             assert hashlib.sha256(canonical_fixture_bytes).hexdigest() == expected_hash, case["case_id"]
 
     assert {case["split"] for case in cases} == {"dev", "holdout", "regression"}
