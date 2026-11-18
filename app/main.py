@@ -83,6 +83,29 @@ page = st.sidebar.radio(
     ),
     key="workspace_navigation",
 )
+# Streamlit drops widget state when a widget is not rendered on a rerun. Preserve
+# the selected upload payloads before the API Settings branch stops rendering
+# the Research Lab, so switching pages does not silently discard datasets.
+_DATASET_UPLOAD_CACHE_KEY = "kept_dataset_upload_payloads"
+
+
+def _snapshot_dataset_uploads_from_widget() -> None:
+    if "dataset_uploader" not in st.session_state:
+        return
+    selected = st.session_state.get("dataset_uploader") or []
+    st.session_state[_DATASET_UPLOAD_CACHE_KEY] = [
+        (uploaded.name, uploaded.getvalue()) for uploaded in selected
+    ]
+
+
+def _cache_dataset_uploads_from_widget() -> None:
+    selected = st.session_state.get("dataset_uploader") or []
+    st.session_state[_DATASET_UPLOAD_CACHE_KEY] = [
+        (uploaded.name, uploaded.getvalue()) for uploaded in selected
+    ]
+
+
+_snapshot_dataset_uploads_from_widget()
 if page == _NAV_API:
     render_api_settings(base_settings)
     st.stop()
@@ -563,15 +586,35 @@ with st.expander(
     st.divider()
     st.header(t("dataset.header"))
     st.write(t("dataset.intro"))
-    uploaded_files = st.file_uploader(
+    uploaded_file_widgets = st.file_uploader(
         t("dataset.uploader"),
         type=["csv", "xlsx"],
         accept_multiple_files=True,
         help=t("dataset.uploader_help"),
         key="dataset_uploader",
+        on_change=_cache_dataset_uploads_from_widget,
     )
-    uploaded_files = list(uploaded_files or [])
-    upload_payloads = [(uploaded.name, uploaded.getvalue()) for uploaded in uploaded_files]
+    uploaded_file_widgets = list(uploaded_file_widgets or [])
+    if uploaded_file_widgets:
+        upload_payloads = [
+            (uploaded.name, uploaded.getvalue()) for uploaded in uploaded_file_widgets
+        ]
+        st.session_state[_DATASET_UPLOAD_CACHE_KEY] = upload_payloads
+    else:
+        # The widget may be empty because Research Lab was not rendered while
+        # API Settings was open. Reuse the session-scoped payloads in that case.
+        upload_payloads = list(st.session_state.get(_DATASET_UPLOAD_CACHE_KEY, []))
+        if upload_payloads:
+            st.info(
+                "Using datasets retained in this session. Select new files to replace them, "
+                "or clear the retained selection below."
+            )
+            if st.button("Clear retained datasets", key="clear_retained_dataset_uploads"):
+                st.session_state[_DATASET_UPLOAD_CACHE_KEY] = []
+                st.rerun()
+    # Downstream code only needs the active upload count; raw bytes stay outside
+    # the persisted foundation state.
+    uploaded_files = upload_payloads
     accepted_identity: str | None = None
     bundle: DatasetBundle | None = None
     bundle_rejected = False
