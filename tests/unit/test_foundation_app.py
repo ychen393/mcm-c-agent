@@ -381,7 +381,9 @@ def test_api_settings_refresh_clears_foundation_products_and_omits_the_key():
     assert not at.exception
     next(box for box in at.text_input if box.label == "Model ID").set_value("deepseek-chat")
     next(box for box in at.text_input if box.label == "API Key").set_value(SECRET)
-    at = at.form_submit_button[0].click().run()
+    # Streamlit AppTest exposes form submit controls through the button
+    # collection; there is no AppTest.form_submit_button attribute.
+    at = _button(at, "Save for this session").click().run()
     assert not at.exception
     assert "API configuration saved for this session." in _messages(at)
     at = at.radio[0].set_value("Research Lab").run()
