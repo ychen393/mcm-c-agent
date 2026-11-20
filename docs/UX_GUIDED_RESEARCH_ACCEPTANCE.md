@@ -28,6 +28,53 @@ python -m streamlit run app/main.py --server.port 8502
 
 Open http://localhost:8502 in a browser after the server is ready.
 
+## Joint gold × Bitcoin EDA (Nov 20, 2026)
+
+This fixes the prior issue where each uploaded dataset had good EDA, but the
+comparison was an obscure advanced preview with one unlabeled index chart.
+
+1. **Stage 2 now has two prominent tabs**: ① Separate EDA and ② Joint market
+   EDA. Upload the original \`LBMA-GOLD.csv\` and \`BCHAIN-MKPRU.csv\`.
+   No paid LLM calls are required. In tab ②, explicitly click
+   **Analyze both markets (5 charts + modeling insights)**.
+2. **Both-market calendar sanity**: the page must show the number of observed
+   common quote dates, BTC-only dates (including weekends), paired intervals,
+   correlation (if defined), and simultaneous down periods. No gold price is
+   forward-filled on closed days and no additional tradable quote is invented.
+3. **Five visualizations with a four-part explanation each**:
+   - Both price indexes starting at 100 on the first *common* date;
+   - Both returns over the *same consecutive common-date interval* (not daily
+     returns across weekends);
+   - Paired-return scatter and historical Pearson correlation, plus how often
+     both assets fell in the same interval;
+   - Past-only 20-paired-interval rolling correlation, or an honest insufficient
+     sample message;
+   - Price drawdown comparison on those common observation dates. This is not
+     a portfolio risk or net strategy metric.
+   Plus a sixth illustrated explanation of gold-closed versus Bitcoin dates.
+4. Under every chart inspect **how to read it / actual measured finding /
+   modeling inspiration / next experiment**. Never infer an optimal strategy
+   from the full-sample charts.
+5. **Save and hand off**: after explicitly running joint analysis, click
+   **Finish EDA · Save and continue to research plan**. The persisted
+   \`eda_report.interpreted_findings.joint_market\` must contain only compact
+   metrics and source SHA-256 fingerprints. \`eda_report.joined\` remains
+   \`false\` and no merged price rows/CSV bytes are stored.
+6. **H1 Strategist → Critic**: the subsequent research plan must cite the actual
+   joined-date count, historical correlation if defined, simultaneous-downside
+   frequency, and market calendar limitations. The Critic must flag that
+   a full-window correlation cannot be used for decisions on prior dates
+   (look-ahead) and that gold closures require separate execution logic.
+7. **Failures to handle**: missing/invalid dates, duplicate dates, insufficient
+   common quotes, zero/negative values, and constant-return windows. Show a
+   specific error or insufficient-data note; no fabricated correlation or graph.
+   Changing either file invalidates the prior source-fingerprint-specific joint
+   confirmation, and a reupload is required when resuming persisted projects.
+
+This is descriptive, offline in-memory analysis of two markets. It does **not**
+produce a persisted merged dataset, a runnable correlated strategy, or a proof
+of statistical predictability.
+
 ## H2 + H3 complete review loops (Nov 17, 2026)
 
 ### H2 · Validate and improve the *actual computed experiment*
