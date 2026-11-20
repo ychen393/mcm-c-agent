@@ -525,6 +525,14 @@ def synthesize_research_proposal(
     observed_files = {
         str(row.get("name") or "").casefold() for row in measured
     }
+    joint = (
+        insight.get("joint_market") if isinstance(insight, dict)
+        and isinstance(insight.get("joint_market"), dict)
+        and insight["joint_market"].get("bundle_fingerprint") == insight.get("bundle_fingerprint")
+        else None
+    )
+    joint_count = int(joint.get("paired_return_intervals") or 0) if joint else 0
+    joint_corr = joint.get("paired_return_correlation") if joint else None
     observations = []
     for item in measured:
         if item.get("valid_prices", 0) and item.get("volatility_pct") is not None:
@@ -533,6 +541,16 @@ def synthesize_research_proposal(
                 f"quote-return volatility={item['volatility_pct']:.2f}%; "
                 f"max observed price drawdown={item.get('max_drawdown_pct'):.2f}%."
             )
+    if joint:
+        observations.append(
+            "Joint observed-date EDA on "
+            f"{joint.get('common_quote_days')} overlapping quote days "
+            f"({joint_count} matched return intervals): "
+            f"return correlation={joint_corr if joint_corr is not None else 'undefined'}, "
+            f"both assets negative in {joint.get('both_negative_intervals')} intervals, "
+            f"BTC-only quote dates={joint.get('bitcoin_only_days')}. "
+            "Results are full-window descriptive context, not causal signals."
+        )
     if measured:
         adjusted = []
         for candidate in candidates:
@@ -559,6 +577,34 @@ def synthesize_research_proposal(
                         )[:800],
                     },
                 ][:24]
+            if joint:
+                # The joint evidence is compact and fingerprinted. Only
+                # hypothesis-level interpretations are added; no strategy
+                # performance or future-tuned trading signals are asserted.
+                payload["provenance"] = [
+                    *payload.get("provenance", []),
+                    {
+                        "kind": "eda_report",
+                        "ref_id": "joint_" + str(joint.get("bundle_fingerprint") or "")[:20],
+                        "summary": (
+                            f"Observed paired returns on {joint_count} common-date intervals, "
+                            f"correlation={joint_corr}; "
+                            f"both-negative={joint.get('both_negative_intervals')}; "
+                            f"BTC-only quote dates={joint.get('bitcoin_only_days')}."
+                        ),
+                    },
+                ][:24]
+                if candidate.method_family in {"portfolio_optimization", "risk_management"}:
+                    payload["strengths"] = [
+                        *payload.get("strengths", []),
+                        "Proposed to test simultaneous-downside and changing "
+                        "cross-asset correlation found in observed joint EDA.",
+                    ][:12]
+                    payload["weaknesses"] = [
+                        *payload.get("weaknesses", []),
+                        "Full-sample correlation cannot be used as a historical "
+                        "trading-day signal; estimate only on past windows.",
+                    ][:12]
             if candidate.method_family in {"portfolio_optimization", "trend_following",
                                            "cost_aware_trading", "risk_management"}:
                 payload["strengths"] = [
@@ -585,6 +631,15 @@ def synthesize_research_proposal(
                 "trend_following": 3, "risk_management": 3,
                 "simulation_backtest": 2,
             }
+            # Joint evidence changes what deserves investigation, NOT which
+            # method has been proven best. Avoid weighting tiny samples.
+            if joint_count >= 30 and isinstance(joint_corr, (float, int)):
+                if abs(joint_corr) < 0.3:
+                    method_priority["portfolio_optimization"] = 6
+                elif joint_corr >= 0.6:
+                    method_priority["risk_management"] = 6
+            # Market closure and commissions remain mandatory irrespective of
+            # observed cross-asset correlation.
             ranked = sorted(
                 candidates,
                 key=lambda cand: (
@@ -609,6 +664,12 @@ def synthesize_research_proposal(
     if observations:
         notes.append("Observed EDA evidence: " + " | ".join(observations)[:1600])
         notes.append("Recommendation conditioned on uploaded historical dataset diagnostics.")
+    if joint:
+        notes.append(
+            "Joint EDA adds a hypothesis to test: cross-asset dependence, "
+            "simultaneous downside and separate gold/BTC trading calendars. "
+            "The full-window observation must not be used to backfit signals."
+        )
     if not measured:
         open_questions.append(
             "No quantified uploaded EDA evidence is attached; model suitability "
@@ -653,6 +714,7 @@ def synthesize_research_proposal(
         recommended_id or "none",
         str(len(marked)),
         str(insight.get("bundle_fingerprint") or "") if isinstance(insight, dict) else "",
+        ("joint_" + str(joint_count) + "_" + str(joint_corr)) if joint else "no_joint",
     )
 
     return ResearchProposal(
