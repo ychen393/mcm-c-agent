@@ -153,9 +153,10 @@ def panel_prerequisites_met(panel: PanelId, state: dict[str, Any] | None) -> boo
     if panel == "literature":
         return _has_eda(state)
     if panel == "h1":
-        # Linear path prefers literature; allow if proposal already exists
-        # (user skipped literature or restored a mid-run).
-        return _has_literature(state) or _has_research_proposal(state)
+        # An actual saved EDA report is enough to draft the first strategy.
+        # Literature may enhance evidence but is not a blocking prerequisite.
+        # Human H1 remains mandatory before modeling.
+        return _has_eda(state) or _has_literature(state) or _has_research_proposal(state)
     if panel == "modeling":
         return modeling_allowed(state)
     if panel == "h2":
@@ -186,8 +187,8 @@ def missing_prerequisite_labels(panel: PanelId, state: dict[str, Any] | None) ->
         labels.append(t("soft.prereq.problem"))
     elif panel == "literature" and not _has_eda(state):
         labels.append(t("soft.prereq.eda"))
-    elif panel == "h1" and not (_has_literature(state) or _has_research_proposal(state)):
-        labels.append(t("soft.prereq.literature"))
+    elif panel == "h1" and not (_has_eda(state) or _has_literature(state) or _has_research_proposal(state)):
+        labels.append(t("soft.prereq.eda"))
     elif panel == "modeling" and not modeling_allowed(state):
         labels.append(t("soft.prereq.h1"))
     elif panel == "h2" and not has_experiment_results(state):

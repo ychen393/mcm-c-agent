@@ -370,6 +370,7 @@ def critique_research_proposal(
     proposal: ResearchProposal | dict[str, Any],
     problem_specification: ProblemSpecification | dict[str, Any] | None = None,
     evidence_report: LiteratureEvidenceReport | dict[str, Any] | None = None,
+    eda_report: dict[str, Any] | None = None,
     use_llm: bool | None = None,
     settings: Settings | None = None,
 ) -> DebateCritique:
@@ -387,6 +388,115 @@ def critique_research_proposal(
     findings.extend(_critique_weak_assumptions(model, spec))
     findings.extend(_critique_contradictions(model, spec))
     findings.extend(_critique_validation_gaps(model))
+
+    # Independent EDA-focused skeptical review. No predictive claims and no
+    # invented citations: every numerical concern comes from source dataset.
+    insight = (
+        eda_report.get("interpreted_findings") if isinstance(eda_report, dict)
+        else None
+    )
+    measured = (
+        [row for row in insight.get("datasets", []) if isinstance(row, dict)]
+        if isinstance(insight, dict) else []
+    )
+    if not measured:
+        findings.append(CritiqueFinding(
+            finding_id="cf_eda_not_grounded",
+            kind="data_gap",
+            severity="high",
+            statement="No observed dataset-level EDA statistics were supplied to the research "
+                      "reviewer. Do not call any strategy optimal before quantitative comparison.",
+            suggested_action="Upload and inspect both markets, then rerun strategy synthesis and critique.",
+        ))
+    else:
+        for row in measured[:5]:
+            ref = str(row.get("dataset_id") or "eda")[:80]
+            name = str(row.get("name") or ref)
+            dd = row.get("max_drawdown_pct")
+            if isinstance(dd, (int, float)) and dd < -35:
+                findings.append(CritiqueFinding(
+                    finding_id=_fid("eda_dd", ref),
+                    kind="weak_assumption",
+                    severity="high",
+                    statement=(
+                        f"Observed {name} price drawdown is {dd:.1f}%. "
+                        "A terminal-value-only comparison may hide material downside risk."
+                    ),
+                    suggested_action="Compare max portfolio drawdown, turnover and "
+                                     "cost sensitivity on walk-forward periods.",
+                    evidence_refs=[ProvenanceRef(
+                        kind="eda_report", ref_id=ref,
+                        summary=f"Observed {name} drawdown={dd:.1f}%",
+                    )],
+                ))
+            missing = sum(int(v) for v in (row.get("missing_by_column") or {}).values())
+            if missing:
+                findings.append(CritiqueFinding(
+                    finding_id=_fid("eda_missing", ref),
+                    kind="data_gap",
+                    severity="medium",
+                    statement=(
+                        f"Uploaded {name} has {missing} missing data cells. "
+                        "Do not silently interpolate quotes across market closures."
+                    ),
+                    suggested_action="Record missing-price behavior and forbid trades "
+                                     "when a quoted asset market is closed.",
+                    evidence_refs=[ProvenanceRef(
+                        kind="eda_report", ref_id=ref,
+                        summary=f"Observed missing cells={missing}",
+                    )],
+                ))
+
+    # Independently challenge any strategy built from full-window joint
+    # statistics. A descriptive cross-market correlation is not information
+    # that was available at each prior trading decision.
+    joint = insight.get("joint_market") if isinstance(insight, dict) else None
+    if (isinstance(joint, dict)
+            and joint.get("bundle_fingerprint") == insight.get("bundle_fingerprint")):
+        ref = "joint_" + str(joint.get("bundle_fingerprint") or "")[:20]
+        findings.append(CritiqueFinding(
+            finding_id=_fid("joint_full_window", ref),
+            kind="validation_gap",
+            severity="high",
+            statement=(
+                "Joint EDA uses observed matched gold/Bitcoin quote intervals "
+                f"({joint.get('paired_return_intervals')}); its correlation "
+                "summarizes the full historical window and cannot be used "
+                "as a look-ahead-free signal in earlier trades."
+            ),
+            suggested_action=(
+                "Use trailing correlation from prices available before each "
+                "decision; compare cash, buy-and-hold, and portfolio risk "
+                "baselines on chronological holdout periods."
+            ),
+            evidence_refs=[ProvenanceRef(
+                kind="eda_report", ref_id=ref,
+                summary=(
+                    f"Measured joint paired-return correlation="
+                    f"{joint.get('paired_return_correlation')}; "
+                    f"BTC-only quote dates={joint.get('bitcoin_only_days')}."
+                ),
+            )],
+        ))
+        if int(joint.get("bitcoin_only_days") or 0) > 0:
+            findings.append(CritiqueFinding(
+                finding_id=_fid("joint_calendar", ref),
+                kind="weak_assumption",
+                severity="high",
+                statement=(
+                    f"{joint.get('bitcoin_only_days')} observed BTC dates have no "
+                    "matching gold quote. A matched-date chart does not prove "
+                    "gold was tradable or its closing quote was known on those days."
+                ),
+                suggested_action=(
+                    "Audit gold market closures separately from BTC daily quotes; "
+                    "never fill unobserved executable gold prices."
+                ),
+                evidence_refs=[ProvenanceRef(
+                    kind="eda_report", ref_id=ref,
+                    summary="Observed BTC-only dates; no imputation used.",
+                )],
+            ))
 
     # Deduplicate by finding_id
     seen: set[str] = set()

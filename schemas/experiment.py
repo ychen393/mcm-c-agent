@@ -12,13 +12,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-ExperimentStrategy = Literal["deterministic_fixture", "sandboxed_python", "hybrid"]
+ExperimentStrategy = Literal["deterministic_fixture", "deterministic_uploaded_csv", "sandboxed_python", "hybrid"]
 ExperimentStatus = Literal["planned", "running", "completed", "blocked", "failed"]
 CodeRefKind = Literal[
     "module_path",
     "function_name",
     "strategy_id",
     "fixture_id",
+    "dataset_sha256",
     "prompt_version",
 ]
 MetricKind = Literal[
@@ -37,6 +38,7 @@ ArtifactKind = Literal[
     "trade_log_summary",
     "constraint_snapshot",
     "price_fixture_ref",
+    "price_upload_ref",
     "run_config",
     "other",
 ]

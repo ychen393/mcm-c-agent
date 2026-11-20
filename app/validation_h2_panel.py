@@ -10,7 +10,8 @@ from __future__ import annotations
 from typing import Any, MutableMapping
 
 import streamlit as st
-from app.i18n import t
+from app.i18n import get_locale, t
+from agents.validation_revision import revise_validation_with_feedback
 
 from agents.validation_sensitivity import (
     run_validation_sensitivity,
@@ -22,6 +23,7 @@ from app.artifact_viewers import (
     render_h2_scenario_viewers,
 )
 from app.persistence_panel import get_or_create_store
+from modeling.uploaded_prices import prepare_uploaded_2022_prices
 from core.config import Settings
 from database.repositories import build_project_store
 from tools.validation_persistence import (
@@ -76,6 +78,7 @@ def render_validation_h2_panel(
     project_id: str | None = None,
     project_name: str | None = None,
     input_signature: str | None = None,
+    upload_payloads: list[tuple[str, bytes]] | None = None,
 ) -> dict[str, Any] | None:
     """Render Validation / Sensitivity + human H2 controls."""
     st.subheader(t("h2.subheader"))
@@ -107,19 +110,44 @@ def render_validation_h2_panel(
         )
     )
 
-    use_llm = st.checkbox(
-        t("h2.use_llm"),
-        value=bool(settings.validation_use_llm),
-        help=t("h2.use_llm_help"),
-        key="validation_use_llm_ui",
-    )
-    st.caption(
-        t("h2.llm_effective", effective=use_llm, settings=settings.validation_use_llm)
-    )
+    zh = get_locale() == "zh"
+    use_llm = False
+    with st.expander("技术配置与数据来源 / Validation details", expanded=False):
+        st.caption("常规敏感性实验由离线代码计算，无付费 LLM 请求。" if zh
+                   else "Standard sensitivity runs use offline computation; no paid LLM calls.")
 
     report_dict = resolve_displayed_validation_report(recorded_state)
+    saved_state = st.session_state.get("last_run")
+    current_state = saved_state if isinstance(saved_state, dict) else recorded_state
+    h2_decision = ((current_state or {}).get("decision_report") or {}).get("h2") or {}
+    h2_status = h2_decision.get("status") or ((current_state or {}).get("approval_status") or {}).get("h2")
+    h2_returned = h2_status == "revision_requested"
 
-    run_disabled = not v_gate.validation_allowed
+    baseline_experiment = (
+        ((recorded_state or {}).get("decision_report") or {}).get("experiment") or {}
+    )
+    baseline_real = baseline_experiment.get("strategy") == "deterministic_uploaded_csv"
+    prepared = None
+    if baseline_real:
+        files = {name.casefold(): data for name, data in (upload_payloads or [])}
+        if "lbma-gold.csv" not in files or "bchain-mkpru.csv" not in files:
+            st.warning(
+                "真实数据验证要求重新上传原始 LBMA-GOLD.csv 和 BCHAIN-MKPRU.csv "
+                "（项目持久化不保存原始数据字节）。"
+            )
+        else:
+            try:
+                prepared = prepare_uploaded_2022_prices(
+                    files["lbma-gold.csv"], files["bchain-mkpru.csv"]
+                )
+            except (ValueError, OSError) as exc:
+                st.error(f"历史 CSV 不能用于验证：{exc}")
+            else:
+                st.info("真实 CSV 敏感性分析：必须与建模阶段的两份文件 SHA-256 完全一致。")
+    else:
+        st.warning("当前基线是合成测试数据；敏感性分析仅用于演示。")
+    run_disabled = (not v_gate.validation_allowed or (baseline_real and prepared is None)
+                    or h2_returned)
     run = st.button(
         t("h2.run"),
         type="primary",
@@ -144,6 +172,9 @@ def render_validation_h2_panel(
                     proposal=recorded_state.get("research_proposal"),
                     use_llm=use_llm,
                     settings=settings,
+                    price_bars=(list(prepared.bars) if prepared is not None else None),
+                    price_sha256=({"gold": prepared.gold_sha256, "bitcoin": prepared.bitcoin_sha256}
+                                  if prepared is not None else None),
                 )
             except PermissionError as exc:
                 st.error(t("h2.gate_blocked", err=exc))
@@ -163,15 +194,174 @@ def render_validation_h2_panel(
                 if report.llm_attempted and report.llm_note:
                     st.info(report.llm_note)
 
-    if report_dict:
-        scenarios = report_dict.get("scenarios") or []
-        st.markdown(
-            f"**Report:** `{report_dict.get('report_id')}` · "
-            f"**Baseline run:** `{report_dict.get('baseline_run_id')}` · "
-            f"**Proposal:** `{report_dict.get('proposal_id')}` · "
-            f"**Candidate:** `{report_dict.get('selected_candidate_id')}` · "
-            f"**Scenarios:** {len(scenarios)}"
+    # Real H2 revision loop: user feedback → bounded LLM test plan → real
+    # deterministic recomputation → independent LLM critique → fresh H2.
+    if report_dict and h2_returned:
+        st.markdown("### 你退回的验证意见，交给 Agent 重新执行" if zh
+                    else "### Your validation feedback → genuinely recomputed tests")
+        feedback = str(h2_decision.get("notes") or "").strip()
+        st.write(("**你的原话：** " if zh else "**Your feedback:** ") + feedback)
+        st.caption(
+            "先由 LLM 把意见转为可执行的手续费／回看窗口／调仓频率实验，"
+            "再由离线回测计算新结果，最后由独立 LLM 审查。"
+            "如果要求当前系统不支持的样本外检验，会明确阻止而不伪造结果。"
+            if zh else
+            "Model proposes executable fee/window tests; deterministic code reruns them "
+            "against unchanged data; a separate model critiques actual results. "
+            "Unsupported methods fail explicitly."
         )
+        consent = st.checkbox(
+            "授权两次 LLM API 请求来重跑 H2（可能收费）" if zh else
+            "I authorize two provider-model calls for H2 revision (may incur charges)",
+            value=False, key="h2_revision_model_consent",
+        )
+        rerun = st.button(
+            "按照反馈重新验证 → 独立审查" if zh else
+            "Recompute validation from feedback → independent review",
+            key="h2_regenerate_from_feedback", type="primary",
+        )
+        if rerun:
+            if not consent:
+                st.warning("请先明确授权模型调用；原验证报告保持不变。" if zh
+                           else "Explicit model-call consent required; existing report unchanged.")
+            elif len(feedback) < 12:
+                st.error("原修改意见过短，请重新填写具体问题。" if zh else
+                         "Original review feedback is too short.")
+            elif baseline_real and prepared is None:
+                st.error("请重新上传与建模阶段 SHA-256 完全相同的两份 CSV。" if zh else
+                         "Reupload identical original CSVs before real-data validation.")
+            elif not isinstance(current_state,dict) or not current_state.get("run_id"):
+                st.error(t("h2.init_before_decide"))
+            else:
+                signature = input_signature or st.session_state.get("foundation_input_signature")
+                if not signature:
+                    st.error(t("common.sig_missing"))
+                else:
+                    try:
+                        with st.spinner("生成验证计划、实际运行场景、交由第二个 Agent 审查…" if zh
+                                        else "Designing, recomputing and reviewing scenarios…"):
+                            revised, audit = revise_validation_with_feedback(
+                                state=current_state,
+                                feedback=feedback,
+                                report=report_dict,
+                                settings=settings,
+                                price_bars=list(prepared.bars) if prepared is not None else None,
+                                price_sha256=(
+                                    {"gold":prepared.gold_sha256,"bitcoin":prepared.bitcoin_sha256}
+                                    if prepared is not None else None
+                                ),
+                                language="zh" if zh else "en",
+                            )
+                            store = get_or_create_store(lambda: build_project_store(settings))
+                            saved = persist_validation_into_state(
+                                store,
+                                project_id=str(project_id or current_state.get("project_id") or "mcm-c-demo"),
+                                project_name=str(project_name or current_state.get("project_name") or "MCM C Demo Project"),
+                                state=current_state,
+                                input_signature=str(signature),
+                                report=revised,
+                                revision_record=audit,
+                                note="h2-feedback-computed-revision",
+                            )
+                        st.session_state["last_run"] = saved
+                        st.session_state[VALIDATION_SESSION_KEY] = saved.get("validation_report")
+                        st.success("新场景已完成真实计算，并保存新旧对比；H2 仍待你批准。" if zh
+                                   else "New scenarios computed, version diff saved. H2 awaits your decision.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(("验证重跑失败，旧报告和审批状态未改变：" if zh
+                                  else "Recomputation failed; previous report and review unchanged: ")
+                                 + f"{type(exc).__name__}: {exc}")
+
+    history = (((st.session_state.get("last_run") or {}).get("decision_report") or {})
+               .get("h2_revision_history") or [])
+    if isinstance(history,list) and history:
+        latest = history[-1]
+        st.markdown("### H2 退回后究竟改了什么？" if zh
+                    else "### What changed in the H2 validation?")
+        with st.container(border=True):
+            for cn,en,key in [
+                ("你的修改意见","Your feedback","feedback"),
+                ("原验证方案","Original validation","before"),
+                ("重新计算结果","Recomputed results","after"),
+                ("修改原因","What changed","changes_made"),
+                ("独立审查意见","Independent reviewer","critic_feedback"),
+            ]:
+                st.write(f"**{cn if zh else en}：** {latest.get(key) or ''}")
+            st.caption("新指标来自离线执行，LLM 未计算或编造结果；H2 需要重新人工批准。"
+                       if zh else "Metrics are recomputed offline. Human H2 approval remains necessary.")
+
+    if report_dict:
+        if report_dict.get("strategy") == "deterministic_uploaded_csv":
+            st.success("已验证的真实 CSV 敏感性结果（仅限样本内）")
+        else:
+            st.warning("合成测试数据敏感性结果 / Synthetic fixture validation")
+        scenarios = report_dict.get("scenarios") or []
+        metrics_by_id = {
+            str(metric.get("metric_id")): metric.get("value")
+            for metric in report_dict.get("baseline_metrics") or []
+            if isinstance(metric, dict)
+        }
+        st.markdown("### 当前策略已经得到什么结果？" if zh else
+                    "### What did the actual baseline achieve?")
+        baseline_cols = st.columns(3)
+        terminal_value = metrics_by_id.get("m_terminal_value")
+        max_dd = metrics_by_id.get("m_max_drawdown")
+        fees = metrics_by_id.get("m_cost_paid")
+        baseline_cols[0].metric(
+            "期末资产" if zh else "Ending portfolio value",
+            f"USD {terminal_value:,.2f}" if isinstance(terminal_value,(int,float)) else "–",
+        )
+        baseline_cols[1].metric(
+            "最大组合回撤" if zh else "Portfolio drawdown",
+            f"{max_dd*100:.1f}%" if isinstance(max_dd,(int,float)) else "–",
+        )
+        baseline_cols[2].metric(
+            "付出的手续费" if zh else "Transaction fees",
+            f"USD {fees:,.2f}" if isinstance(fees,(int,float)) else "–",
+        )
+        requested = [
+            s for s in scenarios if isinstance(s,dict)
+            and str(s.get("scenario_id") or "").startswith("scn_feedback_")
+        ]
+        if requested:
+            st.markdown("#### 按你反馈新做的实验" if zh else
+                        "#### Newly computed tests from your feedback")
+            for scenario in requested:
+                tested = next(
+                    (m for m in scenario.get("metrics") or []
+                     if m.get("metric_id")=="m_terminal_value"), {}
+                )
+                final = tested.get("value")
+                pert = scenario.get("perturbations") or []
+                detail = pert[0] if pert else {}
+                target = detail.get("target")
+                old_value = detail.get("baseline_value")
+                new_value = detail.get("scenario_value")
+                effect = (
+                    final - terminal_value
+                    if isinstance(final,(int,float)) and isinstance(terminal_value,(int,float))
+                    else None
+                )
+                st.write(
+                    (f"**测试 {target}：{old_value} → {new_value}。** "
+                     f"重新计算的最终资产为 USD {final:,.2f}，"
+                     f"相对原策略变化 {effect:+,.2f} 美元。" if zh else
+                     f"**Test {target}: {old_value} → {new_value}.** "
+                     f"Recomputed ending value USD {final:,.2f}, difference {effect:+,.2f} USD.")
+                    if effect is not None else
+                    f"{target}: {old_value} → {new_value}"
+                )
+            st.caption("上述变化来自相同历史数据的重新执行，不能直接作为样本外有效性的证明。"
+                       if zh else "Recomputed on the same data; not out-of-sample evidence.")
+        with st.expander("实验标识与完整技术数据 / Technical experiment metadata", expanded=False):
+            st.markdown(
+                f"**Report:** `{report_dict.get('report_id')}` · "
+                f"**Baseline run:** `{report_dict.get('baseline_run_id')}` · "
+                f"**Proposal:** `{report_dict.get('proposal_id')}` · "
+                f"**Candidate:** `{report_dict.get('selected_candidate_id')}` · "
+                f"**Scenarios:** {len(scenarios)}"
+            )
 
         render_h2_scenario_viewers(report_dict)
 
@@ -212,7 +402,7 @@ def render_validation_h2_panel(
         attach = st.button(
             t("h2.attach"),
             key="persist_validation_report",
-            disabled=not v_gate.validation_allowed,
+            disabled=not v_gate.validation_allowed or h2_returned,
             help=t("h2.attach_help"),
         )
         if attach:
@@ -286,12 +476,19 @@ def render_validation_h2_panel(
     st.markdown(t("h2.approval_card"))
     render_h2_approval_card(report_dict)
 
+    st.markdown("### 你的验收意见" if zh else "### Your review decision")
+    st.caption(
+        "例如：‘只把手续费翻倍还不够。请增加比特币 3% 手续费，以及不同回看窗口的对照，"
+        "解释结果变化。’" if zh else
+        "Example: 'Please add a 3% Bitcoin fee stress case and an alternative "
+        "lookback window, then compare resulting portfolio metrics.'"
+    )
     h2_notes = st.text_area(
-        t("h2.notes"),
-        value="",
-        height=80,
-        key="h2_reviewer_notes",
-        help=t("h2.notes_help"),
+        "给 H2 Agent 的修改意见（退回时必填）" if zh else
+        "H2 revision feedback (required when returning this report)",
+        value="", height=125, key="h2_reviewer_notes",
+        help="说明哪些验证没做够、希望增加什么实验以及怎么判断改善。" if zh
+        else "Describe missing tests, desired computed scenarios and acceptance criteria.",
     )
 
     approve_col, revise_col = st.columns(2)
@@ -316,6 +513,12 @@ def render_validation_h2_panel(
             st.error(t("h2.init_before_decide"))
         elif not form_sig:
             st.error(t("common.sig_missing"))
+        elif revise_clicked and len(h2_notes.strip()) < 12:
+            st.error("请填写至少 12 字的具体修改意见。" if zh
+                     else "Provide at least 12 characters of actionable feedback.")
+        elif approve_clicked and h2_returned:
+            st.error("上次退回尚未实际重跑，不能批准原报告。" if zh
+                     else "Recompute the returned report before approving.")
         else:
             status_value = "approved" if approve_clicked else "revision_requested"
             try:

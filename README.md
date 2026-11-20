@@ -1,8 +1,27 @@
 # MCM C Research Lab
 
+## Guided research workflow (Draft PR #52 — local evaluation)
+
+The Research Lab now has a six-stage, bilingual user path:
+
+1. Understand the problem and record constraints.
+2. Inspect and compare uploaded datasets (the gold/Bitcoin joint chart requires explicit confirmation).
+3. Review research candidates, evidence gaps and **manually approve H1**.
+4. Run an **offline deterministic historical CSV backtest** or explicitly choose a synthetic demo, with source fingerprints.
+5. Re-upload the exact same historical files for sensitivity tests and **manually approve H2**.
+6. Build a traceable paper/LaTeX draft, download .tex/.bib files, and **manually approve H3**.
+
+For the historical 2022 MCM C path use files named LBMA-GOLD.csv (Date, USD (PM)) and BCHAIN-MKPRU.csv (Date, Value). The gold/Bitcoin data are user-supplied, *not* independently verified from an online market provider. Raw uploaded bytes and merged rows are deliberately not stored; a reopened run requires reuploading original files to continue. Only historical dataset hashes and compact result artifacts are persisted.
+
+**Important:** The backtest currently supports a fixed set of transparent deterministic baseline strategies. This is a reproducible experiment workbench, not a proof of an optimal trading strategy. The paper is a grounded **outline/draft**, not an automatically submission-ready MCM solution. Live trading, arbitrary generated Python code, automatic approvals and production hosting are not provided.
+
+**Windows Terminal/UI acceptance:** see [docs/UX_GUIDED_RESEARCH_ACCEPTANCE.md](docs/UX_GUIDED_RESEARCH_ACCEPTANCE.md). Run the tests on the PR branch, keep paid LLM options disabled, inspect the app and approve the PR only after local acceptance.
+
+---
+
 A semi-autonomous multi-agent research workspace for exploring MCM Problem C. The system is designed to support evidence-based problem decomposition, data analysis, modeling, validation, and LaTeX paper preparation.
 
-> **Status:** M0.5 evaluation baseline passed locally; Phase A Data-to-EDA remains in review on `feature/m1a-data-eda`; Phase B includes the Visual EDA Planner, chart validation, opt-in AI planning and mandatory human approval workflow on `feature/m1b-visual-eda` (awaiting final CI and local UI acceptance).
+> **Historical checkpoint (2026-11-05):** The M0.5/Phase A–B status text below describes earlier milestones; for the active guided-workflow evaluation see Draft PR #52 and the acceptance document above.
 
 ## Product principles
 

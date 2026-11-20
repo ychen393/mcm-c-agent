@@ -169,21 +169,27 @@ def run_deterministic_backtest(
     *,
     params: ExperimentParams,
     constraints: ProblemConstraintSnapshot,
+    price_bars: list[PriceBar] | None = None,
 ) -> tuple[Portfolio, list[dict[str, Any]], list[float], list[str]]:
-    """Execute the selected stub strategy on the synthetic fixture.
+    """Backtest a selected strategy on an explicitly supplied price series.
 
-    Past-data-only: decisions at day i use bars[0..i] only (never future bars).
+    If omitted, preserve the legacy offline synthetic fixture mode.
+    Decisions on day i only access bars[0..i].
     """
-    bars = load_price_fixture(params.price_fixture_id)
+    bars = list(price_bars) if price_bars is not None else load_price_fixture(params.price_fixture_id)
+    if not bars:
+        raise ValueError("Backtest requires a nonempty price series")
     portfolio = Portfolio(cash=float(constraints.initial_cash))
     trades: list[dict[str, Any]] = []
     equity: list[float] = []
     notes: list[str] = [
-        PRICE_FIXTURE_NOTE,
+        ("Uploaded historical CSV series (not a fixture)." if price_bars is not None
+         else PRICE_FIXTURE_NOTE),
         f"strategy_id={params.strategy_id}",
         f"past_data_only={constraints.past_data_only}",
     ]
-    last_gold = next((b.gold for b in bars if b.gold is not None), 0.0) or 0.0
+    # Do not look ahead to the first observed gold quote on early BTC-only days.
+    last_gold = 0.0
     alpha_g = float(constraints.alpha_gold)
     alpha_b = float(constraints.alpha_bitcoin)
     strategy = params.strategy_id
@@ -424,6 +430,8 @@ def execute_experiment_run(
     lookback_days: int = 3,
     rebalance_every_n_days: int = 5,
     allow_sandboxed_python: bool = False,
+    price_bars: list[PriceBar] | None = None,
+    price_sha256: dict[str, str] | None = None,
 ) -> ExperimentRun:
     """Build and execute one deterministic experiment run (no H1 check here).
 
@@ -450,13 +458,30 @@ def execute_experiment_run(
         method_family=candidate.method_family,
         explicit=strategy_id,
     )
+    real_data = price_bars is not None
+    if real_data:
+        if not price_bars or not price_sha256 or set(price_sha256) != {"gold", "bitcoin"}:
+            raise ValueError("Uploaded CSV execution requires both datasets and their SHA-256 identities")
+        if any(len(s) != 64 or any(ch not in "0123456789abcdef" for ch in s)
+               for s in price_sha256.values()):
+            raise ValueError("Invalid uploaded dataset SHA-256")
     params = build_experiment_params(
         constraints=constraints,
         strategy_id=resolved_strategy,
         lookback_days=lookback_days,
         rebalance_every_n_days=rebalance_every_n_days,
         allow_sandboxed_python=allow_sandboxed_python,
+        price_fixture_id=("uploaded_2022_mcm_c_csv_v1" if real_data else PRICE_FIXTURE_ID),
     )
+    if real_data:
+        params = params.model_copy(update={"extra": {
+            "source_mode": "uploaded_csv",
+            "gold_sha256": price_sha256["gold"],
+            "bitcoin_sha256": price_sha256["bitcoin"],
+            "first_date": price_bars[0].date,
+            "last_date": price_bars[-1].date,
+            "n_bars": len(price_bars),
+        }})
 
     started = _utc_now()
     sandbox_note = None
@@ -468,6 +493,7 @@ def execute_experiment_run(
     portfolio, trades, equity, notes = run_deterministic_backtest(
         params=params,
         constraints=constraints,
+        price_bars=price_bars,
     )
     finished = _utc_now()
     metrics = _metrics_from_portfolio(
@@ -476,8 +502,20 @@ def execute_experiment_run(
         equity=equity,
     )
 
-    meta = fixture_metadata(params.price_fixture_id)
-    bars = load_price_fixture(params.price_fixture_id)
+    if real_data:
+        meta = {
+            "source_mode": "uploaded_csv",
+            "gold_sha256": price_sha256["gold"],
+            "bitcoin_sha256": price_sha256["bitcoin"],
+            "start_date": price_bars[0].date,
+            "end_date": price_bars[-1].date,
+            "n_bars": len(price_bars),
+            "is_synthetic": False,
+        }
+        bars = price_bars
+    else:
+        meta = fixture_metadata(params.price_fixture_id)
+        bars = load_price_fixture(params.price_fixture_id)
     equity_series = [
         {
             "day_index": bars[i].day_index if i < len(bars) else i,
@@ -494,8 +532,10 @@ def execute_experiment_run(
         "max": max(equity) if equity else None,
         # Cap stored points for persistence safety.
         "sample_points": equity[:: max(1, len(equity) // 8)][:8],
-        # Full short fixture series for UI charts (14 bars max in CI fixture).
-        "series": equity_series[:64],
+        # Include the terminal point of multi-year real-data runs.
+        "series": ([equity_series[i] for i in
+                    sorted(set(round(j * (len(equity_series)-1)/63) for j in range(64)))]
+                   if len(equity_series) > 64 else equity_series),
     }
     trade_payload = {
         "n_trades": len(trades),
@@ -507,14 +547,15 @@ def execute_experiment_run(
         ModelArtifactRef(
             artifact_id=_stable_id("art", "equity", proposal_model.proposal_id, started),
             kind="equity_curve_summary",
-            summary="Compact equity curve summary over synthetic fixture window.",
+            summary=("Compact equity curve summary over uploaded historical CSV series."
+                     if real_data else "Compact equity curve summary over synthetic fixture window."),
             payload=equity_payload,
             content_sha256=_payload_sha(equity_payload),
         ),
         ModelArtifactRef(
             artifact_id=_stable_id("art", "trades", proposal_model.proposal_id, started),
             kind="trade_log_summary",
-            summary="Compact trade log (capped) from deterministic runner.",
+            summary="Compact trade log (first 12 transactions) from deterministic runner.",
             payload=trade_payload,
             content_sha256=_payload_sha(trade_payload),
         ),
@@ -527,8 +568,9 @@ def execute_experiment_run(
         ),
         ModelArtifactRef(
             artifact_id=_stable_id("art", "fixture", proposal_model.proposal_id, started),
-            kind="price_fixture_ref",
-            summary=PRICE_FIXTURE_NOTE,
+            kind="price_upload_ref" if real_data else "price_fixture_ref",
+            summary=("Uploaded CSV dataset SHA-256 provenance (not stored raw)." if real_data
+                     else PRICE_FIXTURE_NOTE),
             payload=dict(meta),
             content_sha256=_payload_sha(dict(meta)),
         ),
@@ -550,8 +592,9 @@ def execute_experiment_run(
             note=f"mapped from method_family={candidate.method_family}",
         ),
         ExperimentCodeRef(
-            kind="fixture_id",
-            value=params.price_fixture_id,
+            kind="dataset_sha256" if real_data else "fixture_id",
+            value=(price_sha256["bitcoin"] if real_data else params.price_fixture_id),
+            note=("Bitcoin input SHA-256; gold SHA-256 in params.extra" if real_data else None),
         ),
         ExperimentCodeRef(
             kind="prompt_version",
@@ -572,7 +615,7 @@ def execute_experiment_run(
     return ExperimentRun(
         run_id=run_id,
         status="completed",
-        strategy="deterministic_fixture",
+        strategy="deterministic_uploaded_csv" if real_data else "deterministic_fixture",
         proposal_id=proposal_model.proposal_id,
         selected_candidate_id=selected_candidate_id,
         candidate_title=candidate.title,

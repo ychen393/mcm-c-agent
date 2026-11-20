@@ -13,6 +13,7 @@ from typing import Any
 
 from core.config import Settings, get_settings
 from modeling.gate import assert_modeling_allowed, modeling_gate_status
+from modeling.fixture_data import PriceBar
 from modeling.runner import (
     PROMPT_VERSION,
     SANDBOX_UNAVAILABLE_NOTE,
@@ -107,6 +108,8 @@ def run_modeling_experiment(
     rebalance_every_n_days: int = 5,
     allow_sandboxed_python: bool | None = None,
     settings: Settings | None = None,
+    price_bars: list[PriceBar] | None = None,
+    price_sha256: dict[str, str] | None = None,
 ) -> ExperimentReport:
     """Run a deterministic experiment when H1 is approved; else raise PermissionError."""
     assert_modeling_allowed(state)
@@ -132,10 +135,13 @@ def run_modeling_experiment(
         lookback_days=lookback_days,
         rebalance_every_n_days=rebalance_every_n_days,
         allow_sandboxed_python=sandbox,
+        price_bars=price_bars,
+        price_sha256=price_sha256,
     )
 
     notes = [
-        "Phase 6 deterministic fixture runner completed.",
+        ("Phase 6 uploaded historical CSV backtest completed." if price_bars is not None
+         else "Phase 6 deterministic fixture runner completed."),
         f"modeling_gate.reason={gate.reason}",
         "Attach results, then run Validation / H2 (Phase 7) separately.",
     ]
@@ -151,7 +157,7 @@ def run_modeling_experiment(
         modeling_allowed=True,
         runs=[run],
         latest_run_id=run.run_id,
-        strategy="deterministic_fixture",
+        strategy=("deterministic_uploaded_csv" if price_bars is not None else "deterministic_fixture"),
         invented_results=False,
         live_trading_api_used=False,
         agent_prompt_version=PROMPT_VERSION,

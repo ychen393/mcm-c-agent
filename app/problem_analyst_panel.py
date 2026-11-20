@@ -4,7 +4,8 @@ from __future__ import annotations
 from typing import Any, MutableMapping
 
 import streamlit as st
-from app.i18n import t
+from app.i18n import get_locale, t
+from app.problem_narrative import is_2022_trading_spec, render_trading_problem_brief
 
 from agents.problem_analyst import analyze_problem
 from core.config import Settings
@@ -34,9 +35,24 @@ def render_problem_specification_summary(spec_dict: dict[str, Any]) -> None:
     title = str(spec_dict.get("title") or t("pa.untitled"))
     problem_id = str(spec_dict.get("problem_id") or "unknown")
     strategy = str(spec_dict.get("strategy") or "unknown")
-    st.markdown(f"**{title}**")
-    st.caption(f"problem_id={problem_id} · strategy={strategy}")
-
+    st.markdown(
+        "**2022 MCM C：黄金与比特币交易策略**"
+        if get_locale() == "zh" and is_2022_trading_spec(spec_dict)
+        else f"**{title}**"
+    )
+    with st.expander("分析来源与技术标识 / Analysis provenance", expanded=False):
+        st.caption(f"Original title: {title}")
+        st.caption(f"problem_id={problem_id} · strategy={strategy}")
+        if strategy == "agent":
+            st.caption(
+                f"Structured LLM analyst: {spec_dict.get('analyst_provider') or 'unknown'}"
+                f" / {spec_dict.get('analyst_model') or 'unknown'}"
+            )
+        else:
+            st.caption("Offline deterministic extraction; no language-model call.")
+    render_trading_problem_brief(spec_dict)
+    if get_locale() == "zh":
+        st.caption("原始研究条目仍保留英文以便核对题目；上方是针对本题的中文研究解释。")
     questions = _item_statements(spec_dict.get("research_questions"))
     objectives = _item_statements(spec_dict.get("objectives"))
     constraints = _item_statements(spec_dict.get("constraints"))
@@ -44,55 +60,56 @@ def render_problem_specification_summary(spec_dict: dict[str, Any]) -> None:
     subproblems = _item_statements(spec_dict.get("subproblems"))
     risks = _item_statements(spec_dict.get("unknowns_or_risks"))
 
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(t("pa.research_questions"))
-        if questions:
-            for q in questions:
-                st.write(f"- {q}")
-        else:
-            st.caption(t("pa.none_recorded"))
-        st.markdown(t("pa.objectives"))
-        if objectives:
-            for item in objectives:
-                st.write(f"- {item}")
-        else:
-            st.caption(t("pa.none_recorded"))
-        st.markdown(t("pa.constraints"))
-        if constraints:
-            for item in constraints:
-                st.write(f"- {item}")
-        else:
-            st.caption(t("pa.none_recorded"))
-    with c2:
-        st.markdown(t("pa.datasets"))
-        if datasets:
-            for item in datasets:
-                st.write(f"- {item}")
-        else:
-            dataset_files = []
-            raw = spec_dict.get("supplied_datasets")
-            if isinstance(raw, list):
-                for item in raw:
-                    if isinstance(item, dict) and item.get("file_name"):
-                        dataset_files.append(str(item["file_name"]))
-            if dataset_files:
-                for name in dataset_files[:5]:
-                    st.write(f"- {name}")
+    with st.expander("查看原始研究条目 / Extracted specification fields", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown(t("pa.research_questions"))
+            if questions:
+                for q in questions:
+                    st.write(f"- {q}")
             else:
                 st.caption(t("pa.none_recorded"))
-        st.markdown(t("pa.subproblems"))
-        if subproblems:
-            for item in subproblems:
-                st.write(f"- {item}")
-        else:
-            st.caption(t("pa.none_recorded"))
-        st.markdown(t("pa.unknowns"))
-        if risks:
-            for item in risks:
-                st.write(f"- {item}")
-        else:
-            st.caption(t("pa.none_recorded"))
+            st.markdown(t("pa.objectives"))
+            if objectives:
+                for item in objectives:
+                    st.write(f"- {item}")
+            else:
+                st.caption(t("pa.none_recorded"))
+            st.markdown(t("pa.constraints"))
+            if constraints:
+                for item in constraints:
+                    st.write(f"- {item}")
+            else:
+                st.caption(t("pa.none_recorded"))
+        with c2:
+            st.markdown(t("pa.datasets"))
+            if datasets:
+                for item in datasets:
+                    st.write(f"- {item}")
+            else:
+                dataset_files = []
+                raw = spec_dict.get("supplied_datasets")
+                if isinstance(raw, list):
+                    for item in raw:
+                        if isinstance(item, dict) and item.get("file_name"):
+                            dataset_files.append(str(item["file_name"]))
+                if dataset_files:
+                    for name in dataset_files[:5]:
+                        st.write(f"- {name}")
+                else:
+                    st.caption(t("pa.none_recorded"))
+            st.markdown(t("pa.subproblems"))
+            if subproblems:
+                for item in subproblems:
+                    st.write(f"- {item}")
+            else:
+                st.caption(t("pa.none_recorded"))
+            st.markdown(t("pa.unknowns"))
+            if risks:
+                for item in risks:
+                    st.write(f"- {item}")
+            else:
+                st.caption(t("pa.none_recorded"))
 
     with st.expander(t("pa.json_expander"), expanded=False):
         st.json(spec_dict)
@@ -138,7 +155,20 @@ def render_problem_analyst_panel(
 ) -> dict[str, Any] | None:
     """Render analyst controls. Returns the latest spec dict if one is available."""
     st.subheader(t("pa.subheader"))
-    st.caption(t("pa.caption"))
+    st.caption(
+        "协作流程：① Problem Analyst 结构化提取 → ② 约束/风险审阅 → "
+        "③ EDA 数据专家 → ④ Research Strategist → ⑤ Debate Critic → ⑥ 人工 H1。"
+        if get_locale() == "zh" else
+        "Workflow: Problem Analyst → Constraint review → EDA analyst → "
+        "Research Strategist → Debate Critic → human H1."
+    )
+    st.info(
+        "启用 LLM 后会调用你配置的模型 API，可能产生费用；不启用时仅运行离线规则，"
+        "不会把规则输出伪称为 LLM 多 Agent 结果。"
+        if get_locale() == "zh" else
+        "Enabling LLM sends the statement to your configured provider and may incur charges. "
+        "Without it, extraction uses an offline rule-based specialist, not a live LLM team."
+    )
 
     use_llm = st.checkbox(
         t("pa.use_llm"),
@@ -172,14 +202,81 @@ def render_problem_analyst_panel(
             else:
                 spec_dict = spec.model_dump(mode="json")
                 st.session_state[PROBLEM_SPEC_SESSION_KEY] = spec_dict
-                if st.session_state.get("last_run") is not None:
-                    updated = dict(st.session_state["last_run"])
+                recorded = st.session_state.get("last_run")
+                if isinstance(recorded, dict) and recorded.get("run_id"):
+                    updated = dict(recorded)
                     updated["problem_specification"] = spec_dict
+                    # A revised problem statement invalidates all downstream approvals.
+                    for key in ("eda_report", "evidence_report", "research_proposal",
+                                "validation_report", "paper_outline", "latex_source",
+                                "review_report"):
+                        updated.pop(key, None)
+                    updated["model_artifacts"] = []
+                    updated["experiment_logs"] = []
+                    phases = dict(updated.get("workspace_phases") or {})
+                    for phase in ("independent_eda", "literature_evidence",
+                                  "research_strategy", "research_proposal", "h1",
+                                  "strategy_modeling", "modeling_experiment",
+                                  "validation_sensitivity", "h2", "paper_latex",
+                                  "h3", "e2e_acceptance"):
+                        phases.pop(phase, None)
+                    phases["independent_eda"] = (
+                        "ready" if updated.get("uploaded_files") else "not ready"
+                    )
+                    updated["workspace_phases"] = phases
+                    approval = dict(updated.get("approval_status") or {})
+                    # These gates are not even pending until their own research
+                    # artifacts exist. Otherwise progress jumps straight to H1.
+                    for gate in ("h1", "h2", "h3", "chart_plan"):
+                        approval.pop(gate, None)
+                    updated["approval_status"] = approval
+                    decision = dict(updated.get("decision_report") or {})
+                    for key in ("h1", "h2", "h3", "experiment", "validation",
+                                "paper", "critique"):
+                        decision.pop(key, None)
+                    updated["decision_report"] = decision
+                    signature = st.session_state.get("foundation_input_signature")
+                    if signature:
+                        try:
+                            # Deferred imports avoid the UI cache/persistence import cycle.
+                            from app.persistence_panel import get_or_create_store
+                            from database.repositories import build_project_store
+                            store = get_or_create_store(
+                                lambda: build_project_store(settings)
+                            )
+                            _project, run_record, persisted = store.save_project_state(
+                                project_id=str(recorded.get("project_id") or "mcm-c-demo"),
+                                project_name=str(recorded.get("project_name") or "MCM C Demo Project"),
+                                state=updated,
+                                input_signature=str(signature),
+                                note="problem-analyst-reviewed",
+                            )
+                            updated = dict(persisted)
+                            updated["run_id"] = run_record.run_id
+                            st.session_state.pop("problem_aware_eda_plan", None)
+                            st.session_state.pop("research_proposal_draft", None)
+                            st.session_state.pop("debate_critique_draft", None)
+                        except Exception as exc:
+                            st.error(
+                                "Problem analysis was generated but not saved: "
+                                f"{type(exc).__name__}: {exc}"
+                            )
+                    else:
+                        st.warning("Please initialize the project to save this analysis.")
                     st.session_state["last_run"] = updated
                 st.success(
                     f"Validated ProblemSpecification · problem_id={spec.problem_id} · "
                     f"strategy={spec.strategy}"
                 )
+                if spec.fallback_reason:
+                    st.warning("Agent fallback / 分析降级：" + spec.fallback_reason)
+                elif spec.strategy == "agent":
+                    st.caption(
+                        f"LLM Problem Analyst: {spec.analyst_provider} / {spec.analyst_model}. "
+                        "This is one model analyst, not yet a completed research-team review."
+                    )
+                else:
+                    st.caption("Offline deterministic Problem Analyst (no paid model call).")
                 if spec.problem_id == "2022_mcm_c":
                     checks = acceptance_checklist_2022_c(spec)
                     failed = [name for name, ok in checks.items() if not ok]
@@ -192,6 +289,24 @@ def render_problem_analyst_panel(
 
     if spec_dict:
         render_problem_specification_summary(spec_dict)
+        st.info(
+            "题意拆解已完成。接下来上传数据、查看质量/价格/收益/回撤图表，"
+            "再据此审查模型，而不是马上宣布最优模型。"
+            if get_locale() == "zh" else
+            "Problem intake is ready. Next, upload and explore actual datasets "
+            "before accepting a supposedly optimal model."
+        )
+        if st.button(
+            "继续到第二阶段：EDA 数据分析 →" if get_locale() == "zh"
+            else "Continue to Stage 2: EDA →",
+            key="problem_to_eda",
+            type="primary",
+        ):
+            if not isinstance(st.session_state.get("last_run"), dict):
+                st.warning("Please initialize and save the project first.")
+            else:
+                st.session_state["guided_stage_target"] = 1
+                st.rerun()
     else:
         st.info(t("pa.none_yet"))
 

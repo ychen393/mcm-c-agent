@@ -10,7 +10,8 @@ from __future__ import annotations
 from typing import Any, MutableMapping
 
 import streamlit as st
-from app.i18n import t
+from app.i18n import get_locale, t
+from agents.paper_revision import revise_paper_with_feedback
 
 from agents.paper_planner import paper_planner_status, run_paper_planner
 from app.artifact_viewers import (
@@ -115,13 +116,12 @@ def render_paper_h3_panel(
         f"pdf_compile_required_for_ci={status['pdf_compile_required_for_ci']}"
     )
 
-    use_llm = st.checkbox(
-        t("h3.use_llm"),
-        value=bool(settings.paper_use_llm),
-        help=t("h3.use_llm_help"),
-        key="paper_use_llm_ui",
-    )
-    st.caption(t("h3.llm_effective", effective=use_llm, settings=settings.paper_use_llm))
+    zh = get_locale() == "zh"
+    use_llm = False
+    with st.expander("技术配置 / Technical settings", expanded=False):
+        st.caption("常规论文草稿生成是离线流程，真实反馈修订只在用户授权后调用 LLM。"
+                   if zh else
+                   "Standard paper draft is offline; LLM editorial revision requires separate consent.")
     attempt_pdf = st.checkbox(
         t("h3.attempt_pdf"),
         value=False,
@@ -130,8 +130,13 @@ def render_paper_h3_panel(
     )
 
     package_dict = resolve_displayed_paper_package(recorded_state)
+    saved_state = st.session_state.get("last_run")
+    current_state = saved_state if isinstance(saved_state,dict) else recorded_state
+    h3_decision = ((current_state or {}).get("decision_report") or {}).get("h3") or {}
+    h3_status_current = h3_decision.get("status") or ((current_state or {}).get("approval_status") or {}).get("h3")
+    h3_returned = h3_status_current == "revision_requested"
 
-    run_disabled = not p_gate.paper_allowed
+    run_disabled = not p_gate.paper_allowed or h3_returned
     run = st.button(
         t("h3.run"),
         type="primary",
@@ -182,23 +187,126 @@ def render_paper_h3_panel(
                             or "PDF compile soft-failed (not required for CI)."
                         )
 
+    if package_dict and h3_returned:
+        st.markdown("### 按照你的审稿意见重新写论文" if zh
+                    else "### Rewrite the paper using your actual review comments")
+        feedback = str(h3_decision.get("notes") or "").strip()
+        st.write(("**你的原话：** " if zh else "**Your feedback:** ") + feedback)
+        st.caption(
+            "先由模型实际修改已有章节，再重新生成 LaTeX 和参考文献文件，"
+            "运行结构与引用检查，并交给第二个独立 Agent 审查。"
+            "不会擅自增加数据、编造实验、添加未经核实的文献。"
+            if zh else
+            "The model edits actual sections; code rebuilds LaTeX and checks citations "
+            "before a second model critiques the revision. It never fabricates experiments or sources."
+        )
+        consent = st.checkbox(
+            "授权两次 LLM API 请求修改论文并独立审查（可能收费）"
+            if zh else
+            "I authorize two provider-model calls for H3 editing and critique (may incur charges)",
+            value=False, key="h3_revision_model_consent",
+        )
+        rerun = st.button(
+            "根据意见重写论文 → 重建 LaTeX → 再审查" if zh
+            else "Rewrite paper from feedback → rebuild LaTeX → review",
+            key="h3_regenerate_from_feedback", type="primary",
+        )
+        if rerun:
+            if not consent:
+                st.warning("请先明确授权这两次模型请求；原论文未被修改。"
+                           if zh else "Explicit provider-call consent is required; paper unchanged.")
+            elif len(feedback)<12:
+                st.error("请先提交至少 12 字的具体修改意见。" if zh
+                         else "Original review needs at least 12 characters.")
+            elif not isinstance(current_state,dict) or not current_state.get("run_id"):
+                st.error(t("h3.init_before_decide"))
+            else:
+                signature = input_signature or st.session_state.get("foundation_input_signature")
+                if not signature:
+                    st.error(t("common.sig_missing"))
+                else:
+                    try:
+                        with st.spinner("改写论文、重建 LaTeX、检查证据并进行独立审查…" if zh
+                                        else "Rewriting, rebuilding and independently reviewing…"):
+                            revised, audit = revise_paper_with_feedback(
+                                state=current_state, package=package_dict,
+                                feedback=feedback, settings=settings,
+                                language="zh" if zh else "en",
+                            )
+                            store = get_or_create_store(lambda: build_project_store(settings))
+                            saved = persist_paper_into_state(
+                                store,
+                                project_id=str(project_id or current_state.get("project_id") or "mcm-c-demo"),
+                                project_name=str(project_name or current_state.get("project_name") or "MCM C Demo Project"),
+                                state=current_state,
+                                input_signature=str(signature),
+                                package=revised,
+                                revision_record=audit,
+                                note="h3-feedback-paper-revision",
+                            )
+                        st.session_state["last_run"] = saved
+                        st.session_state[PAPER_SESSION_KEY] = (
+                            (saved.get("decision_report") or {}).get("paper")
+                        )
+                        st.success("已生成新版论文、LaTeX 与独立审查记录；H3 仍待你批准。"
+                                   if zh else "Revised paper and LaTeX saved; H3 awaits human reapproval.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(("论文修改失败，旧版和退回状态保持不变：" if zh else
+                                  "Paper revision failed; original package and review untouched: ")
+                                 + f"{type(exc).__name__}: {exc}")
+
+    history = (((st.session_state.get("last_run") or {}).get("decision_report") or {})
+               .get("h3_revision_history") or [])
+    if isinstance(history,list) and history:
+        latest=history[-1]
+        st.markdown("### 修改前后，论文有什么变化？" if zh
+                    else "### Which paper sections actually changed?")
+        with st.container(border=True):
+            for cn,en,key in [
+                ("你的修改意见","Human feedback","feedback"),
+                ("原章节","Before","before"),
+                ("修改后章节","After","after"),
+                ("修改说明","What changed","changes_made"),
+                ("独立审查人意见","Independent Critic","critic_feedback"),
+            ]:
+                st.write(f"**{cn if zh else en}：** {latest.get(key) or ''}")
+            st.caption("LaTeX 已重新生成；引用与实验数值不允许虚构；H3 必须再次人工批准。"
+                       if zh else "LaTeX regenerated; no invented evidence or automatic H3 approval.")
+
     if package_dict:
         outline = package_dict.get("outline") or {}
         latex = package_dict.get("latex") or {}
         review = package_dict.get("review") or {}
         st.markdown(
-            f"**Package:** `{package_dict.get('package_id')}` · "
-            f"**Outline:** `{outline.get('outline_id')}` · "
-            f"**Title:** {outline.get('title')} · "
-            f"**Sections:** {len(outline.get('sections') or [])} · "
-            f"**Bib entries:** {len(outline.get('bib_entries') or [])}"
+            ("### 论文草稿：" if zh else "### Paper draft: ")
+            + str(outline.get("title") or "Untitled")
         )
+        st.caption(
+            "下面是已生成的正文框架，可以展开每章检查内容。"
+            "如果论证不够、文字不清楚或遗漏限制，请在底部写具体意见并退回。"
+            if zh else
+            "Expand sections to inspect the actual draft; request concrete revisions "
+            "when explanations, evidence or limitations are incomplete."
+        )
+        with st.expander("内部版本标识 / Technical package identifiers",expanded=False):
+            st.markdown(
+                f"**Package:** `{package_dict.get('package_id')}` · "
+                f"**Outline:** `{outline.get('outline_id')}` · "
+                f"**Title:** {outline.get('title')} · "
+                f"**Sections:** {len(outline.get('sections') or [])} · "
+                f"**Bib entries:** {len(outline.get('bib_entries') or [])}"
+            )
 
+        if outline.get("strategy") == "deterministic_uploaded_csv":
+            st.success("论文草稿已关联真实 CSV 实验与敏感性结果（仍需人工核对论证与参考文献）。")
+        else:
+            st.warning("本论文大纲基于合成测试数据，只能作为结构示例，不能作为正式竞赛成果。")
         render_paper_pdf_preview(package_dict)
 
-        for section in outline.get("sections") or []:
+        for n, section in enumerate(outline.get("sections") or [], start=1):
             with st.expander(
-                f"{section.get('section_id')} · {section.get('title')} · {section.get('kind')}",
+                f"{n}. {section.get('title')}",
                 expanded=section.get("kind") in {"abstract", "methods"},
             ):
                 st.write(section.get("summary") or "")
@@ -240,6 +348,21 @@ def render_paper_h3_panel(
                     st.info(text)
 
         if latex and latex.get("tex_source"):
+            st.download_button(
+                "下载 LaTeX 草稿 / Download .tex",
+                data=latex["tex_source"].encode("utf-8"),
+                file_name="mcm_c_paper_draft.tex",
+                mime="text/plain",
+                key="paper_download_tex",
+            )
+            if latex.get("bib_source"):
+                st.download_button(
+                    "下载参考文献 / Download .bib",
+                    data=latex["bib_source"].encode("utf-8"),
+                    file_name="mcm_c_references.bib",
+                    mime="text/plain",
+                    key="paper_download_bib",
+                )
             with st.expander("LaTeX source (.tex)", expanded=False):
                 st.code(latex.get("tex_source"), language="latex")
             if latex.get("bib_source"):
@@ -252,7 +375,7 @@ def render_paper_h3_panel(
         attach = st.button(
             t("h3.attach"),
             key="persist_paper_package",
-            disabled=not p_gate.paper_allowed,
+            disabled=not p_gate.paper_allowed or h3_returned,
             help=t("h3.attach_help"),
         )
         if attach:
@@ -331,12 +454,20 @@ def render_paper_h3_panel(
     st.markdown(t("h3.approval_card"))
     render_h3_approval_card(package_dict)
 
+    st.markdown("### 论文需要修改什么？" if zh else "### What would make the paper acceptable?")
+    st.caption(
+        "例如：‘结果章节只有一句话，请用已计算的期末资产价值解释比较结果；"
+        "结论必须写清手续费影响和不能证明全局最优的限制。’"
+        if zh else
+        "Example: 'Rewrite the results section around measured terminal wealth; "
+        "explain fee sensitivity and avoid claiming global optimality.'"
+    )
     h3_notes = st.text_area(
-        t("h3.notes"),
-        value="",
-        height=80,
-        key="h3_reviewer_notes",
-        help=t("h3.notes_help"),
+        "给论文 Agent 的修改意见（退回时必填）" if zh else
+        "H3 paper revision feedback (required if returning)",
+        value="", height=130, key="h3_reviewer_notes",
+        help="指出具体章节、错误或不清楚的论证，并说明想看到什么修改。" if zh
+        else "Name sections, weaknesses and required changes.",
     )
 
     approve_col, revise_col = st.columns(2)
@@ -361,6 +492,12 @@ def render_paper_h3_panel(
             st.error(t("h3.init_before_decide"))
         elif not form_sig:
             st.error("Foundation signature missing; re-initialize the project.")
+        elif revise_clicked and len(h3_notes.strip())<12:
+            st.error("请至少填写 12 字的具体论文修改意见。" if zh
+                     else "Provide at least 12 characters of actionable paper feedback.")
+        elif approve_clicked and h3_returned:
+            st.error("原方案已被退回，必须先重新写论文才能批准。" if zh
+                     else "Regenerate the returned paper before approval.")
         else:
             status_value = "approved" if approve_clicked else "revision_requested"
             try:

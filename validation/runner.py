@@ -11,6 +11,8 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timezone
+from functools import partial
+from modeling.fixture_data import PriceBar
 from typing import Any
 
 from modeling.constraints import extract_problem_constraints
@@ -240,6 +242,9 @@ def _params_from_baseline(
         for key in ("initial_cash", "alpha_gold", "alpha_bitcoin"):
             if key in params_raw and params_raw[key] is not None:
                 updates[key] = params_raw[key]
+        # Preserve uploaded CSV identities; never downgrade real data to fixtures.
+        if isinstance(params_raw.get("extra"), dict):
+            updates["extra"] = dict(params_raw["extra"])
         if updates:
             params = params.model_copy(update=updates)
             constraints = constraints.model_copy(
@@ -263,10 +268,12 @@ def _run_scenario(
     params: ExperimentParams,
     constraints: ProblemConstraintSnapshot,
     perturbations: list[PerturbationSpec],
+    price_bars: list[PriceBar] | None = None,
 ) -> SensitivityScenario:
     portfolio, _trades, equity, notes = run_deterministic_backtest(
         params=params,
         constraints=constraints,
+        price_bars=price_bars,
     )
     metrics = _metrics_from_portfolio(
         portfolio,
@@ -302,17 +309,19 @@ def build_default_scenarios(
     baseline_metrics: dict[str, MetricSnapshot],
     params: ExperimentParams,
     constraints: ProblemConstraintSnapshot,
+    price_bars: list[PriceBar] | None = None,
 ) -> list[SensitivityScenario]:
     """Construct the CI-safe default sensitivity suite for 2022 MCM C."""
     baseline_run_id = str(baseline_run["run_id"])
     scenarios: list[SensitivityScenario] = []
+    run_scenario = partial(_run_scenario, price_bars=price_bars)
 
     # 1) Cost: double gold commission
     alpha_g_hi = _clamp_alpha(params.alpha_gold * 2.0 if params.alpha_gold > 0 else 0.02)
     c1 = constraints.model_copy(update={"alpha_gold": alpha_g_hi})
     p1 = params.model_copy(update={"alpha_gold": alpha_g_hi})
     scenarios.append(
-        _run_scenario(
+        run_scenario(
             scenario_id="scn_cost_alpha_gold_x2",
             kind="cost",
             label="Gold commission ×2",
@@ -347,7 +356,7 @@ def build_default_scenarios(
     c2 = constraints.model_copy(update={"alpha_bitcoin": alpha_b_hi})
     p2 = params.model_copy(update={"alpha_bitcoin": alpha_b_hi})
     scenarios.append(
-        _run_scenario(
+        run_scenario(
             scenario_id="scn_cost_alpha_btc_x2",
             kind="cost",
             label="Bitcoin commission ×2",
@@ -379,7 +388,7 @@ def build_default_scenarios(
     lookback_lo = _clamp_days(max(1, params.lookback_days - 2))
     p3 = params.model_copy(update={"lookback_days": lookback_lo})
     scenarios.append(
-        _run_scenario(
+        run_scenario(
             scenario_id="scn_window_lookback_short",
             kind="window",
             label="Shorter lookback window",
@@ -406,7 +415,7 @@ def build_default_scenarios(
     lookback_hi = _clamp_days(params.lookback_days + 2)
     p4 = params.model_copy(update={"lookback_days": lookback_hi})
     scenarios.append(
-        _run_scenario(
+        run_scenario(
             scenario_id="scn_window_lookback_long",
             kind="window",
             label="Longer lookback window",
@@ -432,7 +441,7 @@ def build_default_scenarios(
     rebalance_hi = _clamp_days(params.rebalance_every_n_days + 3)
     p5 = params.model_copy(update={"rebalance_every_n_days": rebalance_hi})
     scenarios.append(
-        _run_scenario(
+        run_scenario(
             scenario_id="scn_param_rebalance_slower",
             kind="param",
             label="Slower rebalance cadence",
@@ -465,7 +474,7 @@ def build_default_scenarios(
     )
     p6 = params.model_copy(update={"alpha_gold": alpha_g_c, "alpha_bitcoin": alpha_b_c})
     scenarios.append(
-        _run_scenario(
+        run_scenario(
             scenario_id="scn_combined_costs_x1_5",
             kind="combined",
             label="Both commissions ×1.5",
@@ -498,6 +507,8 @@ def build_default_scenarios(
 
 def _robustness_notes(
     scenarios: list[SensitivityScenario],
+    *,
+    uploaded: bool = False,
 ) -> list[RobustnessNote]:
     notes: list[RobustnessNote] = []
     # Terminal-value relative swings.
@@ -537,7 +548,8 @@ def _robustness_notes(
                 severity="info",
                 summary=(
                     f"Cost-stress coverage: {len(cost_scenarios)} scenario(s) "
-                    "perturb αgold and/or αbitcoin on the synthetic fixture."
+                    "perturb αgold and/or αbitcoin on the "
+                    + ("uploaded historical CSV series." if uploaded else "synthetic fixture.")
                 ),
                 related_scenario_ids=[s.scenario_id for s in cost_scenarios],
                 related_metric_ids=["m_cost_paid", "m_terminal_value"],
@@ -564,9 +576,12 @@ def _robustness_notes(
             note_id="rn_fixture_limitation",
             severity="info",
             summary=(
-                "Sensitivity uses the Phase 6 synthetic 2022 MCM C price fixture, "
-                "not live LBMA/BCHAIN series. Treat results as CI-safe robustness "
-                "signals, not competition-grade validation."
+                ("Sensitivity uses uploaded historical CSV series. This is in-sample "
+                 "sensitivity analysis, not proof of optimality or out-of-sample performance."
+                 if uploaded else
+                 "Sensitivity uses the Phase 6 synthetic 2022 MCM C price fixture, "
+                 "not live LBMA/BCHAIN series. Treat results as CI-safe robustness "
+                 "signals, not competition-grade validation.")
             ),
             related_scenario_ids=[s.scenario_id for s in scenarios[:4]],
             related_metric_ids=[],
@@ -583,6 +598,9 @@ def execute_validation_report(
     problem_specification: ProblemSpecification | dict[str, Any] | None = None,
     problem_id: str | None = None,
     llm_enabled: bool = False,
+    price_bars: list[PriceBar] | None = None,
+    price_sha256: dict[str, str] | None = None,
+    extra_scenarios: list[dict[str, Any]] | None = None,
 ) -> ValidationReport:
     """Build a deterministic ValidationReport from a Phase 6 experiment payload.
 
@@ -600,13 +618,83 @@ def execute_validation_report(
         baseline_run,
         problem_specification=problem_specification,
     )
+    uploaded = (params.extra or {}).get("source_mode") == "uploaded_csv"
+    if uploaded:
+        hashes = params.extra or {}
+        if not price_bars or not price_sha256 or (
+            hashes.get("gold_sha256") != price_sha256.get("gold")
+            or hashes.get("bitcoin_sha256") != price_sha256.get("bitcoin")
+        ):
+            raise ValueError("Re-upload the exact original gold and bitcoin CSVs (SHA-256 mismatch or missing)")
+        if (hashes.get("first_date") != price_bars[0].date
+            or hashes.get("last_date") != price_bars[-1].date
+            or hashes.get("n_bars") != len(price_bars)):
+            raise ValueError("Uploaded series dates/count do not match original experiment")
+    elif price_bars is not None:
+        raise ValueError("Fixture-based experiments cannot be validated against unrelated uploaded data")
     scenarios = build_default_scenarios(
         baseline_run=baseline_run,
         baseline_metrics=baseline_metrics,
         params=params,
         constraints=constraints,
+        price_bars=price_bars,
     )
-    robustness = _robustness_notes(scenarios)
+    # Revisions may add *computed* allowlisted stress scenarios, never AI
+    # supplied metric values. Every scenario uses the SAME source price bars,
+    # baseline identity and the deterministic trading execution engine.
+    if extra_scenarios:
+        if len(extra_scenarios) > 3:
+            raise ValueError("At most three human-requested extra scenarios")
+        import math
+        for n, request in enumerate(extra_scenarios, 1):
+            if not isinstance(request, dict) or set(request) != {"target", "value", "rationale"}:
+                raise ValueError("Each requested scenario requires target, value and rationale")
+            target = request["target"]
+            if target not in {"alpha_gold", "alpha_bitcoin", "lookback_days",
+                              "rebalance_every_n_days"}:
+                raise ValueError(f"Unsupported validation change: {target}; rerun not claimed")
+            value = request["value"]
+            if isinstance(value, bool) or not isinstance(value, (float, int)) or not math.isfinite(value):
+                raise ValueError("Scenario value must be a finite number")
+            if target.startswith("alpha_"):
+                if not 0 <= value <= 0.10:
+                    raise ValueError("Commission stress must be between 0 and 10 percent")
+            else:
+                if not 1 <= value <= 60 or int(value) != value:
+                    raise ValueError("Lookback/rebalance window must be a whole number from 1 to 60")
+                value = int(value)
+            desc = str(request["rationale"]).strip()
+            if len(desc) < 8 or len(desc) > 350:
+                raise ValueError("Scenario rationale must have 8–350 characters")
+            old = getattr(params, target)
+            if old == value:
+                raise ValueError("Feedback scenario duplicates the baseline parameter")
+            changed_params = params.model_copy(update={target: value})
+            changed_constraints = (
+                constraints.model_copy(update={target: value})
+                if target.startswith("alpha_") else constraints
+            )
+            scenarios.append(
+                _run_scenario(
+                    scenario_id=f"scn_feedback_{n}_{target}",
+                    kind="cost" if target.startswith("alpha_") else
+                         ("window" if target == "lookback_days" else "param"),
+                    label=f"Reviewer request {n}: {target} = {value}",
+                    description=desc,
+                    baseline_run_id=str(baseline_run["run_id"]),
+                    baseline_metrics=baseline_metrics,
+                    params=changed_params,
+                    constraints=changed_constraints,
+                    perturbations=[PerturbationSpec(
+                        target=target,
+                        description=desc,
+                        baseline_value=old,
+                        scenario_value=value,
+                    )],
+                    price_bars=price_bars,
+                )
+            )
+    robustness = _robustness_notes(scenarios, uploaded=uploaded)
 
     llm_attempted = bool(llm_enabled)
     llm_note = LLM_UNAVAILABLE_NOTE if llm_attempted else None
@@ -618,9 +706,11 @@ def execute_validation_report(
         selected_candidate_id,
         str(baseline_run["run_id"]),
         started,
+        json.dumps(extra_scenarios or [], sort_keys=True, ensure_ascii=False),
     )
     notes = [
-        "Phase 7 deterministic sensitivity runner completed.",
+        ("Phase 7 uploaded CSV sensitivity runner completed." if uploaded else
+         "Phase 7 synthetic fixture sensitivity runner completed."),
         f"baseline_run_id={baseline_run['run_id']}",
         f"n_scenarios={len(scenarios)}",
         "Paper / LaTeX (Phase 8) remains blocked until human H2 approval.",
@@ -646,7 +736,7 @@ def execute_validation_report(
         baseline_experiment_report_id=experiment.get("report_id"),
         h1_approved=True,
         validation_allowed=True,
-        strategy="deterministic_fixture",
+        strategy="deterministic_uploaded_csv" if uploaded else "deterministic_fixture",
         llm_enabled=False,
         llm_attempted=llm_attempted,
         llm_note=llm_note,

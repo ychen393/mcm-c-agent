@@ -407,6 +407,39 @@ def build_fixture_outline(
         if isinstance(proposal, dict) and proposal.get("proposal_id") and not proposal_id:
             proposal_id = str(proposal["proposal_id"])
 
+    # Use the *persisted* baseline and validation source, never a guessed source.
+    experiment_data = {}
+    if isinstance(state, dict):
+        decision_data = state.get("decision_report") or {}
+        if isinstance(decision_data, dict):
+            experiment_data = decision_data.get("experiment") or {}
+    if not isinstance(experiment_data, dict):
+        experiment_data = {}
+    experiment_runs = [run for run in (experiment_data.get("runs") or []) if isinstance(run, dict)]
+    baseline = next(
+        (run for run in experiment_runs if run.get("run_id") == baseline_run_id),
+        experiment_runs[-1] if experiment_runs else {},
+    )
+    uploaded = experiment_data.get("strategy") == "deterministic_uploaded_csv"
+    run_params = baseline.get("params") or {}
+    data_identity = run_params.get("extra") or {}
+    run_metrics = [item for item in (baseline.get("metrics") or []) if isinstance(item, dict)]
+    headline_metrics = ", ".join(
+        f"{m.get('label')}: {m.get('value')} {m.get('unit') or ''}".strip()
+        for m in run_metrics
+        if m.get("kind") in {"terminal_value", "total_return", "max_drawdown", "n_trades"}
+    )[:800]
+    if uploaded and (not isinstance(data_identity, dict)
+                     or data_identity.get("source_mode") != "uploaded_csv"):
+        raise ValueError("Real-data paper outline requires recorded uploaded CSV provenance")
+    if uploaded and validation.get("strategy") != "deterministic_uploaded_csv":
+        raise ValueError("Real-data experiment requires matching real-data validation")
+    if uploaded and (not baseline_run_id or not baseline
+                     or baseline.get("run_id") != baseline_run_id):
+        raise ValueError("Cannot produce historical paper without its recorded baseline run")
+    if uploaded and validation.get("baseline_run_id") != baseline_run_id:
+        raise ValueError("Real-data paper requires validation of the same baseline experiment")
+
     bib_entries, citation_gaps = _collect_bib_entries(state)
     bib_keys = [e.citation_key for e in bib_entries]
 
@@ -421,17 +454,41 @@ def build_fixture_outline(
     for spec_row in _SECTION_SPECS:
         kind = str(spec_row["kind"])
         summary = str(spec_row["summary"])
-        # Enrich summaries with concrete artifact ids when present (still deterministic).
+        # Only attach figures and numerical claims present in persisted artifacts.
+        if kind == "data":
+            if uploaded:
+                summary += (
+                    " Source: uploaded historical CSV datasets, not synthetic fixture. "
+                    f"Gold SHA-256: {data_identity.get('gold_sha256')}; "
+                    f"Bitcoin SHA-256: {data_identity.get('bitcoin_sha256')}. "
+                    f"Range: {data_identity.get('first_date')} to "
+                    f"{data_identity.get('last_date')}, "
+                    f"{data_identity.get('n_bars')} observed BTC dates. "
+                    "Missing gold quotes are not treated as open trading days."
+                )
+            else:
+                summary += (
+                    " This experiment uses an offline synthetic price fixture, "
+                    "not the historical LBMA/BCHAIN datasets. Do not report as real observations."
+                )
         if kind == "results" and baseline_run_id:
-            summary = (
-                f"{summary} Baseline run id: {baseline_run_id}."
-            )[:2000]
+            summary += f" Baseline run id: {baseline_run_id}."
+            if headline_metrics:
+                summary += f" Recorded metrics: {headline_metrics}."
+            summary += " These results describe the specific observed backtest window only."
         if kind == "validation" and validation_report_id:
             n_scn = len(validation.get("scenarios") or [])
-            summary = (
-                f"{summary} Validation report {validation_report_id} with "
-                f"{n_scn} scenarios."
-            )[:2000]
+            summary += (
+                f" Validation report {validation_report_id} with {n_scn} scenarios. "
+                "Sensitivity analysis is not a proof of global optimality."
+            )
+        if kind == "conclusion":
+            summary += (
+                " The current strategy is a tested candidate; the exercise does not "
+                "establish the globally best strategy. Avoid future-data lookahead "
+                "and document trading-calendar assumptions."
+            )
+        summary = summary[:2000]
         sections.append(
             PaperSection(
                 section_id=str(spec_row["section_id"]),
@@ -457,7 +514,7 @@ def build_fixture_outline(
     sections = _assign_citations(sections, bib_keys)
 
     notes = [
-        "strategy=deterministic_fixture",
+        ("strategy=deterministic_uploaded_csv" if uploaded else "strategy=deterministic_fixture"),
         f"problem_id={problem_id}",
         f"bib_entries={len(bib_entries)}",
         f"citation_gaps={len(citation_gaps)}",
@@ -483,6 +540,9 @@ def build_fixture_outline(
         "baseline_run_id": baseline_run_id,
         "section_ids": [s.section_id for s in sections],
         "bib_keys": bib_keys,
+        "data_source": ("uploaded_csv" if uploaded else "synthetic_fixture"),
+        "gold_sha256": data_identity.get("gold_sha256") if uploaded else None,
+        "bitcoin_sha256": data_identity.get("bitcoin_sha256") if uploaded else None,
     }
     outline_id = _stable_id(
         "pout",
@@ -497,7 +557,7 @@ def build_fixture_outline(
         baseline_run_id=str(baseline_run_id) if baseline_run_id else None,
         h2_approved=True,
         paper_allowed=True,
-        strategy="deterministic_fixture",
+        strategy="deterministic_uploaded_csv" if uploaded else "deterministic_fixture",
         llm_enabled=bool(llm_enabled),
         llm_attempted=llm_attempted,
         llm_note=llm_note,

@@ -82,6 +82,7 @@ def persist_paper_into_state(
     state: dict[str, Any],
     input_signature: str,
     package: PaperPackage | dict[str, Any],
+    revision_record: dict[str, Any] | None = None,
     note: str = "phase8-paper-latex",
 ) -> dict[str, Any]:
     """Attach sanitized paper outline / latex / review. Requires H2 approved."""
@@ -116,6 +117,27 @@ def persist_paper_into_state(
 
     decision_report = dict(updated.get("decision_report") or {})
     decision_report["paper"] = compact
+    older_revisions = decision_report.get("h3_revision_history") or []
+    if not isinstance(older_revisions, list):
+        older_revisions = []
+    if revision_record is not None:
+        prior_decision = ((state.get("decision_report") or {}).get("h3") or {})
+        prior_paper = ((state.get("decision_report") or {}).get("paper") or {})
+        if prior_decision.get("status") != "revision_requested":
+            raise ValueError("H3 history requires an explicit human revision request")
+        if revision_record.get("previous_package_id") != prior_paper.get("package_id"):
+            raise ValueError("H3 revision must reference exactly the rejected paper")
+        record = {
+            str(key): str(value)[:3500] for key,value in revision_record.items()
+            if isinstance(key,str) and isinstance(value,(str,int,float,bool))
+        }
+        if not record.get("feedback") or record.get("new_package_id") != compact["package_id"]:
+            raise ValueError("H3 feedback and rebuilt package identity must match")
+        if record.get("validation_report_id") != (updated.get("validation_report") or {}).get("report_id"):
+            raise ValueError("H3 revision cannot silently replace its H2 validation source")
+        decision_report["h3_revision_history"] = [*older_revisions[-7:],record][-8:]
+    elif older_revisions:
+        decision_report["h3_revision_history"] = older_revisions[-8:]
     decision_report["h3"] = {
         "status": "pending",
         "auto_approved": False,

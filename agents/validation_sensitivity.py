@@ -12,6 +12,7 @@ import os
 from typing import Any
 
 from core.config import Settings, get_settings
+from modeling.fixture_data import PriceBar
 from schemas.problem_specification import ProblemSpecification
 from schemas.research import ResearchProposal
 from schemas.validation import ValidationReport
@@ -140,6 +141,9 @@ def run_validation_sensitivity(
     selected_candidate_id: str | None = None,
     use_llm: bool | None = None,
     settings: Settings | None = None,
+    price_bars: list[PriceBar] | None = None,
+    price_sha256: dict[str, str] | None = None,
+    extra_scenarios: list[dict[str, Any]] | None = None,
 ) -> ValidationReport:
     """Run deterministic validation when H1 + experiments allow; else PermissionError."""
     assert_validation_allowed(state)
@@ -174,6 +178,9 @@ def run_validation_sensitivity(
         problem_specification=spec,
         problem_id=str(problem_id) if problem_id else None,
         llm_enabled=llm,
+        price_bars=price_bars,
+        price_sha256=price_sha256,
+        extra_scenarios=extra_scenarios,
     )
 
     notes = list(report.analysis_notes)

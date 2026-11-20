@@ -12,7 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-PaperStrategy = Literal["deterministic_fixture", "llm_outline", "hybrid"]
+PaperStrategy = Literal["deterministic_fixture", "deterministic_uploaded_csv", "llm_outline", "hybrid"]
 SectionKind = Literal[
     "abstract",
     "introduction",

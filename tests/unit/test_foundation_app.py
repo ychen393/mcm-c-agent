@@ -76,6 +76,12 @@ def _problem(at: AppTest):
     return next(area for area in at.text_area if area.label.startswith("MCM problem statement"))
 
 
+def _show_eda(at: AppTest) -> AppTest:
+    """Navigate to the dedicated EDA workspace (no implicit research mutation)."""
+    guide = next(box for box in at.selectbox if "Explore a stage" in box.label)
+    return guide.select(guide.options[1]).run()
+
+
 def _button(at: AppTest, label: str):
     return next(button for button in at.button if button.label == label)
 
@@ -210,6 +216,8 @@ def test_two_files_are_recorded_only_after_initialize_and_stay_unjoined():
 
     at.session_state["last_run"]["approval_status"] = {"h1": "approved"}
     at.session_state["last_run"]["research_proposal"] = {"strategy": "momentum"}
+    at = at.run()
+    at = _show_eda(at)
     at = _button(at, "Preview join").click().run()
     assert not at.exception
     kept = at.session_state["last_run"]
@@ -373,7 +381,9 @@ def test_api_settings_refresh_clears_foundation_products_and_omits_the_key():
     assert not at.exception
     next(box for box in at.text_input if box.label == "Model ID").set_value("deepseek-chat")
     next(box for box in at.text_input if box.label == "API Key").set_value(SECRET)
-    at = at.form_submit_button[0].click().run()
+    # Streamlit AppTest exposes form submit controls through the button
+    # collection; there is no AppTest.form_submit_button attribute.
+    at = _button(at, "Save for this session").click().run()
     assert not at.exception
     assert "API configuration saved for this session." in _messages(at)
     at = at.radio[0].set_value("Research Lab").run()

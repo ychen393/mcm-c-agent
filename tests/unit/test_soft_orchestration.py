@@ -10,6 +10,7 @@ from streamlit.testing.v1 import AppTest
 from app.soft_orchestration import (
     next_step_guide,
     panel_is_unlocked,
+    missing_prerequisite_labels,
     panel_prerequisites_met,
 )
 from core.lifecycle import distinguish_status
@@ -168,3 +169,15 @@ def test_apptest_power_user_override_reveals_problem_analyst():
     at = unlock.check().run()
     assert not at.exception
     assert any(b.label == "Analyze problem" for b in at.button)
+
+
+def test_saved_eda_unlocks_research_team_without_requiring_literature():
+    state = {
+        "run_id": "run_eda",
+        "problem_specification": {"problem_id": "mcm_2022"},
+        "eda_report": {"report_id": "eda_real", "interpreted_findings": {"datasets": []}},
+        "approval_status": {"h1": "pending"},
+    }
+    assert panel_is_unlocked("h1", state, override=False)
+    assert not panel_is_unlocked("modeling", state, override=False)
+    assert "literature" not in missing_prerequisite_labels("h1", state)
