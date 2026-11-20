@@ -138,6 +138,50 @@ def render_research_decision(
                         f"Observed quote-return volatility {vol:.2f}%; historical asset-price drawdown {drawdown:.1f}%. These motivate tests, not empirical superiority."
                     )
                 )
+    joint = ((eda_report or {}).get("interpreted_findings") or {}).get("joint_market")
+    if isinstance(joint,dict):
+        st.markdown("#### 两份数据放在一起后，对模型选择有什么帮助？" if zh
+                    else "#### How do paired-market findings shape our model hypotheses?")
+        corr = joint.get("paired_return_correlation")
+        count = int(joint.get("paired_return_intervals") or 0)
+        joint_down = int(joint.get("both_negative_intervals") or 0)
+        bitcoin_only = int(joint.get("bitcoin_only_days") or 0)
+        if zh:
+            st.write(
+                f"**实际发现：** 在 {count} 个共同报价区间里，"
+                + (f"历史收益相关系数约 {corr:+.2f}；" if isinstance(corr,(int,float)) else
+                   "相关系数因样本不足或价格变化缺少差异而无法计算；")
+                + f"两种资产同时下跌 {joint_down} 次。"
+            )
+            st.write(
+                f"**日历限制：** {bitcoin_only} 个比特币报价日没有同日黄金报价；"
+                "黄金休市的日期不允许交易黄金。"
+            )
+            st.write(
+                "**建模启发：** 把现金、买入持有和成本感知的组合策略作为比较基线；"
+                "测试分散投资在两者同时下跌时是否真的降低组合回撤，并明确 "
+                "黄金 1% / BTC 2% 手续费。"
+            )
+            st.write(
+                "**怎么验证：** 用过去窗口估计相关性或仓位，只在未来未参与调参的日期验收；"
+                "不能把这张覆盖整段历史的相关性作为以前每一天都知道的信号。"
+            )
+        else:
+            st.write(
+                f"**Observed:** {count} matching quote intervals; "
+                + (f"correlation {corr:+.2f}; " if isinstance(corr,(int,float)) else
+                   "correlation unavailable; ")
+                + f"{joint_down} simultaneous declines and {bitcoin_only} BTC-only quote dates."
+            )
+            st.write(
+                "**Model hypothesis:** Compare cash/buy-and-hold to cost-aware "
+                "allocations in co-decline periods while respecting market closures."
+            )
+            st.write(
+                "**Required test:** Historical full-window correlation is hindsight. "
+                "Use trailing estimates and out-of-sample periods, not future facts."
+            )
+
     st.info(
         "实际实现范围：此版本实验执行器仍只支持有限的确定性基线。"
         "复杂风险配置或动态规划如果尚未实现，不会被标为“已经跑通”。"
