@@ -447,6 +447,57 @@ def critique_research_proposal(
                     )],
                 ))
 
+    # Independently challenge any strategy built from full-window joint
+    # statistics. A descriptive cross-market correlation is not information
+    # that was available at each prior trading decision.
+    joint = insight.get("joint_market") if isinstance(insight, dict) else None
+    if (isinstance(joint, dict)
+            and joint.get("bundle_fingerprint") == insight.get("bundle_fingerprint")):
+        ref = "joint_" + str(joint.get("bundle_fingerprint") or "")[:20]
+        findings.append(CritiqueFinding(
+            finding_id=_fid("joint_full_window", ref),
+            kind="validation_gap",
+            severity="high",
+            statement=(
+                "Joint EDA uses observed matched gold/Bitcoin quote intervals "
+                f"({joint.get('paired_return_intervals')}); its correlation "
+                "summarizes the full historical window and cannot be used "
+                "as a look-ahead-free signal in earlier trades."
+            ),
+            suggested_action=(
+                "Use trailing correlation from prices available before each "
+                "decision; compare cash, buy-and-hold, and portfolio risk "
+                "baselines on chronological holdout periods."
+            ),
+            evidence_refs=[ProvenanceRef(
+                kind="eda_report", ref_id=ref,
+                summary=(
+                    f"Measured joint paired-return correlation="
+                    f"{joint.get('paired_return_correlation')}; "
+                    f"BTC-only quote dates={joint.get('bitcoin_only_days')}."
+                ),
+            )],
+        ))
+        if int(joint.get("bitcoin_only_days") or 0) > 0:
+            findings.append(CritiqueFinding(
+                finding_id=_fid("joint_calendar", ref),
+                kind="weak_assumption",
+                severity="high",
+                statement=(
+                    f"{joint.get('bitcoin_only_days')} observed BTC dates have no "
+                    "matching gold quote. A matched-date chart does not prove "
+                    "gold was tradable or its closing quote was known on those days."
+                ),
+                suggested_action=(
+                    "Audit gold market closures separately from BTC daily quotes; "
+                    "never fill unobserved executable gold prices."
+                ),
+                evidence_refs=[ProvenanceRef(
+                    kind="eda_report", ref_id=ref,
+                    summary="Observed BTC-only dates; no imputation used.",
+                )],
+            ))
+
     # Deduplicate by finding_id
     seen: set[str] = set()
     unique: list[CritiqueFinding] = []
