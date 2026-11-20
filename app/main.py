@@ -338,8 +338,11 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
             "Original files remain separate; date previews never permanently merge or fill prices."
         )
         st.info(
-            "Each file is profiled on its own. This step does not join files, "
-            "align dates, draw a cross-dataset chart, or call a model."
+            "此处仅检查独立文件与关联规则，不会永久合并文件。真正的共同日期比较、相关性、"
+            "共同下跌与建模启发，请到上方「② 两份数据联合分析」标签运行。"
+            if get_locale() == "zh" else
+            "This advanced profile does not join files persistently. Use the "
+            "Joint market EDA tab for read-only aligned charts and insights."
         )
         for note in bundle.manifest.limitations:
             st.caption(note)
@@ -408,6 +411,19 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
             bundle,
             column_units_by_dataset=units,
             temporal_frequency_by_dataset=frequencies,
+        )
+    current_insights = st.session_state.get("eda_insights")
+    if (any("USD (PM)" in ref.column_names for ref in bundle.datasets)
+            and any("Value" in ref.column_names for ref in bundle.datasets)
+            and not (isinstance(current_insights, dict)
+                     and isinstance(current_insights.get("joint_market"), dict)
+                     and current_insights["joint_market"].get("bundle_fingerprint") == bundle.fingerprint)):
+        st.warning(
+            "当前尚未执行两市场联合分析。现在保存仅包含分开分析的结果；"
+            "建议先在「② 两份数据联合分析」中点击开始，再保存进入模型研究。"
+            if get_locale() == "zh" else
+            "Joint-market analysis has not been run. Saving now includes only "
+            "individual EDA; run the Joint market EDA tab first to include it."
         )
     if st.button(
         ("完成 EDA · 保存并继续研究方案" if get_locale() == "zh"
