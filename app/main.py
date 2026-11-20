@@ -1118,17 +1118,28 @@ else:
     spec_for_eda = resolve_displayed_problem_specification(_state_dict)
 # Problem-aware plan runs after foundation sync + analyst so cleared specs cannot linger.
 if selected_stage == 1 and bundle is not None and not bundle_rejected:
-    st.session_state["eda_insights"] = render_explainable_eda(bundle)
     if len(bundle.datasets) >= 2:
-        # Source-comparable joint EDA is a prominent part of the actual research
-        # stage, not buried under technical relationship/preview controls.
-        joint_summary = render_joint_eda_panel(bundle)
+        st.markdown(
+            "### 第二阶段｜先单独了解数据，再研究两市场之间的关系"
+            if get_locale() == "zh" else
+            "### Stage 2 | Inspect each dataset, then compare markets"
+        )
+        single_tab, joint_tab = st.tabs(
+            ["① 各自的数据分析 / Separate EDA",
+             "② 两份数据联合分析 / Joint market EDA"]
+        )
+        with single_tab:
+            st.session_state["eda_insights"] = render_explainable_eda(bundle)
+        with joint_tab:
+            joint_summary = render_joint_eda_panel(bundle)
         if isinstance(joint_summary, dict):
             st.session_state["eda_insights"] = {
                 **st.session_state["eda_insights"],
                 "joint_market": joint_summary,
             }
         _render_multi_dataset_eda(bundle)
+    else:
+        st.session_state["eda_insights"] = render_explainable_eda(bundle)
     if panel_is_unlocked("eda", _state_dict):
         with st.expander(
             "专业分析规划明细（可选） / Advanced EDA planning", expanded=False
