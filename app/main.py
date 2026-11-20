@@ -409,7 +409,6 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
             column_units_by_dataset=units,
             temporal_frequency_by_dataset=frequencies,
         )
-        render_joint_eda_panel(bundle)
     if st.button(
         ("完成 EDA · 保存并继续研究方案" if get_locale() == "zh"
          else "Finish EDA · Save and continue to research plan"),
@@ -464,8 +463,13 @@ def _render_multi_dataset_eda(bundle: DatasetBundle) -> None:
                     )
                     st.session_state["last_run"] = saved
                     st.success(
-                        "EDA findings recorded with source fingerprints. "
-                        "No original file bytes or merged rows saved."
+                        ("已保存单数据集分析"
+                         + ("与联合市场分析" if isinstance(compact.get("interpreted_findings"), dict)
+                            and compact["interpreted_findings"].get("joint_market") else "")
+                         + "的统计发现与数据指纹。原始 CSV 与共同报价行均未保存。")
+                        if get_locale() == "zh" else
+                        "EDA summary and source fingerprints saved. "
+                        "No CSV bytes or joined price rows were stored."
                     )
                     st.session_state["guided_stage_target"] = 2
                     st.rerun()
@@ -1116,6 +1120,14 @@ else:
 if selected_stage == 1 and bundle is not None and not bundle_rejected:
     st.session_state["eda_insights"] = render_explainable_eda(bundle)
     if len(bundle.datasets) >= 2:
+        # Source-comparable joint EDA is a prominent part of the actual research
+        # stage, not buried under technical relationship/preview controls.
+        joint_summary = render_joint_eda_panel(bundle)
+        if isinstance(joint_summary, dict):
+            st.session_state["eda_insights"] = {
+                **st.session_state["eda_insights"],
+                "joint_market": joint_summary,
+            }
         _render_multi_dataset_eda(bundle)
     if panel_is_unlocked("eda", _state_dict):
         with st.expander(
