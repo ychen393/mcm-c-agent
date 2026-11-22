@@ -131,6 +131,11 @@ def with_research_decision(
 ) -> ResearchProposal:
     """Build one main + up to two different-family strategy directions."""
     packet = build_research_evidence_packet(eda_report)
+    # A V2 2022-C research decision requires BOTH single-market and matched
+    # market evidence. With incomplete inputs retain the legacy draft so older
+    # saved projects and their offline review workflow remain usable.
+    if not packet.get("joint_market") or len(packet.get("datasets") or []) < 2:
+        return proposal
     families = set()
     ranked = []
     candidates = []
