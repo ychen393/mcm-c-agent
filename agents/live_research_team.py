@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from agents.research_evidence import build_research_evidence_packet
 from core.config import Settings
 from llm.base import BaseLLM
 from llm.factory import LLMFactory
@@ -29,7 +30,12 @@ def _compact_context(
         eda_report.get("interpreted_findings") if isinstance(eda_report, dict)
         else None
     ) or {}
+    packet = build_research_evidence_packet(eda_report)
     return {
+        "evidence_packet_sha256": packet["packet_sha256"],
+        "source_fingerprint": packet["bundle_fingerprint"],
+        "joint_market_observations": packet.get("joint_market"),
+        "source_rules": packet["trading_information_warning"],
         "problem": {
             "title": str(specification.get("title") or "")[:250],
             "research_questions": _items(specification, "research_questions"),
