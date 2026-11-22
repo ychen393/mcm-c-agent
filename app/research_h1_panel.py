@@ -534,7 +534,7 @@ def render_research_h1_panel(
                         st.markdown(t("h1.weaknesses", text="; ".join(cand["weaknesses"])))
 
         attach = st.button(
-            t("h1.attach_proposal"),
+            "确认当前研究方案并提交 H1 审核" if zh else t("h1.attach_proposal"),
             key="persist_research_proposal",
             help=t("h1.attach_proposal_help"),
         )
@@ -545,6 +545,11 @@ def render_research_h1_panel(
                 st.error(t("h1.init_before_attach"))
             elif not form_sig:
                 st.error(t("common.sig_missing"))
+            elif (proposal_dict.get("research_decision") and
+                  (not isinstance(critique_dict, dict) or
+                   critique_dict.get("proposal_id") != proposal_dict.get("proposal_id"))):
+                st.error("需要先让独立 Critic 审查这份确切版本的研究方案。"
+                         if zh else "Independent Critic must review this exact plan before H1 submission.")
             else:
                 try:
                     store = get_or_create_store(lambda: build_project_store(settings))
@@ -565,6 +570,7 @@ def render_research_h1_panel(
                     )
                     st.session_state["last_run"] = saved
                     st.session_state[PROPOSAL_SESSION_KEY] = saved.get("research_proposal")
+                    st.session_state.pop("research_pending_explicit_attach_id", None)
                     st.success(t("h1.proposal_attached"))
                 except Exception as exc:
                     st.error(t("h1.persist_proposal_failed", err=f"{type(exc).__name__}: {exc}"))
@@ -683,10 +689,14 @@ def render_research_h1_panel(
         st.info(t("h1.need_proposal"))
         return proposal_dict
 
+    decision = proposal_dict.get("research_decision") or {}
+    shortlist_ids = ([decision.get("primary_candidate_id"),
+                      *(decision.get("alternate_candidate_ids") or [])]
+                     if decision else None)
     candidates = [
-        c
-        for c in (proposal_dict.get("candidates") or [])
+        c for c in (proposal_dict.get("candidates") or [])
         if isinstance(c, dict) and c.get("candidate_id")
+        and (shortlist_ids is None or c.get("candidate_id") in shortlist_ids)
     ]
     candidate_ids = [str(c["candidate_id"]) for c in candidates]
     labels_by_id = {
@@ -708,6 +718,15 @@ def render_research_h1_panel(
             "H1",
             approved_title or labels_by_id.get(str(recommended), t("viewer.research_plan")),
         )
+        preflight = research_execution_preflight(
+            gate_state if isinstance(gate_state, dict) else None,
+            selected_candidate_id=h1_status == "approved" and
+                ((gate_state or {}).get("decision_report") or {}).get("h1", {}).get("selected_candidate_id"),
+        )
+        if not preflight["allowed"]:
+            st.warning("H1 已批准研究方向，但模型尚未实现或验证，建模执行被阻止："
+                       if zh else "H1 approved research, but the model is not executable: "
+                       + str(preflight["reason"]))
         render_h1_approval_card(
             candidate=approved_cand
             or next((c for c in candidates if c.get("candidate_id") == recommended), None),
@@ -817,6 +836,12 @@ def render_research_h1_panel(
         elif approve_clicked and review_status == "revision_requested":
             st.error("上一轮退回尚未重新生成，不能批准旧方案。" if zh
                      else "Regenerate the rejected proposal before approving.")
+        elif (proposal_dict.get("research_decision") and
+              (not (recorded.get("research_proposal") or {}).get("proposal_id")
+               or (recorded.get("research_proposal") or {}).get("proposal_id") != proposal_dict.get("proposal_id")
+               or proposal_sha256(recorded["research_proposal"]) != proposal_sha256(proposal_dict))):
+            st.error("请先保存当前研究方案及独立 Critic，再进行 H1 审批。" if zh
+                     else "Submit this exact proposal and Critic before making an H1 decision.")
         else:
             status = "approved" if approve_clicked else "revision_requested"
             try:
