@@ -13,6 +13,7 @@ from typing import Any
 
 from core.config import Settings, get_settings
 from modeling.gate import assert_modeling_allowed, modeling_gate_status
+from modeling.preflight import research_execution_preflight
 from modeling.fixture_data import PriceBar
 from modeling.runner import (
     PROMPT_VERSION,
@@ -122,6 +123,13 @@ def run_modeling_experiment(
         raise ValueError("Research proposal is required for modeling experiments.")
 
     candidate_id = _selected_candidate_id(state, proposal_model, selected_candidate_id)
+    if proposal_model.research_decision is not None:
+        ready = research_execution_preflight(
+            state, selected_candidate_id=candidate_id,
+            explicit_strategy_id=strategy_id,
+        )
+        if not ready["allowed"]:
+            raise PermissionError(ready["reason"])
     cfg = settings or get_settings()
     sandbox = _sandbox_enabled(cfg, allow_sandboxed_python)
 
