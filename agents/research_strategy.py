@@ -14,6 +14,7 @@ import re
 from typing import Any
 
 from core.config import Settings, get_settings
+from agents.research_decision import with_research_decision
 from schemas.eda_plan import ProblemAwareEDAPlan
 from schemas.evidence import LiteratureEvidenceReport
 from schemas.problem_specification import ProblemSpecification
@@ -717,7 +718,7 @@ def synthesize_research_proposal(
         ("joint_" + str(joint_count) + "_" + str(joint_corr)) if joint else "no_joint",
     )
 
-    return ResearchProposal(
+    proposal = ResearchProposal(
         proposal_id=proposal_id,
         problem_id=spec.problem_id if spec else None,
         strategy="deterministic_rules" if not llm_on else "hybrid",
@@ -735,6 +736,9 @@ def synthesize_research_proposal(
         agent_prompt_version=PROMPT_VERSION,
         analysis_notes=notes,
     )
+    # Convert the large legacy method inventory into one research decision
+    # with two alternatives, without deleting old method provenance.
+    return with_research_decision(proposal, eda_report)
 
 
 def research_strategy_status() -> dict[str, Any]:
