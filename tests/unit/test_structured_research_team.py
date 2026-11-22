@@ -236,3 +236,82 @@ def test_h1_cannot_approve_unresolved_blocking_critic(tmp_path):
             store, project_id=state["project_id"], project_name=state["project_name"],
             state=saved, input_signature="sig", decision=decision,
         )
+
+
+
+class FakeHumanReviser:
+    """Two model-shaped messages per round; never external API traffic."""
+    def __init__(self, *, reject_status=False):
+        self.calls = []
+        self.reject_status = reject_status
+
+    def invoke(self, messages):
+        self.calls.append(messages)
+        if len(self.calls) == 1:
+            context = json.loads(messages[1]["content"])
+            plan = dict(context["primary_execution_plan"])
+            plan["signal_definition"] = (
+                "Use a new trailing-window signal and hold-off threshold "
+                "strictly before the trade date, reflecting human feedback: "
+                + context["reviewer_feedback"][:100]
+            )
+            if self.reject_status:
+                plan["implementation_status"] = "implemented"
+                plan["executable_strategy_id"] = "made_up_strategy"
+            return SimpleNamespace(content=json.dumps({
+                "candidate_id": context["research_decision"]["primary_candidate_id"],
+                "revised_summary": (
+                    "Concrete fee-aware plan with prior-day lagged signals, "
+                    "gold market closure handling and chronological validation; "
+                    "the previous research rules are superseded by this revision."
+                ),
+                "revised_execution_plan": plan,
+                "changes_made": (
+                    "Changed the actual trading signal to address human feedback "
+                    "and preserved the unimplemented status for Sprint B."
+                ),
+                "next_tests": ["Compare costs in a held-out period"],
+                "remaining_risks": ["Past correlations are descriptive only"],
+            }), provider="mock", model="reviser")
+        return SimpleNamespace(
+            content="Independent critic: verify the revised timing convention and no-trade threshold on an unseen period; it remains a research hypothesis.",
+            provider="mock", model="reviser",
+        )
+
+
+def test_v2_human_feedback_revises_execution_plan_over_two_rounds():
+    from agents.research_revision import revise_with_feedback
+
+    current = _proposal()
+    first_feedback = "Please change the transaction timing to avoid close-price lookahead."
+    second_feedback = "Please add stricter cash and risk limits when markets are volatile."
+    records = []
+    for feedback in (first_feedback, second_feedback):
+        mock = FakeHumanReviser()
+        newer, history = revise_with_feedback(
+            proposal=current,
+            feedback=feedback,
+            problem_specification={"title": "2022 MCM C", "constraints": [
+                {"statement": "Gold market closed on weekends"},
+            ]},
+            eda_report=_evidence(),
+            settings=get_settings(), llm=mock, language="en",
+        )
+        assert len(mock.calls) == 2
+        assert newer.proposal_id != current.proposal_id
+        assert newer.research_decision.primary_candidate_id == current.research_decision.primary_candidate_id
+        assert newer.candidates[0].execution_plan != current.candidates[0].execution_plan
+        assert newer.candidates[0].execution_plan.implementation_status == "needs_implementation"
+        assert history["feedback"] == feedback
+        assert history["before"] != history["after"]
+        records.append(history)
+        current = newer
+    assert len({r["new_proposal_id"] for r in records}) == 2
+    rejected = FakeHumanReviser(reject_status=True)
+    with pytest.raises(ValueError, match="cannot change"):
+        revise_with_feedback(
+            proposal=current, feedback="Please simulate the unimplemented model as if done.",
+            problem_specification={"title": "2022 MCM C"}, eda_report=_evidence(),
+            settings=get_settings(), llm=rejected,
+        )
+    assert len(rejected.calls) == 1
