@@ -12,7 +12,9 @@ from app.research_decision_story import render_research_decision, plan_readable
 
 from agents.debate_critic import critique_research_proposal
 from agents.research_strategy import synthesize_research_proposal
-from agents.live_research_team import run_live_research_team
+from agents.structured_research_team import run_structured_research_team
+from modeling.preflight import research_execution_preflight
+from tools.research_persistence import proposal_sha256
 from agents.research_revision import revise_with_feedback
 from app.artifact_viewers import (
     candidate_display_label,
@@ -42,6 +44,7 @@ def clear_research_h1_caches(
     state = st.session_state if session_state is None else session_state
     state.pop(PROPOSAL_SESSION_KEY, None)
     state.pop(CRITIQUE_SESSION_KEY, None)
+    state.pop("research_pending_explicit_attach_id", None)
 
 
 def resolve_displayed_proposal(
@@ -50,6 +53,12 @@ def resolve_displayed_proposal(
 ) -> dict[str, Any] | None:
     """Prefer recorded ResearchState over an orphan session cache."""
     state = st.session_state if session_state is None else session_state
+    candidate_draft = state.get(PROPOSAL_SESSION_KEY)
+    if (state.get("research_pending_explicit_attach_id")
+            and isinstance(candidate_draft, dict)
+            and candidate_draft.get("proposal_id") ==
+                state.get("research_pending_explicit_attach_id")):
+        return candidate_draft
     if recorded_state is not None:
         existing = recorded_state.get("research_proposal")
         if isinstance(existing, dict) and existing:
@@ -66,6 +75,11 @@ def resolve_displayed_critique(
     session_state: MutableMapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     state = st.session_state if session_state is None else session_state
+    if state.get("research_pending_explicit_attach_id"):
+        pending = state.get(CRITIQUE_SESSION_KEY)
+        if (isinstance(pending, dict) and pending.get("proposal_id") ==
+                state.get("research_pending_explicit_attach_id")):
+            return pending
     if recorded_state is not None:
         decision = recorded_state.get("decision_report") or {}
         if isinstance(decision, dict):
@@ -319,17 +333,12 @@ def render_research_h1_panel(
         else:
             proposal_dict = proposal.model_dump(mode="json")
             st.session_state[PROPOSAL_SESSION_KEY] = proposal_dict
-            # New proposal invalidates prior critique cache.
+            # Drafts stay in session until explicitly submitted to H1.
+            # Never pretend they were saved by mutating last_run.
+            st.session_state["research_pending_explicit_attach_id"] = proposal_dict["proposal_id"]
             st.session_state.pop(CRITIQUE_SESSION_KEY, None)
             st.session_state.pop("research_live_team_review", None)
             critique_dict = None
-            if st.session_state.get("last_run") is not None:
-                updated = dict(st.session_state["last_run"])
-                updated["research_proposal"] = proposal_dict
-                approval = dict(updated.get("approval_status") or {})
-                approval["h1"] = "pending"
-                updated["approval_status"] = approval
-                st.session_state["last_run"] = updated
             st.success(
                 t(
                     "h1.proposal_ready",
@@ -377,57 +386,45 @@ def render_research_h1_panel(
                 if critique.llm_attempted and critique.llm_note:
                     st.info(critique.llm_note)
 
-    # Optional *real* two-call LLM review, never conflated with deterministic agents.
+    # Optional real structured collaboration. No model calls without explicit
+    # checkbox + button click; the typed result becomes the SAME draft used by H1.
     if team_run and live_review and proposal_dict and critique_dict:
         if not measured:
-            st.warning(
-                "未检测到可核对的真实 EDA 统计，已跳过付费 LLM 调用。"
-                if zh else "No observed EDA statistics: paid model calls skipped."
-            )
+            st.warning("需要先保存真实 EDA 证据才能调用模型。" if zh
+                       else "Recorded EDA evidence is required before model calls.")
         elif not isinstance(problem_specification, dict):
             st.warning("No structured problem specification; live review skipped.")
         else:
             try:
-                result = run_live_research_team(
-                    specification=problem_specification,
-                    proposal=proposal_dict,
-                    eda_report=eda_report,
-                    settings=settings,
+                revised, independent, audit = run_structured_research_team(
+                    specification=problem_specification, proposal=proposal_dict,
+                    eda_report=eda_report, settings=settings,
                     language="zh" if zh else "en",
                 )
-                result["proposal_id"] = proposal_dict.get("proposal_id")
-                result["eda_fingerprint"] = (insight or {}).get("bundle_fingerprint")
-                st.session_state["research_live_team_review"] = result
-                st.success(
-                    "真实 LLM Strategist 和 Critic 已分别完成调用；输出不自动成为实验结论。"
-                    if zh else "Live LLM Strategist and Critic calls completed; advice remains provisional."
-                )
+                proposal_dict = revised.model_dump(mode="json")
+                critique_dict = independent.model_dump(mode="json")
+                st.session_state[PROPOSAL_SESSION_KEY] = proposal_dict
+                st.session_state[CRITIQUE_SESSION_KEY] = critique_dict
+                st.session_state["research_pending_explicit_attach_id"] = revised.proposal_id
+                st.session_state["research_live_team_review"] = audit
+                st.success("已形成结构化新版方案与独立审查；请提交 H1 审核。"
+                           if zh else
+                           "Structured revision and independent critique are ready; submit for H1 review.")
             except Exception as exc:
-                st.error(
-                    ("真实 LLM 协作调用失败；离线研究方案仍可审阅。"
-                     if zh else "Live LLM review failed; offline proposal remains usable.")
-                    + f" {type(exc).__name__}: {exc}"
-                )
+                st.error(("真实模型修改未通过校验，保留离线方案：" if zh
+                          else "Model patch rejected; offline plan was preserved: ")
+                         + f"{type(exc).__name__}: {exc}")
 
     live_result = st.session_state.get("research_live_team_review")
-    if (isinstance(live_result, dict) and isinstance(proposal_dict, dict)
-            and live_result.get("proposal_id") == proposal_dict.get("proposal_id")
-            and live_result.get("eda_fingerprint") ==
-                ((insight or {}).get("bundle_fingerprint"))):
-        with st.expander(
-            "真实 LLM 两角色审议（建议，不是事实验证）"
-            if zh else "Live two-role LLM review (advisory, not validated facts)",
-            expanded=True,
-        ):
-            st.caption(f"{live_result.get('provider')} / {live_result.get('model')}")
-            st.markdown("**Strategist**")
-            st.write(live_result.get("strategist"))
-            st.markdown("**Independent Critic**")
-            st.write(live_result.get("critic"))
-            st.warning(
-                "LLM 内容可能含未经核实的推断；需要和 EDA、基线实验及题目逐项核对。"
-                if zh else "LLM output is unverified advice; check against EDA, baselines and problem facts."
-            )
+    if (isinstance(live_result, dict)
+            and live_result.get("new_proposal_id") == (proposal_dict or {}).get("proposal_id")):
+        with st.expander("结构化 Agent 修改记录 / Structured Agent revision", expanded=False):
+            st.write("**修改了什么 / Changes**")
+            st.write(live_result.get("changes_made"))
+            st.write("**Critic 结论 / Reviewer**")
+            st.write(live_result.get("critic_verdict"))
+            st.caption("该方案仍是草稿；提交后才能人工审批，不会自动产生交易结果。"
+                       if zh else "Draft only: H1 submission and human approval are separate.")
 
     # Show the exact human feedback, old/new plan and real independent review.
     decision_for_history = (
