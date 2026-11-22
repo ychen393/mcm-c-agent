@@ -26,6 +26,7 @@ from database.repositories import build_project_store
 from modeling.fixture_data import PRICE_FIXTURE_ID
 from modeling.uploaded_prices import prepare_uploaded_2022_prices
 from modeling.gate import modeling_allowed, modeling_gate_status
+from modeling.preflight import research_execution_preflight
 from tools.experiment_persistence import persist_experiment_into_state
 
 EXPERIMENT_SESSION_KEY = "modeling_experiment_draft"
@@ -233,7 +234,22 @@ def render_modeling_experiment_panel(
 
     report_dict = resolve_displayed_experiment_report(recorded_state)
 
+    readiness = research_execution_preflight(
+        recorded_state, selected_candidate_id=selected_candidate_id,
+        explicit_strategy_id=strategy_id,
+    )
+    if not readiness["allowed"]:
+        st.warning(
+            "模型执行准备检查未通过：" + str(readiness["reason"])
+            + "。H1 批准研究方向不等于模型已经实现；不会自动改为其他策略运行。"
+        )
+    elif readiness.get("legacy"):
+        st.info(
+            "旧版研究项目未包含 V2 策略映射，仍按原版兼容模式运行。"
+            "建议先重新完成 EDA 与 H1，以便获得正式的执行一致性检查。"
+        )
     run_disabled = (not gate.modeling_allowed or not proposal or not selected_candidate_id
+                    or not readiness["allowed"]
                     or (data_mode == "uploaded_csv" and prepared is None))
     run = st.button(
         ("运行真实 CSV 回测 / Run historical backtest" if data_mode == "uploaded_csv"
