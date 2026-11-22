@@ -95,6 +95,8 @@ def disagreement_log_from_critique(
             "candidate_id": finding.candidate_id,
             "statement": finding.statement,
             "suggested_action": finding.suggested_action,
+            "target_field": finding.target_field,
+            "review_priority": finding.review_priority,
             "invented_source": False,
         }
         assert_safe_for_persistence(entry, "disagreement_log")
