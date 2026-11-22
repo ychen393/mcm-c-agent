@@ -12,7 +12,9 @@ from app.research_decision_story import render_research_decision, plan_readable
 
 from agents.debate_critic import critique_research_proposal
 from agents.research_strategy import synthesize_research_proposal
-from agents.live_research_team import run_live_research_team
+from agents.structured_research_team import run_structured_research_team
+from modeling.preflight import research_execution_preflight
+from tools.research_persistence import proposal_sha256
 from agents.research_revision import revise_with_feedback
 from app.artifact_viewers import (
     candidate_display_label,
@@ -42,6 +44,7 @@ def clear_research_h1_caches(
     state = st.session_state if session_state is None else session_state
     state.pop(PROPOSAL_SESSION_KEY, None)
     state.pop(CRITIQUE_SESSION_KEY, None)
+    state.pop("research_pending_explicit_attach_id", None)
 
 
 def resolve_displayed_proposal(
@@ -50,6 +53,12 @@ def resolve_displayed_proposal(
 ) -> dict[str, Any] | None:
     """Prefer recorded ResearchState over an orphan session cache."""
     state = st.session_state if session_state is None else session_state
+    candidate_draft = state.get(PROPOSAL_SESSION_KEY)
+    if (state.get("research_pending_explicit_attach_id")
+            and isinstance(candidate_draft, dict)
+            and candidate_draft.get("proposal_id") ==
+                state.get("research_pending_explicit_attach_id")):
+        return candidate_draft
     if recorded_state is not None:
         existing = recorded_state.get("research_proposal")
         if isinstance(existing, dict) and existing:
@@ -66,6 +75,11 @@ def resolve_displayed_critique(
     session_state: MutableMapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     state = st.session_state if session_state is None else session_state
+    if state.get("research_pending_explicit_attach_id"):
+        pending = state.get(CRITIQUE_SESSION_KEY)
+        if (isinstance(pending, dict) and pending.get("proposal_id") ==
+                state.get("research_pending_explicit_attach_id")):
+            return pending
     if recorded_state is not None:
         decision = recorded_state.get("decision_report") or {}
         if isinstance(decision, dict):
@@ -319,17 +333,12 @@ def render_research_h1_panel(
         else:
             proposal_dict = proposal.model_dump(mode="json")
             st.session_state[PROPOSAL_SESSION_KEY] = proposal_dict
-            # New proposal invalidates prior critique cache.
+            # Drafts stay in session until explicitly submitted to H1.
+            # Never pretend they were saved by mutating last_run.
+            st.session_state["research_pending_explicit_attach_id"] = proposal_dict["proposal_id"]
             st.session_state.pop(CRITIQUE_SESSION_KEY, None)
             st.session_state.pop("research_live_team_review", None)
             critique_dict = None
-            if st.session_state.get("last_run") is not None:
-                updated = dict(st.session_state["last_run"])
-                updated["research_proposal"] = proposal_dict
-                approval = dict(updated.get("approval_status") or {})
-                approval["h1"] = "pending"
-                updated["approval_status"] = approval
-                st.session_state["last_run"] = updated
             st.success(
                 t(
                     "h1.proposal_ready",
@@ -377,57 +386,45 @@ def render_research_h1_panel(
                 if critique.llm_attempted and critique.llm_note:
                     st.info(critique.llm_note)
 
-    # Optional *real* two-call LLM review, never conflated with deterministic agents.
+    # Optional real structured collaboration. No model calls without explicit
+    # checkbox + button click; the typed result becomes the SAME draft used by H1.
     if team_run and live_review and proposal_dict and critique_dict:
         if not measured:
-            st.warning(
-                "未检测到可核对的真实 EDA 统计，已跳过付费 LLM 调用。"
-                if zh else "No observed EDA statistics: paid model calls skipped."
-            )
+            st.warning("需要先保存真实 EDA 证据才能调用模型。" if zh
+                       else "Recorded EDA evidence is required before model calls.")
         elif not isinstance(problem_specification, dict):
             st.warning("No structured problem specification; live review skipped.")
         else:
             try:
-                result = run_live_research_team(
-                    specification=problem_specification,
-                    proposal=proposal_dict,
-                    eda_report=eda_report,
-                    settings=settings,
+                revised, independent, audit = run_structured_research_team(
+                    specification=problem_specification, proposal=proposal_dict,
+                    eda_report=eda_report, settings=settings,
                     language="zh" if zh else "en",
                 )
-                result["proposal_id"] = proposal_dict.get("proposal_id")
-                result["eda_fingerprint"] = (insight or {}).get("bundle_fingerprint")
-                st.session_state["research_live_team_review"] = result
-                st.success(
-                    "真实 LLM Strategist 和 Critic 已分别完成调用；输出不自动成为实验结论。"
-                    if zh else "Live LLM Strategist and Critic calls completed; advice remains provisional."
-                )
+                proposal_dict = revised.model_dump(mode="json")
+                critique_dict = independent.model_dump(mode="json")
+                st.session_state[PROPOSAL_SESSION_KEY] = proposal_dict
+                st.session_state[CRITIQUE_SESSION_KEY] = critique_dict
+                st.session_state["research_pending_explicit_attach_id"] = revised.proposal_id
+                st.session_state["research_live_team_review"] = audit
+                st.success("已形成结构化新版方案与独立审查；请提交 H1 审核。"
+                           if zh else
+                           "Structured revision and independent critique are ready; submit for H1 review.")
             except Exception as exc:
-                st.error(
-                    ("真实 LLM 协作调用失败；离线研究方案仍可审阅。"
-                     if zh else "Live LLM review failed; offline proposal remains usable.")
-                    + f" {type(exc).__name__}: {exc}"
-                )
+                st.error(("真实模型修改未通过校验，保留离线方案：" if zh
+                          else "Model patch rejected; offline plan was preserved: ")
+                         + f"{type(exc).__name__}: {exc}")
 
     live_result = st.session_state.get("research_live_team_review")
-    if (isinstance(live_result, dict) and isinstance(proposal_dict, dict)
-            and live_result.get("proposal_id") == proposal_dict.get("proposal_id")
-            and live_result.get("eda_fingerprint") ==
-                ((insight or {}).get("bundle_fingerprint"))):
-        with st.expander(
-            "真实 LLM 两角色审议（建议，不是事实验证）"
-            if zh else "Live two-role LLM review (advisory, not validated facts)",
-            expanded=True,
-        ):
-            st.caption(f"{live_result.get('provider')} / {live_result.get('model')}")
-            st.markdown("**Strategist**")
-            st.write(live_result.get("strategist"))
-            st.markdown("**Independent Critic**")
-            st.write(live_result.get("critic"))
-            st.warning(
-                "LLM 内容可能含未经核实的推断；需要和 EDA、基线实验及题目逐项核对。"
-                if zh else "LLM output is unverified advice; check against EDA, baselines and problem facts."
-            )
+    if (isinstance(live_result, dict)
+            and live_result.get("new_proposal_id") == (proposal_dict or {}).get("proposal_id")):
+        with st.expander("结构化 Agent 修改记录 / Structured Agent revision", expanded=False):
+            st.write("**修改了什么 / Changes**")
+            st.write(live_result.get("changes_made"))
+            st.write("**Critic 结论 / Reviewer**")
+            st.write(live_result.get("critic_verdict"))
+            st.caption("该方案仍是草稿；提交后才能人工审批，不会自动产生交易结果。"
+                       if zh else "Draft only: H1 submission and human approval are separate.")
 
     # Show the exact human feedback, old/new plan and real independent review.
     decision_for_history = (
@@ -537,7 +534,7 @@ def render_research_h1_panel(
                         st.markdown(t("h1.weaknesses", text="; ".join(cand["weaknesses"])))
 
         attach = st.button(
-            t("h1.attach_proposal"),
+            "确认当前研究方案并提交 H1 审核" if zh else t("h1.attach_proposal"),
             key="persist_research_proposal",
             help=t("h1.attach_proposal_help"),
         )
@@ -548,6 +545,11 @@ def render_research_h1_panel(
                 st.error(t("h1.init_before_attach"))
             elif not form_sig:
                 st.error(t("common.sig_missing"))
+            elif (proposal_dict.get("research_decision") and
+                  (not isinstance(critique_dict, dict) or
+                   critique_dict.get("proposal_id") != proposal_dict.get("proposal_id"))):
+                st.error("需要先让独立 Critic 审查这份确切版本的研究方案。"
+                         if zh else "Independent Critic must review this exact plan before H1 submission.")
             else:
                 try:
                     store = get_or_create_store(lambda: build_project_store(settings))
@@ -568,6 +570,7 @@ def render_research_h1_panel(
                     )
                     st.session_state["last_run"] = saved
                     st.session_state[PROPOSAL_SESSION_KEY] = saved.get("research_proposal")
+                    st.session_state.pop("research_pending_explicit_attach_id", None)
                     st.success(t("h1.proposal_attached"))
                 except Exception as exc:
                     st.error(t("h1.persist_proposal_failed", err=f"{type(exc).__name__}: {exc}"))
@@ -686,10 +689,14 @@ def render_research_h1_panel(
         st.info(t("h1.need_proposal"))
         return proposal_dict
 
+    decision = proposal_dict.get("research_decision") or {}
+    shortlist_ids = ([decision.get("primary_candidate_id"),
+                      *(decision.get("alternate_candidate_ids") or [])]
+                     if decision else None)
     candidates = [
-        c
-        for c in (proposal_dict.get("candidates") or [])
+        c for c in (proposal_dict.get("candidates") or [])
         if isinstance(c, dict) and c.get("candidate_id")
+        and (shortlist_ids is None or c.get("candidate_id") in shortlist_ids)
     ]
     candidate_ids = [str(c["candidate_id"]) for c in candidates]
     labels_by_id = {
@@ -711,6 +718,15 @@ def render_research_h1_panel(
             "H1",
             approved_title or labels_by_id.get(str(recommended), t("viewer.research_plan")),
         )
+        preflight = research_execution_preflight(
+            gate_state if isinstance(gate_state, dict) else None,
+            selected_candidate_id=h1_status == "approved" and
+                ((gate_state or {}).get("decision_report") or {}).get("h1", {}).get("selected_candidate_id"),
+        )
+        if not preflight["allowed"]:
+            st.warning("H1 已批准研究方向，但模型尚未实现或验证，建模执行被阻止："
+                       if zh else "H1 approved research, but the model is not executable: "
+                       + str(preflight["reason"]))
         render_h1_approval_card(
             candidate=approved_cand
             or next((c for c in candidates if c.get("candidate_id") == recommended), None),
@@ -820,6 +836,12 @@ def render_research_h1_panel(
         elif approve_clicked and review_status == "revision_requested":
             st.error("上一轮退回尚未重新生成，不能批准旧方案。" if zh
                      else "Regenerate the rejected proposal before approving.")
+        elif (proposal_dict.get("research_decision") and
+              (not (recorded.get("research_proposal") or {}).get("proposal_id")
+               or (recorded.get("research_proposal") or {}).get("proposal_id") != proposal_dict.get("proposal_id")
+               or proposal_sha256(recorded["research_proposal"]) != proposal_sha256(proposal_dict))):
+            st.error("请先保存当前研究方案及独立 Critic，再进行 H1 审批。" if zh
+                     else "Submit this exact proposal and Critic before making an H1 decision.")
         else:
             status = "approved" if approve_clicked else "revision_requested"
             try:

@@ -95,6 +95,8 @@ def disagreement_log_from_critique(
             "candidate_id": finding.candidate_id,
             "statement": finding.statement,
             "suggested_action": finding.suggested_action,
+            "target_field": finding.target_field,
+            "review_priority": finding.review_priority,
             "invented_source": False,
         }
         assert_safe_for_persistence(entry, "disagreement_log")
@@ -127,6 +129,8 @@ def persist_research_proposal_into_state(
 ) -> dict[str, Any]:
     """Attach sanitized research_proposal (+ optional critique) into project state."""
     compact = compact_research_proposal(proposal)
+    if critique is not None and as_debate_critique(critique).proposal_id != compact["proposal_id"]:
+        raise ValueError("Independent Critic must review this exact ResearchProposal version")
     updated = dict(state)
     updated["research_proposal"] = compact
     # Replacing a proposal invalidates earlier modeling, validation and paper
@@ -226,6 +230,9 @@ def persist_critique_into_state(
     """Attach critique / disagreement_log without changing H1 human decision."""
     critique_compact = compact_debate_critique(critique)
     updated = dict(state)
+    recorded_proposal = updated.get("research_proposal") or {}
+    if critique_compact["proposal_id"] != recorded_proposal.get("proposal_id"):
+        raise ValueError("Cannot attach critique to a different research proposal version")
     decision_report = dict(updated.get("decision_report") or {})
     decision_report["report_version"] = DECISION_REPORT_VERSION
     decision_report["critique"] = critique_compact
@@ -305,6 +312,28 @@ def persist_h1_decision_into_state(
     h1 = decision if isinstance(decision, H1Decision) else H1Decision.model_validate(decision)
     if h1.auto_approved:
         raise ValueError("H1 auto-approval is forbidden.")
+    stored = state.get("research_proposal") or {}
+    if stored and as_research_proposal(stored).research_decision is not None:
+        # Sprint A V2: approval applies ONLY to the recorded, latest proposal.
+        # Old cached drafts and old Critic versions are never approvable.
+        official = as_research_proposal(stored)
+        actual_hash = proposal_sha256(official)
+        if h1.proposal_id != official.proposal_id or h1.proposal_sha256 != actual_hash:
+            raise ValueError("H1 decision points to a stale/unsaved research proposal")
+        if h1.status == "approved":
+            ids = {c.candidate_id for c in official.candidates}
+            if h1.selected_candidate_id not in ids:
+                raise ValueError("Selected H1 model is not part of the approved proposal")
+            critique = ((state.get("decision_report") or {}).get("critique") or {})
+            if critique.get("proposal_id") != official.proposal_id:
+                raise ValueError("H1 requires independent Critic review of the current proposal")
+            if not h1.critique_id or h1.critique_id != critique.get("critique_id"):
+                raise ValueError("H1 selected an outdated Critic report")
+            unresolved = [x for x in critique.get("findings", [])
+                          if x.get("severity") == "blocking" and
+                          x.get("candidate_id") in (None, h1.selected_candidate_id)]
+            if unresolved:
+                raise ValueError("H1 has unresolved blocking Critic findings")
     compact = compact_h1_decision(h1)
     updated = dict(state)
     approval_status = dict(updated.get("approval_status") or {})

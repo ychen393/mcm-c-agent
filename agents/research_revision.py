@@ -11,6 +11,8 @@ import json
 import re
 from typing import Any
 
+from agents.research_evidence import build_research_evidence_packet
+from schemas.research_plan_v2 import ExecutableResearchPlan
 from core.config import Settings
 from llm.base import BaseLLM
 from llm.factory import LLMFactory
@@ -78,8 +80,19 @@ def revise_with_feedback(
         raise ValueError("Please describe the requested change in 12–2400 characters")
     if not prev.candidates:
         raise ValueError("There is no candidate proposal to revise")
-    provider = llm or LLMFactory.create(settings)
     context = _brief_for_model(prev, problem_specification, eda_report)
+    if prev.research_decision is not None:
+        evidence = build_research_evidence_packet(eda_report)
+        if evidence["packet_sha256"] != prev.research_decision.evidence_packet_sha256:
+            raise ValueError("Changed evidence must be re-analyzed before H1 revision")
+        context["research_decision"] = prev.research_decision.model_dump(mode="json")
+        context["evidence"] = evidence
+        context["primary_execution_plan"] = next(
+            c.execution_plan.model_dump(mode="json") for c in prev.candidates
+            if c.candidate_id == prev.research_decision.primary_candidate_id
+            and c.execution_plan is not None
+        )
+    provider = llm or LLMFactory.create(settings)
     context["reviewer_feedback"] = feedback
     lang = "Chinese" if language == "zh" else "English"
     response = provider.invoke([
@@ -93,6 +106,10 @@ def revise_with_feedback(
             "max 2600 chars), changes_made (a short explanation of HOW the human "
             "feedback was incorporated, max 900 chars), next_tests (array of up "
             "to 4 test instructions), and remaining_risks (array of up to 4 items). "
+            "For V2 plans ALSO return revised_execution_plan with every required "
+            "field. Update the actual signal, timing, fees and validation rules "
+            "from feedback, but never change implementation_status or "
+            "executable_strategy_id. "
             "Do not invent dataset numbers, paper citations, completed tests, "
             "implementation status or a new candidate ID. "
             f"All user-visible text must be {lang}. "
@@ -105,6 +122,21 @@ def revise_with_feedback(
     matched = next((c for c in prev.candidates if c.candidate_id == cid), None)
     if matched is None:
         raise ValueError("Reviser returned an unknown candidate; saved plan is unchanged")
+    new_exec_plan = None
+    if prev.research_decision is not None:
+        if cid != prev.research_decision.primary_candidate_id:
+            raise ValueError("V2 feedback must revise the primary research candidate")
+        if not isinstance(patch.get("revised_execution_plan"), dict) or matched.execution_plan is None:
+            raise ValueError("V2 human feedback must update actual structured execution fields")
+        new_exec_plan = ExecutableResearchPlan.model_validate(patch["revised_execution_plan"])
+        if (new_exec_plan.implementation_status != matched.execution_plan.implementation_status
+                or new_exec_plan.executable_strategy_id != matched.execution_plan.executable_strategy_id):
+            raise ValueError("LLM cannot claim implementation or change strategy mapping")
+        if new_exec_plan == matched.execution_plan:
+            raise ValueError("Feedback did not change the structured execution plan")
+        if any(ref not in matched.execution_plan.evidence_refs
+               for ref in new_exec_plan.evidence_refs):
+            raise ValueError("Revised plan cited a non-existent evidence source")
     summary = str(patch.get("revised_summary") or "").strip()
     explanation = str(patch.get("changes_made") or "").strip()
     if len(summary) < 60 or len(summary) > 2600:
@@ -134,6 +166,9 @@ def revise_with_feedback(
             "feedback":feedback,
             "original_summary":matched.summary[:650],
             "proposed_revision":patch,
+            "actual_updated_execution_plan":(
+                new_exec_plan.model_dump(mode="json") if new_exec_plan else None
+            ),
             "observed_eda":context["observed_eda"],
             "constraints":context["constraints"],
         },ensure_ascii=False)},
@@ -148,6 +183,8 @@ def revise_with_feedback(
         data["status"] = "recommended" if candidate.candidate_id == cid else "proposed"
         if candidate.candidate_id == cid:
             data["summary"] = summary
+            if new_exec_plan is not None:
+                data["execution_plan"] = new_exec_plan.model_dump(mode="json")
             data["weaknesses"] = (data["weaknesses"] + risks)[:12]
             data["strengths"] = (
                 data["strengths"] +
@@ -180,8 +217,16 @@ def revise_with_feedback(
         "new_proposal_id":new_proposal.proposal_id,
         "changed_candidate_id":cid,
         "feedback":feedback,
-        "before":matched.summary[:1400],
-        "after":summary,
+        "before":(
+            matched.summary[:800] + ("\nEXECUTION:\n" + json.dumps(
+                matched.execution_plan.model_dump(mode="json"), ensure_ascii=False
+            )[:1900] if new_exec_plan else "")
+        )[:3000],
+        "after":(
+            summary[:800] + ("\nEXECUTION:\n" + json.dumps(
+                new_exec_plan.model_dump(mode="json"), ensure_ascii=False
+            )[:1900] if new_exec_plan else "")
+        )[:3000],
         "changes_made":explanation,
         "critic_feedback":criticism,
         "next_tests":"\n".join(tests),

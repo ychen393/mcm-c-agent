@@ -12,6 +12,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from schemas.research_plan_v2 import ExecutableResearchPlan, ResearchDecisionV2
+
 ProvenanceKind = Literal[
     "problem_specification",
     "eda_plan",
@@ -112,6 +114,8 @@ class CandidateMethod(BaseModel):
     title: str = Field(min_length=3, max_length=200)
     summary: str = Field(min_length=3, max_length=4000)
     method_family: str = Field(min_length=2, max_length=120)
+    research_role: Literal["strategy", "baseline", "prerequisite", "validation"] = "strategy"
+    execution_plan: ExecutableResearchPlan | None = None
     hypotheses: list[HypothesisItem] = Field(default_factory=list, max_length=16)
     data_needs: list[DataNeed] = Field(default_factory=list, max_length=24)
     validation_plan: list[ValidationPlanItem] = Field(default_factory=list, max_length=16)
@@ -145,6 +149,7 @@ class ResearchProposal(BaseModel):
     llm_note: str | None = Field(default=None, max_length=1000)
     candidates: list[CandidateMethod] = Field(default_factory=list, max_length=12)
     recommended_candidate_id: str | None = Field(default=None, max_length=64)
+    research_decision: ResearchDecisionV2 | None = None
     consensus_notes: list[str] = Field(default_factory=list, max_length=24)
     open_questions: list[str] = Field(default_factory=list, max_length=24)
     problem_specification_present: bool = False
@@ -167,6 +172,19 @@ class ResearchProposal(BaseModel):
                     f"recommended_candidate_id '{self.recommended_candidate_id}' "
                     "is not among candidates"
                 )
+        if self.research_decision is not None:
+            decision = self.research_decision
+            ids = {c.candidate_id for c in self.candidates}
+            if decision.primary_candidate_id not in ids:
+                raise ValueError("ResearchDecision primary ID must exist in proposal")
+            if any(cid not in ids for cid in decision.alternate_candidate_ids):
+                raise ValueError("ResearchDecision alternate IDs must exist in proposal")
+            if decision.primary_candidate_id != self.recommended_candidate_id:
+                raise ValueError("ResearchDecision primary ID must match recommended candidate")
+            for cid in [decision.primary_candidate_id, *decision.alternate_candidate_ids]:
+                candidate = next(c for c in self.candidates if c.candidate_id == cid)
+                if candidate.research_role != "strategy" or candidate.execution_plan is None:
+                    raise ValueError("Shortlisted candidates must have a structured strategy plan")
         return self
 
 
@@ -182,6 +200,8 @@ class CritiqueFinding(BaseModel):
     statement: str = Field(min_length=3, max_length=2000)
     evidence_refs: list[ProvenanceRef] = Field(default_factory=list, max_length=12)
     suggested_action: str | None = Field(default=None, max_length=800)
+    target_field: str | None = Field(default=None, max_length=80)
+    review_priority: Literal["blocking", "important", "future_work"] | None = None
     invented_source: bool = False
 
     @model_validator(mode="after")
