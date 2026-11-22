@@ -308,7 +308,7 @@ def test_v2_human_feedback_revises_execution_plan_over_two_rounds():
         current = newer
     assert len({r["new_proposal_id"] for r in records}) == 2
     rejected = FakeHumanReviser(reject_status=True)
-    with pytest.raises(ValueError, match="cannot change"):
+    with pytest.raises(ValueError, match="cannot claim implementation"):
         revise_with_feedback(
             proposal=current, feedback="Please simulate the unimplemented model as if done.",
             problem_specification={"title": "2022 MCM C"}, eda_report=_evidence(),
