@@ -88,8 +88,15 @@ def render_research_decision(
     zh = get_locale() == "zh"
     if not isinstance(proposal, dict):
         return
-    candidates = [x for x in proposal.get("candidates",[]) if isinstance(x,dict)]
-    rec_id = proposal.get("recommended_candidate_id")
+    decision = proposal.get("research_decision") or {}
+    ids = ([decision.get("primary_candidate_id"),
+            *(decision.get("alternate_candidate_ids") or [])]
+           if decision else None)
+    candidates = [
+        x for x in proposal.get("candidates", []) if isinstance(x, dict)
+        and (ids is None or x.get("candidate_id") in ids)
+    ]
+    rec_id = decision.get("primary_candidate_id") or proposal.get("recommended_candidate_id")
     recommended = next((c for c in candidates if c.get("candidate_id")==rec_id),None)
     st.markdown("### 先告诉你结论：目前建议研究哪条路线？"
                 if zh else "### The decision: what should we test next?")
@@ -103,6 +110,37 @@ def render_research_decision(
             (("如何判断它真有用","How to validate"),"test"),
         ):
             st.write(f"**{label[0] if zh else label[1]}：** {d[key]}")
+    if recommended and isinstance(recommended.get("execution_plan"), dict):
+        plan = recommended["execution_plan"]
+        st.markdown("#### 主模型具体要如何实现？" if zh else
+                    "#### The main model's concrete research specification")
+        for cn,en,key in [
+            ("使用数据","Input features","input_features"),
+            ("交易信号","Signal definition","signal_definition"),
+            ("决策与成交时点","Decision/transaction timing","decision_timing"),
+            ("买卖规则","Execution rules","execution_rule"),
+            ("手续费","Fees","transaction_costs"),
+            ("参数选择","Parameters","parameters"),
+            ("风险控制","Risk controls","risk_controls"),
+            ("验证方法","Validation","validation_design"),
+        ]:
+            value = plan.get(key)
+            st.write(f"**{cn if zh else en}：** " +
+                     ("；".join(map(str,value)) if isinstance(value,list) else str(value or "—")))
+        if plan.get("implementation_status") != "implemented":
+            st.warning(
+                "当前是完整研究规格，不代表交易代码已经实现。必须在 Sprint B "
+                "落实成交时序和模型映射后才能按此方案运行。"
+                if zh else
+                "This is a research specification, not runnable code. Sprint B must implement "
+                "and verify trading timing and exact strategy mapping."
+            )
+    if decision:
+        st.caption(
+            "研究前置条件：" + "；".join(decision.get("prerequisite_tasks") or [])
+            if zh else "Research prerequisites: " +
+            "; ".join(decision.get("prerequisite_tasks") or [])
+        )
     st.warning(
         "这是“下一步优先测试什么”，不是宣称已经找到收益最高的交易模型。"
         "只有跑通真实数据、和基线公平比较并检验后，才能讨论效果。"
