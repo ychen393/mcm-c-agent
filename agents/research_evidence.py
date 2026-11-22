@@ -59,7 +59,9 @@ def build_research_evidence_packet(eda_report: dict[str, Any] | None) -> dict[st
                      if expected in str(d.get("name") or "").lower()
                      or ("gold" in str(d.get("name") or "").lower() if token == "gold_sha256"
                          else any(x in str(d.get("name") or "").lower() for x in ("bitcoin", "bchain", "btc")))]
-            if len(match) == 1 and match[0].get("sha256") != joint_source.get(token):
+            if len(match) != 1 or not match[0].get("sha256"):
+                raise ValueError(f"Joint EDA {token} has no unique original upload source")
+            if match[0]["sha256"] != joint_source.get(token):
                 raise ValueError(f"Joint EDA {token} does not match the original upload")
         joint = {k: _safe_value(joint_source.get(k)) for k in _JOINT_FIELDS}
     result = {
